@@ -1,0 +1,13 @@
+{
+  "name": "moca-game-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "HOST=127.0.0.1 PORT=5177 node server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

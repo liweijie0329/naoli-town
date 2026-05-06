@@ -1,0 +1,67 @@
+# MoCA 游戏化筛查小程序原型
+
+这是一个面向智能平板横屏使用的 MoCA 游戏化测评 Web 原型，按附件中文 MoCA 量表题目与评分规则映射。
+
+## 运行
+
+```bash
+npm start
+```
+
+打开 `http://localhost:5177`。
+
+## 联网部署
+
+项目已经适配公网 Web 部署：
+
+- `Dockerfile`: 云端容器部署
+- `render.yaml`: Render 自动部署和持久化磁盘配置
+- `/api/health`: 健康检查接口
+- `DATA_DIR`: 云端数据目录环境变量
+
+详细步骤见 [docs/deploy-online.md](./docs/deploy-online.md)。
+
+## 主要能力
+
+- 15 张任务卡覆盖附件 MoCA 的 30 分项目与 2 次不计分记忆学习。
+- 交替连线、复制立方体、画钟表使用画布，并上传画布图片到 AI 评分接口。
+- 选择题为主，句子复述、动物流畅性、延迟回忆、定向和画图题提交后由 AI 直接评分。
+- 自动记录总分、教育水平加分、每题得分、每题用时、总用时、连线序列、敲击反应、画图图片、AI 评分结果。
+- 后台数据库为本地 JSON 文件：`data/sessions.json`。
+
+## AI 评分接入
+
+默认 `POST /api/ai-score` 是本地演示评分服务，会直接返回分数、置信度和说明。
+
+生产环境可设置：
+
+```bash
+AI_SCORE_ENDPOINT=https://your-ai-score-service.example/api/score npm start
+```
+
+外部服务应接收：
+
+```json
+{
+  "taskId": "clock",
+  "image": "data:image/png;base64,...",
+  "rubric": "评分标准文本",
+  "clientAutoScore": null
+}
+```
+
+建议返回：
+
+```json
+{
+  "scoreSuggestion": 2,
+  "confidence": 0.82,
+  "requiresHumanReview": true,
+  "rubricMatched": true,
+  "comment": "数字完整，指针方向不准确。"
+}
+```
+
+## 研究注意
+
+游戏化和选择题化会改变 MoCA 的原始作答负荷与猜测概率，不能直接等同纸笔版常模。正式基层大规模筛查前，建议完成授权、伦理审查、设备一致性测试、操作人员培训、AI 评分一致性验证，以及与标准 MoCA 的并测等值研究。
