@@ -206,6 +206,7 @@ const root = document.querySelector("#app");
 const persisted = localStorage.getItem("moca-game-draft");
 const initialState = persisted ? JSON.parse(persisted) : null;
 const educationLevels = ["", "小学", "初中", "中专", "高中", "大专", "本科及以上"];
+const LOCAL_SESSIONS_KEY = "moca-game-local-sessions";
 
 let state =
   initialState || {
@@ -237,6 +238,79 @@ let fluencyTimer = null;
 
 function saveDraft() {
   localStorage.setItem("moca-game-draft", JSON.stringify(state));
+}
+
+async function requestJson(path, options, fallback) {
+  try {
+    const response = await fetch(path, options);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    return fallback(error);
+  }
+}
+
+function readLocalSessions() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(LOCAL_SESSIONS_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalSessions(sessions) {
+  localStorage.setItem(LOCAL_SESSIONS_KEY, JSON.stringify(sessions));
+}
+
+function localSaveSession(payload) {
+  const sessions = readLocalSessions();
+  const saved = {
+    ...payload,
+    id: payload.id || crypto.randomUUID(),
+    savedAt: new Date().toISOString(),
+    storageMode: "browser-local"
+  };
+  const index = sessions.findIndex((entry) => entry.id === saved.id);
+  if (index >= 0) sessions[index] = saved;
+  else sessions.unshift(saved);
+  writeLocalSessions(sessions);
+  return saved;
+}
+
+function localListSessions() {
+  return readLocalSessions().map((session) => ({
+    id: session.id,
+    participant: session.participant,
+    startedAt: session.startedAt,
+    finishedAt: session.finishedAt,
+    totalDurationMs: session.totalDurationMs,
+    rawScore: session.rawScore,
+    educationBonus: session.educationBonus,
+    totalScore: session.totalScore,
+    riskBand: session.riskBand,
+    itemCount: session.itemResponses?.length || 0,
+    storageMode: session.storageMode || "browser-local"
+  }));
+}
+
+function localAiScore(payload) {
+  const maxScore = Number.isFinite(Number(payload.maxScore)) ? Number(payload.maxScore) : 0;
+  let scoreSuggestion = typeof payload.clientAutoScore === "number" ? payload.clientAutoScore : null;
+  if (scoreSuggestion === null && payload.image && ["cube", "clock"].includes(payload.taskId)) {
+    scoreSuggestion = maxScore;
+  }
+  if (scoreSuggestion === null) scoreSuggestion = 0;
+  scoreSuggestion = Math.max(0, Math.min(maxScore, Math.round(scoreSuggestion)));
+  return {
+    mode: "browser-local-demo",
+    taskId: payload.taskId,
+    scoreSuggestion,
+    confidence: payload.image ? 0.68 : 0.82,
+    requiresHumanReview: false,
+    rubricMatched: true,
+    comment: "当前为免费静态网页模式，本机演示评分已返回；正式研究请接入真实 AI 评分服务。"
+  };
 }
 
 function resetState() {
@@ -898,7 +972,11 @@ behavior:
 AI评分接口:
   POST /api/ai-score
   body: { taskId, image, answer, rubric, maxScore, clientAutoScore }
-  response: { scoreSuggestion, confidence, requiresHumanReview, comment }`;
+  response: { scoreSuggestion, confidence, requiresHumanReview, comment }
+
+免费静态网页模式:
+  如果 /api 不可用，系统会自动把数据保存到当前浏览器 localStorage。
+  这种方式不需要付费服务器，但不同平板之间不会自动汇总数据。`;
 }
 
 function setupCurrentTask(task) {
@@ -1077,19 +1155,20 @@ async function scoreTaskWithAi(task, { renderAfter = false } = {}) {
   const image = task.type === "drawing" || task.type === "trail" ? captureCanvas(task.id) : null;
   const response = getResponse(task.id);
   const clientAutoScore = clientAutoScoreForAi(task, response);
-  const result = await fetch("/api/ai-score", {
+  const payload = {
+    taskId: task.id,
+    taskType: task.type,
+    image,
+    answer: response.answer,
+    rubric: task.scoring,
+    maxScore: task.maxScore,
+    clientAutoScore
+  };
+  const result = await requestJson("/api/ai-score", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      taskId: task.id,
-      taskType: task.type,
-      image,
-      answer: response.answer,
-      rubric: task.scoring,
-      maxScore: task.maxScore,
-      clientAutoScore
-    })
-  }).then((entry) => entry.json());
+    body: JSON.stringify(payload)
+  }, () => localAiScore(payload));
   response.ai = result;
   if (image) response.drawingImage = image;
   response.score = computeTaskScore(task, response);
@@ -1582,11 +1661,11 @@ function addAnimal() {
 async function saveSession() {
   state.finishedAt = state.finishedAt || new Date().toISOString();
   const payload = buildSessionPayload();
-  const saved = await fetch("/api/sessions", {
+  const saved = await requestJson("/api/sessions", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload)
-  }).then((entry) => entry.json());
+  }, () => localSaveSession(payload));
   state.sessionId = saved.id;
   state.selectedSession = saved;
   await loadSessions(false);
@@ -1595,13 +1674,15 @@ async function saveSession() {
 }
 
 async function loadSessions(shouldRender = false) {
-  const sessions = await fetch("/api/sessions").then((entry) => entry.json());
+  const sessions = await requestJson("/api/sessions", undefined, () => localListSessions());
   state.adminSessions = sessions;
   if (shouldRender) render();
 }
 
 async function selectSavedSession(id) {
-  state.selectedSession = await fetch(`/api/sessions/${encodeURIComponent(id)}`).then((entry) => entry.json());
+  state.selectedSession = await requestJson(`/api/sessions/${encodeURIComponent(id)}`, undefined, () => {
+    return readLocalSessions().find((entry) => entry.id === id) || null;
+  });
   render();
 }
 

@@ -1,0 +1,257 @@
+<view wx:if="{{view == 'setup'}}" class="setup-screen">
+  <view class="setup-panel">
+    <view class="brand-row">
+      <view class="mascot"><view></view></view>
+      <view>
+        <text class="eyebrow">基层老年认知筛查</text>
+        <text class="page-title">参加者登录</text>
+      </view>
+    </view>
+    <view class="setup-grid">
+      <view class="field">
+        <text>参加者姓名</text>
+        <input data-key="name" value="{{participant.name}}" bindinput="onParticipantInput" />
+      </view>
+      <view class="field">
+        <text>年龄</text>
+        <input type="number" data-key="age" value="{{participant.age}}" bindinput="onParticipantInput" />
+      </view>
+      <view class="field">
+        <text>性别</text>
+        <picker range="{{sexOptions}}" value="{{sexIndex}}" bindchange="onSexChange">
+          <view class="picker-box">{{participant.sex || '请选择'}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <text>教育水平</text>
+        <picker range="{{educationOptions}}" value="{{educationIndex}}" bindchange="onEducationChange">
+          <view class="picker-box">{{participant.educationLevel || '请选择'}}</view>
+        </picker>
+      </view>
+    </view>
+    <view class="setup-actions">
+      <button class="primary" bindtap="startSession">开始测评</button>
+      <button class="ghost" bindtap="openDesign">查看技术细节</button>
+    </view>
+    <text class="fineprint">原型按附件 MoCA 中文版题目和分值映射实现；正式研究需完成授权、伦理审查、设备一致性和常模校准。</text>
+  </view>
+</view>
+
+<view wx:else class="app-shell">
+  <scroll-view class="sidebar" scroll-y>
+    <view class="mini-brand">
+      <view class="mascot small"><view></view></view>
+      <view>
+        <text class="brand-name">MoCA Quest</text>
+        <text class="brand-subtitle">{{participant.name || '未填写姓名'}}</text>
+      </view>
+    </view>
+    <view class="score-orb">
+      <text>{{view == 'test' ? '进度' : '总分'}}</text>
+      <text class="score-number">{{view == 'test' ? activeTaskIndex + 1 : totals.totalScore}}</text>
+      <text>{{view == 'test' ? '/' + tasks.length : '/30'}}</text>
+    </view>
+    <view class="task-list">
+      <button wx:for="{{taskNav}}" wx:key="id" class="task-pill {{index == activeTaskIndex && view == 'test' ? 'active' : ''}} {{item.done ? 'done' : ''}}" data-index="{{index}}" bindtap="selectTask">
+        <text class="task-index">{{index + 1}}</text>
+        <text class="task-title">{{item.title}}</text>
+        <text class="task-state">{{item.done ? '已完成' : '待完成'}}</text>
+      </button>
+    </view>
+  </scroll-view>
+
+  <view class="main-panel">
+    <view class="topbar">
+      <view>
+        <text class="eyebrow">{{current.domain}} · {{current.modality}}</text>
+        <text class="view-title">{{view == 'results' ? '测评结果' : view == 'admin' ? '后台数据库' : view == 'design' ? '游戏设计技术细节' : current.title}}</text>
+      </view>
+      <view class="top-actions">
+        <button class="{{view == 'test' ? 'selected' : 'ghost'}}" data-view="test" bindtap="navView">任务</button>
+        <button class="{{view == 'results' ? 'selected' : 'ghost'}}" data-view="results" bindtap="navView">结果</button>
+        <button class="{{view == 'admin' ? 'selected' : 'ghost'}}" data-view="admin" bindtap="navView">后台</button>
+        <button class="{{view == 'design' ? 'selected' : 'ghost'}}" data-view="design" bindtap="navView">技术细节</button>
+        <button class="ghost" bindtap="newSession">登录页</button>
+      </view>
+    </view>
+
+    <view wx:if="{{view == 'results'}}" class="results-grid">
+      <view class="result-hero">
+        <text class="eyebrow">总分</text>
+        <text class="result-score">{{totals.totalScore}}</text>
+        <text class="result-max">/30</text>
+        <text class="risk-text">{{totals.riskBand}}</text>
+      </view>
+      <view class="domain-table">
+        <view wx:for="{{domainRows}}" wx:key="domain" class="domain-row">
+          <text>{{item.domain}}</text>
+          <text class="strong">{{item.score}}/{{item.max}}</text>
+        </view>
+      </view>
+      <view class="metric-strip">
+        <view><text>原始分</text><text class="strong">{{totals.rawScore}}</text></view>
+        <view><text>教育加分</text><text class="strong">{{totals.educationBonus}}</text></view>
+        <view><text>总用时</text><text class="strong">{{totalDurationText}}</text></view>
+        <view><text>完成题数</text><text class="strong">{{totals.completed}}/{{tasks.length}}</text></view>
+      </view>
+      <view class="control-row">
+        <button class="primary" bindtap="saveSession">保存到后台数据库</button>
+        <button class="ghost" bindtap="newSession">新测评</button>
+      </view>
+    </view>
+
+    <view wx:elif="{{view == 'admin'}}" class="admin-layout">
+      <view class="admin-toolbar">
+        <button class="primary" bindtap="loadSessions">刷新数据库</button>
+        <button class="secondary" bindtap="saveSession">保存当前测评</button>
+        <button class="ghost" bindtap="copySelectedJson">复制JSON</button>
+      </view>
+      <view class="admin-table">
+        <view class="admin-head">
+          <text>参加者</text><text>总分</text><text>原始分</text><text>总用时</text><text>保存时间</text>
+        </view>
+        <button wx:for="{{adminSessions}}" wx:key="id" class="admin-row" data-id="{{item.id}}" bindtap="selectSavedSession">
+          <text>{{item.participant.name || item.id}}</text>
+          <text>{{item.totalScore}}/30</text>
+          <text>{{item.rawScore}}</text>
+          <text>{{item.totalDurationMs}}</text>
+          <text>{{item.finishedAt || '-'}}</text>
+        </button>
+        <text wx:if="{{adminSessions.length == 0}}" class="empty">暂无保存记录</text>
+      </view>
+      <scroll-view class="json-preview" scroll-y>
+        <text>{{selectedSessionText}}</text>
+      </scroll-view>
+    </view>
+
+    <scroll-view wx:elif="{{view == 'design'}}" class="design-layout" scroll-y>
+      <view class="design-note">
+        <text class="section-title">核心设计</text>
+        <text>每道题是一张任务卡，保留附件 MoCA 的指导语、题目和分值。选择题用于降低平板操作负担；画图、复述、流畅性、延迟回忆和定向题由程序直接评分。</text>
+      </view>
+      <view wx:for="{{designRows}}" wx:key="id" class="design-card">
+        <text class="domain-text">{{item.domain}}</text>
+        <text class="design-title">{{item.title}} · {{item.maxScore}}分</text>
+        <text>题型：{{item.modality}}</text>
+        <text>提示：{{item.prompt}}</text>
+        <text>评分：{{item.scoring}}</text>
+      </view>
+    </scroll-view>
+
+    <view wx:else class="task-stage">
+      <view class="progress-track"><view style="width: {{(activeTaskIndex + 1) * 100 / tasks.length}}%;"></view></view>
+      <view class="task-card">
+        <view class="task-copy">
+          <text class="domain-badge">{{current.domain}}</text>
+          <text class="task-heading">{{current.title}}</text>
+          <text class="prompt">{{current.prompt}}</text>
+        </view>
+
+        <scroll-view class="task-workspace" scroll-y>
+          <view wx:if="{{current.type == 'trail'}}">
+            <canvas canvas-id="taskCanvas" class="task-canvas" style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;" bindtouchstart="onCanvasStart"></canvas>
+            <view class="control-row">
+              <button class="ghost" bindtap="undoTrail">撤销一步</button>
+              <button class="ghost" bindtap="clearTrail">清空</button>
+            </view>
+            <view class="status-bar">序列：{{trailSequenceText}}</view>
+          </view>
+
+          <view wx:elif="{{current.type == 'drawing'}}" class="{{current.drawingKind == 'cube' ? 'drawing-layout' : 'drawing-layout no-reference'}}">
+            <view wx:if="{{current.drawingKind == 'cube'}}" class="reference-panel">
+              <canvas canvas-id="refCanvas" class="ref-canvas" style="width: 220px; height: 180px;"></canvas>
+            </view>
+            <view>
+              <canvas canvas-id="taskCanvas" class="task-canvas" style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;" bindtouchstart="onCanvasStart" bindtouchmove="onCanvasMove" bindtouchend="onCanvasEnd"></canvas>
+              <view class="control-row"><button class="ghost" bindtap="clearDrawing">清空画布</button></view>
+            </view>
+          </view>
+
+          <view wx:elif="{{current.type == 'naming'}}" class="animal-grid">
+            <view wx:for="{{animalCards}}" wx:for-item="animal" wx:key="key" class="animal-card">
+              <view class="animal-visual {{animal.key}}"><view></view></view>
+              <view class="option-grid">
+                <button wx:for="{{animal.options}}" wx:key="value" class="option {{item.picked ? 'picked' : ''}}" data-key="{{animal.key}}" data-value="{{item.value}}" bindtap="answerSubitem">{{item.value}}</button>
+              </view>
+            </view>
+          </view>
+
+          <view wx:elif="{{current.type == 'memory'}}" class="memory-panel">
+            <view class="word-ribbon">
+              <text wx:for="{{memoryChoiceList}}" wx:key="word" class="word-chip {{item.picked ? 'picked' : ''}}" data-word="{{item.word}}" bindtap="toggleMemoryWord">{{item.word}}</text>
+            </view>
+          </view>
+
+          <view wx:elif="{{current.type == 'choice'}}">
+            <view class="listening-card">
+              <text class="digit-chip">{{current.stimulus}}</text>
+            </view>
+            <view class="option-grid wide">
+              <button wx:for="{{choiceOptions}}" wx:key="value" class="option {{item.picked ? 'picked' : ''}}" data-value="{{item.value}}" bindtap="answerValue">{{item.value}}</button>
+            </view>
+          </view>
+
+          <view wx:elif="{{current.type == 'vigilance'}}" class="vigilance-board">
+            <view class="digit-stream"><text wx:for="{{vigilanceDigits}}" wx:key="*this">{{item}}</text></view>
+            <view class="control-row centered">
+              <button class="primary" bindtap="startVigilance">开始播放</button>
+              <button class="tap-button" bindtap="tapVigilance">敲一下</button>
+            </view>
+            <view class="status-bar">状态：{{vigilanceStatus}} · 已敲 {{response.answer.taps ? response.answer.taps.length : 0}} 次</view>
+          </view>
+
+          <view wx:elif="{{current.type == 'serial7'}}" class="serial-row">
+            <view wx:for="{{serialValues}}" wx:key="index" class="number-step">
+              <text>第 {{index + 1}} 次</text>
+              <input type="number" value="{{item}}" data-index="{{index}}" bindinput="onSerialInput" />
+            </view>
+          </view>
+
+          <view wx:elif="{{current.type == 'sentence'}}" class="sentence-list">
+            <view wx:for="{{sentenceRows}}" wx:key="index" class="sentence-card">
+              <text class="sentence-label">第 {{index + 1}} 句转写</text>
+              <textarea data-index="{{index}}" value="{{item.value}}" bindinput="onTranscriptInput" placeholder="语音识别转写内容" />
+            </view>
+          </view>
+
+          <view wx:elif="{{current.type == 'fluency'}}" class="fluency-panel">
+            <view class="timer-face">{{response.answer.remaining || 60}}</view>
+            <view class="control-row centered">
+              <button class="primary" bindtap="startFluency">开始60秒</button>
+              <input class="animal-input" value="{{animalInput}}" bindinput="onAnimalInput" placeholder="输入听到的动物名" />
+              <button class="secondary" bindtap="addAnimal">添加</button>
+            </view>
+            <view class="animal-tags">
+              <button wx:for="{{animalTags}}" wx:key="word" data-word="{{item.word}}" bindtap="removeAnimal">{{item.word}}</button>
+            </view>
+          </view>
+
+          <view wx:elif="{{current.type == 'multiChoice'}}" class="abstract-panel">
+            <view wx:for="{{multiChoiceItems}}" wx:for-item="pair" wx:key="key" class="abstract-card">
+              <text class="pair-title">{{pair.pair}}</text>
+              <view class="option-grid">
+                <button wx:for="{{pair.options}}" wx:key="value" class="option {{item.picked ? 'picked' : ''}}" data-key="{{pair.key}}" data-value="{{item.value}}" bindtap="answerSubitem">{{item.value}}</button>
+              </view>
+            </view>
+          </view>
+
+          <view wx:elif="{{current.type == 'recall'}}">
+            <textarea class="large-textarea" value="{{response.answer.freeText}}" bindinput="onRecallInput" placeholder="语音识别转写：请记录参加者无提示自由回忆的内容" />
+          </view>
+
+          <view wx:elif="{{current.type == 'orientation'}}" class="orientation-grid">
+            <view wx:for="{{orientationRows}}" wx:key="key" class="field">
+              <text>{{item.label}}</text>
+              <input value="{{item.value}}" data-key="{{item.key}}" bindinput="onOrientationInput" placeholder="{{item.placeholder}}" />
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+      <view class="task-footer">
+        <button class="ghost" disabled="{{activeTaskIndex == 0}}" bindtap="previousTask">上一题</button>
+          <text class="footer-score">用时 {{responseDurationText}}</text>
+        <button class="primary" bindtap="nextTask">{{activeTaskIndex == tasks.length - 1 ? '查看结果' : '下一题'}}</button>
+      </view>
+    </view>
+  </view>
+</view>

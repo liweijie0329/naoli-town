@@ -53,3 +53,5 @@ Render 开启 Auto Deploy 后会自动重新构建和上线，平板刷新页面
 - HTTPS 域名
 - 备份策略
 - 伦理审批和隐私合规说明
+
+如果 Render 要求立即绑定付费信息，先看 [免费发布方案](./free-deploy-options.md)。项目已经支持 GitHub Pages / Cloudflare Pages 纯静态免费发布，但静态模式的数据只保存在当前平板本机。

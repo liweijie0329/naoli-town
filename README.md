@@ -21,6 +21,13 @@ npm start
 
 详细步骤见 [docs/deploy-online.md](./docs/deploy-online.md)。
 
+如果云平台要求绑定付费信息，可以先走免费路线：
+
+- GitHub Pages / Cloudflare Pages：纯静态网页，任何平板可访问，数据保存在当前平板浏览器。
+- 微信小程序：见 `wechat-miniprogram/`，可导入微信开发者工具预览，默认使用本机微信缓存。
+
+详细说明见 [docs/free-deploy-options.md](./docs/free-deploy-options.md)。
+
 ## 主要能力
 
 - 15 张任务卡覆盖附件 MoCA 的 30 分项目与 2 次不计分记忆学习。
@@ -28,6 +35,7 @@ npm start
 - 选择题为主，句子复述、动物流畅性、延迟回忆、定向和画图题提交后由 AI 直接评分。
 - 自动记录总分、教育水平加分、每题得分、每题用时、总用时、连线序列、敲击反应、画图图片、AI 评分结果。
 - 后台数据库为本地 JSON 文件：`data/sessions.json`。
+- 纯静态免费网页或小程序免费模式下，后台记录会退化为当前设备本地缓存。
 
 ## AI 评分接入
 

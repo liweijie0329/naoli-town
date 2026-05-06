@@ -1,0 +1,13 @@
+{
+  "description": "基层老年认知筛查游戏化微信小程序原型",
+  "appid": "touristappid",
+  "projectname": "cognition-hearing-game",
+  "miniprogramRoot": "./",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "postcss": true,
+    "minified": false
+  },
+  "compileType": "miniprogram"
+}
