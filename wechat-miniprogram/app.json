@@ -6,8 +6,26 @@
     "navigationBarTitleText": "MoCA Quest",
     "navigationBarBackgroundColor": "#20a66b",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#f5f7fb"
+    "backgroundColor": "#f5f7fb",
+    "pageOrientation": "landscape"
   },
+  "plugins": {
+    "WechatSI": {
+      "version": "0.3.5",
+      "provider": "wx069ba97219f66d99"
+    }
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于自动记录定向题的当前位置参考答案"
+    },
+    "scope.record": {
+      "desc": "用于语音作答、复述和词语流畅性识别"
+    }
+  },
+  "requiredPrivateInfos": [
+    "getLocation"
+  ],
   "style": "v2",
   "sitemapLocation": "sitemap.json"
 }

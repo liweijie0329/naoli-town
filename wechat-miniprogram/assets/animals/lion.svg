@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 420" role="img" aria-label="cute cartoon lion">
+  <rect width="520" height="420" rx="36" fill="#FFF7DF"/>
+  <circle cx="260" cy="190" r="122" fill="#F5A623"/>
+  <circle cx="260" cy="190" r="88" fill="#FFD46B"/>
+  <circle cx="224" cy="174" r="13" fill="#243447"/>
+  <circle cx="296" cy="174" r="13" fill="#243447"/>
+  <path d="M260 198l-18 24h36z" fill="#9C5A2D"/>
+  <path d="M222 244c22 26 54 26 76 0" fill="none" stroke="#243447" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="184" cy="230" r="20" fill="#FF9D8A"/>
+  <circle cx="336" cy="230" r="20" fill="#FF9D8A"/>
+  <path d="M146 126l-38-42 58 4M374 126l38-42-58 4" fill="#F5A623"/>
+  <ellipse cx="260" cy="338" rx="112" ry="28" fill="#E7EDF3"/>
+</svg>

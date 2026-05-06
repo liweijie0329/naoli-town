@@ -41,8 +41,8 @@ const tasks = [
     title: "动物命名",
     maxScore: 3,
     type: "naming",
-    modality: "选择题",
-    prompt: "请从左到右说出或选择每个动物的名字。",
+    modality: "逐张看图选择",
+    prompt: "请看屏幕上的小动物，选择它的名字。",
     scoring: "每答对一个给 1 分。正确答案依次为：狮子、犀牛、骆驼或单峰骆驼。",
     items: [
       { key: "lion", answer: "狮子", options: ["狮子", "老虎", "豹子", "狐狸"] },
@@ -76,11 +76,11 @@ const tasks = [
     title: "数字顺背",
     maxScore: 1,
     type: "choice",
-    modality: "选择题",
-    prompt: "请听数字，读完后按原顺序复述。",
+    modality: "听觉+数字卡",
+    prompt: "请听一串数字，听完后按原顺序点击数字卡。",
     scoring: "顺背 21854 完全正确给 1 分，否则 0 分。",
     stimulus: "21854",
-    options: ["21854", "21584", "81254", "21845"],
+    options: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
     answer: "21854"
   },
   {
@@ -89,11 +89,11 @@ const tasks = [
     title: "数字倒背",
     maxScore: 1,
     type: "choice",
-    modality: "选择题",
-    prompt: "请听数字，但在我读完后，按倒着的顺序复述。",
+    modality: "听觉+数字卡",
+    prompt: "请听一串数字，听完后按倒着的顺序点击数字卡。",
     scoring: "读出 742，倒背正确答案为 247；完全正确给 1 分，否则 0 分。",
     stimulus: "742",
-    options: ["247", "742", "274", "427"],
+    options: ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
     answer: "247"
   },
   {
@@ -145,22 +145,22 @@ const tasks = [
     domain: "抽象",
     title: "词语相似性",
     maxScore: 2,
-    type: "multiChoice",
-    modality: "选择题",
-    prompt: "请说出两样东西在什么方面相类似。",
+    type: "abstractionSpeech",
+    modality: "语音识别",
+    prompt: "请听两个词，说出它们在什么方面相类似。",
     scoring: "火车-自行车回答运输工具、交通工具或旅行用的给 1 分；手表-尺子回答测量仪器或测量用的给 1 分。具体特征不给分。",
     items: [
       {
         key: "trainBike",
         pair: "火车 - 自行车",
         answer: "交通工具",
-        options: ["交通工具", "都有轮子", "都很快", "都用金属做成"]
+        accepted: ["交通", "运输", "出行", "旅行"]
       },
       {
         key: "watchRuler",
         pair: "手表 - 尺子",
         answer: "测量工具",
-        options: ["测量工具", "都有数字", "都能戴在身上", "都是文具"]
+        accepted: ["测量", "量", "工具", "仪器"]
       }
     ]
   },
@@ -181,7 +181,7 @@ const tasks = [
     maxScore: 6,
     type: "orientation",
     modality: "输入评分",
-    prompt: "请回答今天的日期，以及现在所在地点和城市。",
+    prompt: "请依次回答年份、日期、星期、城市和地点。",
     scoring: "星期、月份、年份、日期、地点、城市各 1 分。日期必须精确；地点需为医院、诊所、办公室等具体名称。"
   }
 ];
@@ -316,6 +316,15 @@ function scoreSentenceTranscript(task, response) {
   }, 0);
 }
 
+function scoreAbstractionSpeech(task, response) {
+  const transcript = response.answer.transcript || {};
+  return task.items.reduce((sum, item, index) => {
+    const text = normalizeText(transcript[index] || "");
+    const correct = (item.accepted || []).some((keyword) => text.includes(normalizeText(keyword)));
+    return sum + (correct ? 1 : 0);
+  }, 0);
+}
+
 function scoreRecallText(response) {
   const text = normalizeText(response.answer.freeText || "");
   return WORDS.reduce((sum, word) => sum + (text.includes(normalizeText(word)) ? 1 : 0), 0);
@@ -329,8 +338,12 @@ function scoreOrientationByInputs(response) {
   if (String(Number(answer.month)) === today.month) score += 1;
   if (String(Number(answer.year)) === today.year) score += 1;
   if (String(Number(answer.day)) === today.day) score += 1;
-  if (normalizeText(answer.place)) score += 1;
-  if (normalizeText(answer.city)) score += 1;
+  const expectedCity = normalizeText(answer.expectedCity || "");
+  const expectedPlace = normalizeText(answer.expectedPlace || "");
+  const city = normalizeText(answer.city);
+  const place = normalizeText(answer.place);
+  if (place && (expectedPlace ? place.includes(expectedPlace) || expectedPlace.includes(place) : true)) score += 1;
+  if (city && (expectedCity ? city.includes(expectedCity) || expectedCity.includes(city) : true)) score += 1;
   return score;
 }
 
@@ -344,6 +357,7 @@ function clientAutoScoreForTask(session, task, response) {
   if (task.type === "trail") return scoreTrail(session);
   if (task.type === "sentence") return scoreSentenceTranscript(task, response);
   if (task.type === "fluency") return uniqueWords(response.answer.animals || []).length >= 11 ? 1 : 0;
+  if (task.type === "abstractionSpeech") return scoreAbstractionSpeech(task, response);
   if (task.type === "recall") return scoreRecallText(response);
   if (task.type === "orientation") return scoreOrientationByInputs(response);
   return null;
@@ -374,16 +388,20 @@ function scoreTask(session, task, response) {
     return task.items.reduce((sum, item) => sum + (response.answer[item.key] === item.answer ? 1 : 0), 0);
   }
   if (task.type === "memory") return 0;
-  if (task.type === "choice") return response.answer.value === task.answer ? 1 : 0;
+  if (task.type === "choice") {
+    const value = response.answer.sequence ? response.answer.sequence.join("") : response.answer.value;
+    return value === task.answer ? 1 : 0;
+  }
   if (task.type === "vigilance") return scoreVigilance(response);
   if (task.type === "serial7") return scoreSerial7(response);
   if (task.type === "sentence") return aiScore || 0;
   if (task.type === "fluency") return aiScore !== null ? aiScore : uniqueWords(response.answer.animals || []).length >= 11 ? 1 : 0;
+  if (task.type === "abstractionSpeech") return aiScore !== null ? aiScore : scoreAbstractionSpeech(task, response);
   if (task.type === "multiChoice") {
     return task.items.reduce((sum, item) => sum + (response.answer[item.key] === item.answer ? 1 : 0), 0);
   }
   if (task.type === "recall") return aiScore || 0;
-  if (task.type === "orientation") return aiScore || 0;
+  if (task.type === "orientation") return aiScore !== null ? aiScore : scoreOrientationByInputs(response);
   return 0;
 }
 

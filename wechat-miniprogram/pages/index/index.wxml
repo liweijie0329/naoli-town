@@ -1,7 +1,10 @@
 <view wx:if="{{view == 'setup'}}" class="setup-screen">
+  <view class="floating-stars">
+    <view></view><view></view><view></view>
+  </view>
   <view class="setup-panel">
     <view class="brand-row">
-      <view class="mascot"><view></view></view>
+      <image class="logo-image bounce-in" src="/assets/logo.svg" mode="aspectFit" />
       <view>
         <text class="eyebrow">基层老年认知筛查</text>
         <text class="page-title">参加者登录</text>
@@ -30,54 +33,57 @@
       </view>
     </view>
     <view class="setup-actions">
-      <button class="primary" bindtap="startSession">开始测评</button>
-      <button class="ghost" bindtap="openDesign">查看技术细节</button>
+      <button class="primary big-button" bindtap="startSession">开始测评</button>
     </view>
-    <text class="fineprint">原型按附件 MoCA 中文版题目和分值映射实现；正式研究需完成授权、伦理审查、设备一致性和常模校准。</text>
+    <text class="fineprint">横屏平板使用，每次作答占满一页。后台自动记录总分、每题得分和作答行为。</text>
   </view>
 </view>
 
 <view wx:else class="app-shell">
-  <scroll-view class="sidebar" scroll-y>
-    <view class="mini-brand">
-      <view class="mascot small"><view></view></view>
-      <view>
-        <text class="brand-name">MoCA Quest</text>
-        <text class="brand-subtitle">{{participant.name || '未填写姓名'}}</text>
+  <view class="hidden-drawer {{menuOpen ? 'open' : ''}}">
+    <view class="drawer-mask" bindtap="closeMenu"></view>
+    <view class="drawer-panel">
+      <view class="drawer-brand">
+        <image class="drawer-logo" src="/assets/logo.svg" mode="aspectFit" />
+        <view>
+          <text class="brand-name">MoCA Quest</text>
+          <text class="brand-subtitle">{{participant.name || '未填写姓名'}}</text>
+        </view>
+      </view>
+      <button class="drawer-item" data-view="test" bindtap="navView">任务</button>
+      <button class="drawer-item" data-view="results" bindtap="navView">结果</button>
+      <button class="drawer-item" data-view="admin" bindtap="navView">后台</button>
+      <button class="drawer-item" data-view="design" bindtap="navView">技术细节</button>
+      <button class="drawer-item" bindtap="goHome">返回首页</button>
+      <view class="drawer-progress">
+        <text>{{progressText}}</text>
+        <view class="mini-progress"><view style="width: {{progressWidth}};"></view></view>
+      </view>
+      <view class="drawer-task-list">
+        <button wx:for="{{taskNav}}" wx:key="id" class="drawer-task {{item.done ? 'done' : ''}}" data-index="{{index}}" bindtap="selectTask">
+          <text>{{index + 1}}</text>
+          <text>{{item.title}}</text>
+        </button>
       </view>
     </view>
-    <view class="score-orb">
-      <text>{{view == 'test' ? '进度' : '总分'}}</text>
-      <text class="score-number">{{view == 'test' ? activeTaskIndex + 1 : totals.totalScore}}</text>
-      <text>{{view == 'test' ? '/' + tasks.length : '/30'}}</text>
-    </view>
-    <view class="task-list">
-      <button wx:for="{{taskNav}}" wx:key="id" class="task-pill {{index == activeTaskIndex && view == 'test' ? 'active' : ''}} {{item.done ? 'done' : ''}}" data-index="{{index}}" bindtap="selectTask">
-        <text class="task-index">{{index + 1}}</text>
-        <text class="task-title">{{item.title}}</text>
-        <text class="task-state">{{item.done ? '已完成' : '待完成'}}</text>
-      </button>
-    </view>
-  </scroll-view>
+  </view>
 
-  <view class="main-panel">
-    <view class="topbar">
-      <view>
-        <text class="eyebrow">{{current.domain}} · {{current.modality}}</text>
-        <text class="view-title">{{view == 'results' ? '测评结果' : view == 'admin' ? '后台数据库' : view == 'design' ? '游戏设计技术细节' : current.title}}</text>
+  <view class="page-shell">
+    <view class="page-header">
+      <button class="icon-button" bindtap="openMenu">≡</button>
+      <view class="header-title">
+        <text class="eyebrow">{{current.domain}}</text>
+        <text class="view-title">{{view == 'results' ? '测评结果' : view == 'admin' ? '后台数据库' : view == 'design' ? '技术细节' : current.title}}</text>
       </view>
-      <view class="top-actions">
-        <button class="{{view == 'test' ? 'selected' : 'ghost'}}" data-view="test" bindtap="navView">任务</button>
-        <button class="{{view == 'results' ? 'selected' : 'ghost'}}" data-view="results" bindtap="navView">结果</button>
-        <button class="{{view == 'admin' ? 'selected' : 'ghost'}}" data-view="admin" bindtap="navView">后台</button>
-        <button class="{{view == 'design' ? 'selected' : 'ghost'}}" data-view="design" bindtap="navView">技术细节</button>
-        <button class="ghost" bindtap="newSession">登录页</button>
+      <view class="header-progress">
+        <text>{{progressText}}</text>
+        <view class="progress-track"><view style="width: {{progressWidth}};"></view></view>
       </view>
     </view>
 
-    <view wx:if="{{view == 'results'}}" class="results-grid">
+    <view wx:if="{{view == 'results'}}" class="single-page results-page">
       <view class="result-hero">
-        <text class="eyebrow">总分</text>
+        <text class="result-label">总分</text>
         <text class="result-score">{{totals.totalScore}}</text>
         <text class="result-max">/30</text>
         <text class="risk-text">{{totals.riskBand}}</text>
@@ -88,19 +94,13 @@
           <text class="strong">{{item.score}}/{{item.max}}</text>
         </view>
       </view>
-      <view class="metric-strip">
-        <view><text>原始分</text><text class="strong">{{totals.rawScore}}</text></view>
-        <view><text>教育加分</text><text class="strong">{{totals.educationBonus}}</text></view>
-        <view><text>总用时</text><text class="strong">{{totalDurationText}}</text></view>
-        <view><text>完成题数</text><text class="strong">{{totals.completed}}/{{tasks.length}}</text></view>
-      </view>
       <view class="control-row">
         <button class="primary" bindtap="saveSession">保存到后台数据库</button>
         <button class="ghost" bindtap="newSession">新测评</button>
       </view>
     </view>
 
-    <view wx:elif="{{view == 'admin'}}" class="admin-layout">
+    <view wx:elif="{{view == 'admin'}}" class="single-page admin-page">
       <view class="admin-toolbar">
         <button class="primary" bindtap="loadSessions">刷新数据库</button>
         <button class="secondary" bindtap="saveSession">保存当前测评</button>
@@ -108,149 +108,160 @@
       </view>
       <view class="admin-table">
         <view class="admin-head">
-          <text>参加者</text><text>总分</text><text>原始分</text><text>总用时</text><text>保存时间</text>
+          <text>参加者</text><text>总分</text><text>原始分</text><text>保存时间</text>
         </view>
         <button wx:for="{{adminSessions}}" wx:key="id" class="admin-row" data-id="{{item.id}}" bindtap="selectSavedSession">
           <text>{{item.participant.name || item.id}}</text>
           <text>{{item.totalScore}}/30</text>
           <text>{{item.rawScore}}</text>
-          <text>{{item.totalDurationMs}}</text>
           <text>{{item.finishedAt || '-'}}</text>
         </button>
         <text wx:if="{{adminSessions.length == 0}}" class="empty">暂无保存记录</text>
       </view>
-      <scroll-view class="json-preview" scroll-y>
-        <text>{{selectedSessionText}}</text>
-      </scroll-view>
+      <view class="json-preview"><text>{{selectedSessionText}}</text></view>
     </view>
 
-    <scroll-view wx:elif="{{view == 'design'}}" class="design-layout" scroll-y>
+    <view wx:elif="{{view == 'design'}}" class="single-page design-page">
       <view class="design-note">
         <text class="section-title">核心设计</text>
-        <text>每道题是一张任务卡，保留附件 MoCA 的指导语、题目和分值。选择题用于降低平板操作负担；画图、复述、流畅性、延迟回忆和定向题由程序直接评分。</text>
+        <text>每道题是一张横屏任务页，选择题、语音、画图和行为记录统一写入后台。评分标准仍按附件 MoCA 映射，答题端不展示评分标准。</text>
       </view>
-      <view wx:for="{{designRows}}" wx:key="id" class="design-card">
-        <text class="domain-text">{{item.domain}}</text>
-        <text class="design-title">{{item.title}} · {{item.maxScore}}分</text>
-        <text>题型：{{item.modality}}</text>
-        <text>提示：{{item.prompt}}</text>
-        <text>评分：{{item.scoring}}</text>
+      <view class="design-grid">
+        <view wx:for="{{tasks}}" wx:key="id" class="design-card">
+          <text class="domain-text">{{item.domain}}</text>
+          <text class="design-title">{{item.title}}</text>
+          <text>{{item.modality}}</text>
+        </view>
       </view>
-    </scroll-view>
+    </view>
 
-    <view wx:else class="task-stage">
-      <view class="progress-track"><view style="width: {{(activeTaskIndex + 1) * 100 / tasks.length}}%;"></view></view>
-      <view class="task-card">
-        <view class="task-copy">
+    <view wx:else class="single-page task-page">
+      <view class="task-copy">
+        <view class="task-badge-row">
           <text class="domain-badge">{{current.domain}}</text>
-          <text class="task-heading">{{current.title}}</text>
-          <text class="prompt">{{current.prompt}}</text>
+          <text class="step-badge">{{stepText}}</text>
+        </view>
+        <text class="task-heading">{{current.title}}</text>
+        <text class="prompt">{{current.prompt}}</text>
+        <text wx:if="{{pageHint}}" class="page-hint">{{pageHint}}</text>
+        <view class="cute-helper floaty">
+          <image src="/assets/logo.svg" mode="aspectFit" />
+        </view>
+      </view>
+
+      <view class="task-workspace">
+        <view wx:if="{{current.type == 'trail'}}" class="trail-page">
+          <canvas canvas-id="taskCanvas" class="task-canvas" style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;" bindtouchstart="onCanvasStart"></canvas>
+          <view class="control-row">
+            <button class="ghost" bindtap="undoTrail">撤销一步</button>
+            <button class="ghost" bindtap="clearTrail">重画</button>
+          </view>
         </view>
 
-        <scroll-view class="task-workspace" scroll-y>
-          <view wx:if="{{current.type == 'trail'}}">
-            <canvas canvas-id="taskCanvas" class="task-canvas" style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;" bindtouchstart="onCanvasStart"></canvas>
-            <view class="control-row">
-              <button class="ghost" bindtap="undoTrail">撤销一步</button>
-              <button class="ghost" bindtap="clearTrail">清空</button>
-            </view>
-            <view class="status-bar">序列：{{trailSequenceText}}</view>
+        <view wx:elif="{{current.type == 'drawing'}}" class="drawing-page {{current.drawingKind == 'clock' ? 'clock-page' : ''}}">
+          <view wx:if="{{current.drawingKind == 'cube'}}" class="reference-panel">
+            <canvas canvas-id="refCanvas" class="ref-canvas" style="width: 240px; height: 190px;"></canvas>
           </view>
+          <view class="canvas-wrap">
+            <text wx:if="{{current.drawingKind == 'clock'}}" class="clock-label">11:10</text>
+            <canvas canvas-id="taskCanvas" class="task-canvas" style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;" bindtouchstart="onCanvasStart" bindtouchmove="onCanvasMove" bindtouchend="onCanvasEnd"></canvas>
+            <button class="ghost redraw-button" bindtap="clearDrawing">重画</button>
+          </view>
+        </view>
 
-          <view wx:elif="{{current.type == 'drawing'}}" class="{{current.drawingKind == 'cube' ? 'drawing-layout' : 'drawing-layout no-reference'}}">
-            <view wx:if="{{current.drawingKind == 'cube'}}" class="reference-panel">
-              <canvas canvas-id="refCanvas" class="ref-canvas" style="width: 220px; height: 180px;"></canvas>
-            </view>
-            <view>
-              <canvas canvas-id="taskCanvas" class="task-canvas" style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;" bindtouchstart="onCanvasStart" bindtouchmove="onCanvasMove" bindtouchend="onCanvasEnd"></canvas>
-              <view class="control-row"><button class="ghost" bindtap="clearDrawing">清空画布</button></view>
-            </view>
+        <view wx:elif="{{current.type == 'naming'}}" class="naming-page">
+          <image class="animal-photo pop-in" src="{{animalPage.asset}}" mode="aspectFit" />
+          <text class="animal-question">{{animalPage.prompt}}</text>
+          <view class="option-grid">
+            <button wx:for="{{namingOptions}}" wx:key="value" class="option {{item.picked ? 'picked' : ''}}" data-value="{{item.value}}" bindtap="chooseNaming">{{item.value}}</button>
           </view>
+        </view>
 
-          <view wx:elif="{{current.type == 'naming'}}" class="animal-grid">
-            <view wx:for="{{animalCards}}" wx:for-item="animal" wx:key="key" class="animal-card">
-              <view class="animal-visual {{animal.key}}"><view></view></view>
-              <view class="option-grid">
-                <button wx:for="{{animal.options}}" wx:key="value" class="option {{item.picked ? 'picked' : ''}}" data-key="{{animal.key}}" data-value="{{item.value}}" bindtap="answerSubitem">{{item.value}}</button>
-              </view>
-            </view>
+        <view wx:elif="{{current.type == 'memory'}}" class="memory-page">
+          <view wx:if="{{!memoryReady}}" class="wait-card">
+            <text class="wait-title">请休息一下</text>
+            <text class="wait-count">{{memoryWaitRemainingText}}</text>
+            <text>第二次词语学习将在倒计时结束后开始。</text>
           </view>
+          <view wx:else class="voice-card">
+            <view class="audio-visual">
+              <view class="headphone-icon"></view>
+              <view class="sound-wave"></view>
+            </view>
+            <button class="primary circle-button" bindtap="playCurrentAudio">播放词语</button>
+          </view>
+        </view>
 
-          <view wx:elif="{{current.type == 'memory'}}" class="memory-panel">
-            <view class="word-ribbon">
-              <text wx:for="{{memoryChoiceList}}" wx:key="word" class="word-chip {{item.picked ? 'picked' : ''}}" data-word="{{item.word}}" bindtap="toggleMemoryWord">{{item.word}}</text>
-            </view>
+        <view wx:elif="{{current.type == 'choice'}}" class="digit-page">
+          <button class="primary sound-button" bindtap="playCurrentAudio">播放声音</button>
+          <view class="digit-answer">
+            <text wx:for="{{selectedDigits}}" wx:key="index">{{item}}</text>
           </view>
+          <view class="keypad digit-keypad">
+            <button wx:for="{{digitPad}}" wx:key="*this" data-digit="{{item}}" bindtap="appendDigit">{{item}}</button>
+            <button class="key-wide" bindtap="backspaceDigit">退格</button>
+          </view>
+        </view>
 
-          <view wx:elif="{{current.type == 'choice'}}">
-            <view class="listening-card">
-              <text class="digit-chip">{{current.stimulus}}</text>
-            </view>
-            <view class="option-grid wide">
-              <button wx:for="{{choiceOptions}}" wx:key="value" class="option {{item.picked ? 'picked' : ''}}" data-value="{{item.value}}" bindtap="answerValue">{{item.value}}</button>
-            </view>
-          </view>
+        <view wx:elif="{{current.type == 'vigilance'}}" class="vigilance-page">
+          <button wx:if="{{!vigilanceStarted}}" class="primary circle-button" bindtap="playCurrentAudio">开始</button>
+          <button wx:else class="tap-button pulse" bindtap="tapVigilance">敲一下</button>
+          <text wx:if="{{vigilanceStarted}}" class="tap-count">已敲 {{vigilanceTapCount}} 次</text>
+        </view>
 
-          <view wx:elif="{{current.type == 'vigilance'}}" class="vigilance-board">
-            <view class="digit-stream"><text wx:for="{{vigilanceDigits}}" wx:key="*this">{{item}}</text></view>
-            <view class="control-row centered">
-              <button class="primary" bindtap="startVigilance">开始播放</button>
-              <button class="tap-button" bindtap="tapVigilance">敲一下</button>
-            </view>
-            <view class="status-bar">状态：{{vigilanceStatus}} · 已敲 {{response.answer.taps ? response.answer.taps.length : 0}} 次</view>
+        <view wx:elif="{{current.type == 'serial7'}}" class="serial-page">
+          <text class="math-question">{{serialQuestion}}</text>
+          <view class="serial-display">{{serialDisplay || ' '}}</view>
+          <view class="keypad">
+            <button wx:for="{{digitPad}}" wx:key="*this" data-digit="{{item}}" bindtap="inputSerialDigit">{{item}}</button>
+            <button class="key-wide" bindtap="backspaceSerial">退格</button>
           </view>
+        </view>
 
-          <view wx:elif="{{current.type == 'serial7'}}" class="serial-row">
-            <view wx:for="{{serialValues}}" wx:key="index" class="number-step">
-              <text>第 {{index + 1}} 次</text>
-              <input type="number" value="{{item}}" data-index="{{index}}" bindinput="onSerialInput" />
-            </view>
+        <view wx:elif="{{current.type == 'sentence'}}" class="speech-page">
+          <view class="audio-visual">
+            <view class="headphone-icon"></view>
+            <view class="mic-icon {{voiceState == '请说' ? 'recording' : ''}}"></view>
           </view>
+          <button class="primary sound-button" bindtap="playCurrentAudio">{{playState}}</button>
+          <button class="ghost" bindtap="toggleVoiceInput">{{voiceState == '请说' ? '停止识别' : '请说'}}</button>
+          <text class="transcript">{{sentencePage.value || '等待语音识别...'}}</text>
+        </view>
 
-          <view wx:elif="{{current.type == 'sentence'}}" class="sentence-list">
-            <view wx:for="{{sentenceRows}}" wx:key="index" class="sentence-card">
-              <text class="sentence-label">第 {{index + 1}} 句转写</text>
-              <textarea data-index="{{index}}" value="{{item.value}}" bindinput="onTranscriptInput" placeholder="语音识别转写内容" />
-            </view>
-          </view>
+        <view wx:elif="{{current.type == 'fluency'}}" class="fluency-page">
+          <button class="timer-button {{fluencyRunning ? 'running' : ''}}" bindtap="startFluency">{{fluencyRunning ? fluencyRemaining : '开始'}}</button>
+          <text class="count-label">已识别 {{fluencyCount}} 个</text>
+          <text class="transcript">{{voiceText || '点击开始后说动物名'}}</text>
+        </view>
 
-          <view wx:elif="{{current.type == 'fluency'}}" class="fluency-panel">
-            <view class="timer-face">{{response.answer.remaining || 60}}</view>
-            <view class="control-row centered">
-              <button class="primary" bindtap="startFluency">开始60秒</button>
-              <input class="animal-input" value="{{animalInput}}" bindinput="onAnimalInput" placeholder="输入听到的动物名" />
-              <button class="secondary" bindtap="addAnimal">添加</button>
-            </view>
-            <view class="animal-tags">
-              <button wx:for="{{animalTags}}" wx:key="word" data-word="{{item.word}}" bindtap="removeAnimal">{{item.word}}</button>
-            </view>
-          </view>
+        <view wx:elif="{{current.type == 'abstractionSpeech'}}" class="speech-page">
+          <text class="pair-title">{{abstractionPage.pair}}</text>
+          <button class="primary sound-button" bindtap="playCurrentAudio">播放</button>
+          <button class="ghost" bindtap="toggleVoiceInput">{{voiceState == '请说' ? '停止识别' : '请说'}}</button>
+          <text class="transcript">{{abstractionPage.value || '等待语音识别...'}}</text>
+        </view>
 
-          <view wx:elif="{{current.type == 'multiChoice'}}" class="abstract-panel">
-            <view wx:for="{{multiChoiceItems}}" wx:for-item="pair" wx:key="key" class="abstract-card">
-              <text class="pair-title">{{pair.pair}}</text>
-              <view class="option-grid">
-                <button wx:for="{{pair.options}}" wx:key="value" class="option {{item.picked ? 'picked' : ''}}" data-key="{{pair.key}}" data-value="{{item.value}}" bindtap="answerSubitem">{{item.value}}</button>
-              </view>
-            </view>
+        <view wx:elif="{{current.type == 'recall'}}" class="speech-page">
+          <view class="audio-visual">
+            <view class="mic-icon {{voiceState == '请说' ? 'recording' : ''}}"></view>
           </view>
+          <button class="primary sound-button" bindtap="playCurrentAudio">播放提示</button>
+          <button class="ghost" bindtap="toggleVoiceInput">{{voiceState == '请说' ? '停止识别' : '请说'}}</button>
+          <text class="transcript">{{recallText || '等待语音识别...'}}</text>
+        </view>
 
-          <view wx:elif="{{current.type == 'recall'}}">
-            <textarea class="large-textarea" value="{{response.answer.freeText}}" bindinput="onRecallInput" placeholder="语音识别转写：请记录参加者无提示自由回忆的内容" />
-          </view>
-
-          <view wx:elif="{{current.type == 'orientation'}}" class="orientation-grid">
-            <view wx:for="{{orientationRows}}" wx:key="key" class="field">
-              <text>{{item.label}}</text>
-              <input value="{{item.value}}" data-key="{{item.key}}" bindinput="onOrientationInput" placeholder="{{item.placeholder}}" />
-            </view>
-          </view>
-        </scroll-view>
+        <view wx:elif="{{current.type == 'orientation'}}" class="speech-page">
+          <text class="orientation-question">{{orientationPage.label}}</text>
+          <text class="location-text">{{locationStatus}}</text>
+          <button class="primary sound-button" bindtap="playCurrentAudio">播放</button>
+          <button class="ghost" bindtap="toggleVoiceInput">{{voiceState == '请说' ? '停止识别' : '请说'}}</button>
+          <text class="transcript">{{orientationPage.value || '等待语音识别...'}}</text>
+        </view>
       </view>
+
       <view class="task-footer">
-        <button class="ghost" disabled="{{activeTaskIndex == 0}}" bindtap="previousTask">上一题</button>
-          <text class="footer-score">用时 {{responseDurationText}}</text>
-        <button class="primary" bindtap="nextTask">{{activeTaskIndex == tasks.length - 1 ? '查看结果' : '下一题'}}</button>
+        <button class="ghost" disabled="{{activeTaskIndex == 0}}" bindtap="previousTask">上一页</button>
+        <button class="primary" disabled="{{nextDisabled}}" bindtap="nextTask">{{nextLabel}}</button>
       </view>
     </view>
   </view>

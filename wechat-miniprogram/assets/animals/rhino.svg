@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 420" role="img" aria-label="cute cartoon rhino">
+  <rect width="520" height="420" rx="36" fill="#EEF8FF"/>
+  <ellipse cx="252" cy="220" rx="142" ry="92" fill="#B7C4CA"/>
+  <circle cx="340" cy="180" r="76" fill="#CBD5DA"/>
+  <path d="M394 170l74-34-48 74z" fill="#FFF4D6" stroke="#70808B" stroke-width="8" stroke-linejoin="round"/>
+  <circle cx="322" cy="172" r="13" fill="#243447"/>
+  <path d="M220 144c16-52 68-52 84 0" fill="#A8B7BE"/>
+  <circle cx="292" cy="220" r="18" fill="#90A0A8"/>
+  <path d="M172 292v48M252 300v48M328 286v48" stroke="#70808B" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="276" cy="238" r="20" fill="#FFB0A1"/>
+  <ellipse cx="260" cy="344" rx="130" ry="28" fill="#DCE6ED"/>
+</svg>

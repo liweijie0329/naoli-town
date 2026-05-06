@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 420" role="img" aria-label="cute cartoon camel">
+  <rect width="520" height="420" rx="36" fill="#FFF2E4"/>
+  <path d="M104 250c14-84 72-92 104-22 32-76 96-74 126 22h52c-16-76 10-142 70-150 30-4 44 24 22 46-32 32-36 68-24 104h28v48H90v-48z" fill="#D69A55"/>
+  <circle cx="452" cy="98" r="42" fill="#D69A55"/>
+  <circle cx="466" cy="88" r="9" fill="#243447"/>
+  <path d="M444 112c12 12 28 12 40 0" fill="none" stroke="#8F5F34" stroke-width="7" stroke-linecap="round"/>
+  <path d="M140 292v54M228 292v54M320 292v54M424 292v54" stroke="#9C6639" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="408" cy="132" r="17" fill="#FFB0A1"/>
+  <ellipse cx="268" cy="350" rx="150" ry="28" fill="#EDD8C2"/>
+</svg>

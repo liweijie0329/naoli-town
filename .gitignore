@@ -5,3 +5,4 @@ data/sessions.json
 *.log
 
 /cognition-hearing-game/
+wechat-miniprogram/project.private.config.json
