@@ -1,12 +1,12 @@
 services:
   - type: web
-    name: moca-game-app
+    name: cognition-hearing-game
     env: docker
     plan: starter
     healthCheckPath: /api/health
     autoDeploy: true
     disk:
-      name: moca-game-data
+      name: cognition-hearing-game-data
       mountPath: /data
       sizeGB: 1
     envVars:

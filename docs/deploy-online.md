@@ -20,13 +20,13 @@
 
 ## 上线步骤
 
-1. 把 `moca-game-app` 作为一个 GitHub 仓库推送。
+1. 把 `cognition-hearing-game` 作为一个 GitHub 仓库推送。
 2. 在 Render 新建 Blueprint 或 Web Service，选择该仓库。
 3. Render 会读取 `render.yaml`，创建服务和 1GB 持久化磁盘。
 4. 部署成功后，Render 会分配一个公网地址，形如：
 
    ```text
-   https://moca-game-app.onrender.com
+   https://cognition-hearing-game.onrender.com
    ```
 
 5. 平板打开这个 HTTPS 链接即可使用。

@@ -80,7 +80,7 @@ async function handleApi(req, res, url) {
   if (req.method === "GET" && url.pathname === "/api/health") {
     sendJson(res, 200, {
       ok: true,
-      service: "moca-game-app",
+      service: "cognition-hearing-game",
       dataDir,
       now: new Date().toISOString()
     });
@@ -222,5 +222,5 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`MoCA game app running at http://${host}:${port}`);
+  console.log(`Cognition hearing game running at http://${host}:${port}`);
 });
