@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js';
+
 export interface SessionPayload {
   gender: string;
   age: number;
@@ -19,25 +21,43 @@ export interface SessionRecord {
   answers: StageAnswer[] | null;
 }
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/$/, '');
+type SessionStatus = 'in_progress' | 'completed';
 
-function apiUrl(path: string): string {
-  if (!API_BASE_URL) return path;
-  return `${API_BASE_URL}${path}`;
+interface BrainSessionRow {
+  id: string;
+  gender: string;
+  age: number;
+  status: SessionStatus;
+  completed_stages: number;
+  total_score: number;
+  answers: StageAnswer[] | null;
 }
 
-export async function createSession(payload: SessionPayload): Promise<SessionRecord> {
-  const response = await fetch(apiUrl('/api/sessions'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim().replace(/\/rest\/v1\/?$/, '');
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
-  if (!response.ok) {
-    throw new Error('创建会话失败，请检查后端和 Supabase 配置。');
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('缺少 VITE_SUPABASE_URL 或 VITE_SUPABASE_ANON_KEY 环境变量。');
+}
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+export async function createSession(payload: SessionPayload): Promise<SessionRecord> {
+  const { data, error } = await supabase
+    .from('brain_sessions')
+    .insert({
+      gender: payload.gender,
+      age: payload.age,
+      status: 'in_progress',
+    })
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    throw new Error(`创建会话失败：${error?.message || '未知错误'}`);
   }
 
-  return response.json();
+  return data as BrainSessionRow;
 }
 
 export async function completeSession(
@@ -45,20 +65,22 @@ export async function completeSession(
   answers: StageAnswer[],
   totalScore: number,
 ): Promise<SessionRecord> {
-  const response = await fetch(apiUrl(`/api/sessions/${id}`), {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const { data, error } = await supabase
+    .from('brain_sessions')
+    .update({
       status: 'completed',
-      completedStages: answers.length,
-      totalScore,
+      completed_stages: answers.length,
+      total_score: totalScore,
       answers,
-    }),
-  });
+      finished_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select('*')
+    .single();
 
-  if (!response.ok) {
-    throw new Error('保存测评结果失败，请稍后重试。');
+  if (error || !data) {
+    throw new Error(`保存测评结果失败：${error?.message || '未知错误'}`);
   }
 
-  return response.json();
+  return data as BrainSessionRow;
 }
