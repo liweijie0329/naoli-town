@@ -5,7 +5,10 @@ const DIGIT_PAD = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 const MEMORY_WAIT_MS = 5 * 60 * 1000;
 const LOCAL_SESSIONS_KEY = "moca-game-local-sessions";
 const LOGO_SRC = "./assets/logo.svg";
-const NATURAL_VOICE_HINTS = ["xiaoxiao", "ting-ting", "tingting", "google 普通话", "google 國語", "mandarin", "普通话", "美佳", "sin-ji"];
+const MOCA_SHEET_IMAGE = "./assets/moca/moca-page.png";
+const NATURAL_VOICE_HINTS = ["xiaoxiao", "xiaoyi", "xiaobei", "ting-ting", "tingting", "mei-jia", "meijia", "google 普通话", "google 國語", "mandarin", "普通话", "美佳", "sin-ji"];
+const MEMORY_OPTIONS_A = ["面孔", "学校", "红色", "天鹅绒", "苹果", "教堂", "火车", "菊花", "尺子", "蓝色"];
+const MEMORY_OPTIONS_B = ["菊花", "鼻子", "天鹅绒", "绿色", "面孔", "医院", "红色", "自行车", "教堂", "手掌"];
 
 const animalEmojis = {
   lion: "🦁",
@@ -36,6 +39,7 @@ const tasks = [
     type: "trail",
     modality: "点选连线",
     prompt: "请按数字、汉字交替上升的规则点击圆圈，每个圆圈只点一次。",
+    instruction: "请按照从数字到汉字并逐渐升高的顺序画一条连线。从 1 连向甲，再连向 2，并一直连下去，到戊结束。",
     scoring: "完全按照 1-甲-2-乙-3-丙-4-丁-5-戊，且没有任何交叉线，给 1 分；出现任何错误且未立刻自我纠正，给 0 分。"
   },
   {
@@ -47,6 +51,7 @@ const tasks = [
     drawingKind: "cube",
     modality: "画图",
     prompt: "请照着左侧图形，在空白区域尽可能精确地画一遍。",
+    instruction: "请您照着这幅图在下面的空白处再画一遍，并尽可能精确。",
     scoring: "图形为三维结构、所有线存在、无多余线、相对边基本平行且长度基本一致，全部满足给 1 分；任一标准不满足给 0 分。"
   },
   {
@@ -58,6 +63,7 @@ const tasks = [
     drawingKind: "clock",
     modality: "画图",
     prompt: "请画一个钟表，填上所有数字，并指示出 11 点过 10 分。",
+    instruction: "请您在此处画一个钟表，填上所有的数字并指示出 11 点 10 分。",
     scoring: "轮廓 1 分；数字 1 分；指针 1 分。"
   },
   {
@@ -67,7 +73,8 @@ const tasks = [
     maxScore: 3,
     type: "naming",
     modality: "逐张看图选择",
-    prompt: "请看屏幕上的小动物，选择它的名字。",
+    prompt: "这是什么动物？",
+    instruction: "请您告诉我这个动物的名字。",
     scoring: "狮子、犀牛、骆驼或单峰骆驼，各 1 分。",
     items: [
       { key: "lion", answer: "狮子", options: ["狮子", "老虎", "豹子", "狐狸"] },
@@ -81,21 +88,25 @@ const tasks = [
     title: "词语学习 第一次",
     maxScore: 0,
     type: "memory",
-    modality: "语音",
+    modality: "语音+10选5",
     prompt: "我会读几个词，请您注意听并记住。读完后，把记住的词告诉我。",
+    instruction: "这是一个记忆力测验。我会给您读几个词，您要注意听，一定要记住。当我读完后，请选出您记住的词。",
     scoring: "第一次学习不计入总分，仅记录编码表现和用时。",
-    trial: 1
+    trial: 1,
+    options: MEMORY_OPTIONS_A
   },
   {
     id: "memory2",
-    domain: "记忆",
-    title: "词语学习 第二次",
-    maxScore: 0,
+    domain: "延迟回忆",
+    title: "词语回忆 第二遍",
+    maxScore: 5,
     type: "memory",
-    modality: "语音",
-    prompt: "我把这些词再读一遍。请努力记住，并把刚才和这次记住的词都告诉我。",
-    scoring: "第二次学习不计入总分，结束后提示稍后还要回忆这些词。",
-    trial: 2
+    modality: "10选5",
+    prompt: "请从这些词中选出刚才记过的 5 个词。",
+    instruction: "刚才我给您读了几个词让您记住，请您再尽量回忆一下，选出这些词都有什么。",
+    scoring: "选出一个正确词给 1 分，共 5 分。",
+    trial: 2,
+    options: MEMORY_OPTIONS_B
   },
   {
     id: "digitForward",
@@ -105,6 +116,7 @@ const tasks = [
     type: "choice",
     modality: "听觉+数字卡",
     prompt: "请听一串数字，听完后按原顺序点击数字卡。",
+    instruction: "下面我说一些数字，您仔细听，当我说完时您就跟着照样背出来。",
     scoring: "顺背 21854 完全正确给 1 分，否则 0 分。",
     stimulus: "21854",
     answer: "21854"
@@ -117,6 +129,7 @@ const tasks = [
     type: "choice",
     modality: "听觉+数字卡",
     prompt: "请听一串数字，听完后按倒着的顺序点击数字卡。",
+    instruction: "下面我再说一些数字，您仔细听，但是当我说完时您必须按照原数倒着背出来。",
     scoring: "读出 742，倒背正确答案为 247；完全正确给 1 分，否则 0 分。",
     stimulus: "742",
     answer: "247"
@@ -129,6 +142,7 @@ const tasks = [
     type: "vigilance",
     modality: "听觉反应",
     prompt: "请听一串数字。每当听到数字 1 时，敲一下按钮；其他数字不要敲。",
+    instruction: "下面我要读出一系列数字，请注意听。每当我读到 1 的时候，您就拍一下手。当我读其他的数字时不要拍手。",
     scoring: "完全正确或只有一次错误给 1 分；错误数大于或等于 2 给 0 分。"
   },
   {
@@ -139,6 +153,7 @@ const tasks = [
     type: "serial7",
     modality: "数字键盘",
     prompt: "请从 100 中减去 7，再从得数中继续减 7，一共算 5 次。",
+    instruction: "现在请您做一道计算题，从 100 中减去一个 7，而后从得数中再减去一个 7，一直往下减，直到我让您停下为止。",
     scoring: "4-5 个正确给 3 分，2-3 个正确给 2 分，1 个正确给 1 分，0 个正确给 0 分。"
   },
   {
@@ -149,6 +164,7 @@ const tasks = [
     type: "sentence",
     modality: "语音识别",
     prompt: "请尽可能原原本本地复述听到的句子。",
+    instruction: "现在我要对您说一句话，我说完后请您把我说的话尽可能原原本本地重复出来。",
     scoring: "每句话准确复述给 1 分。省略、替换、增加或语序变化均不得分。",
     sentences: [
       "我只知道今天张亮是帮过忙的人",
@@ -163,6 +179,7 @@ const tasks = [
     type: "fluency",
     modality: "60秒语音",
     prompt: "请在 1 分钟内尽可能多地说出动物的名字。",
+    instruction: "请您尽可能快、尽可能多地说出您所知道的动物的名称。时间是 1 分钟。",
     scoring: "1 分钟内说出的动物名称不少于 11 个给 1 分，否则 0 分。神化动物也算正确。"
   },
   {
@@ -170,24 +187,15 @@ const tasks = [
     domain: "抽象",
     title: "词语相似性",
     maxScore: 2,
-    type: "abstractionSpeech",
-    modality: "语音识别",
-    prompt: "请听两个词，说出它们在什么方面相类似。",
+    type: "abstractionChoice",
+    modality: "4选1",
+    prompt: "请选择两样东西在什么方面相类似。",
+    instruction: "请您说说两个词在什么方面相类似，或者说它们有什么共性。",
     scoring: "交通/运输工具 1 分；测量仪器/测量用的 1 分。",
     items: [
-      { key: "trainBike", pair: "火车 - 自行车", answer: "交通工具", accepted: ["交通", "运输", "出行", "旅行"] },
-      { key: "watchRuler", pair: "手表 - 尺子", answer: "测量工具", accepted: ["测量", "量", "工具", "仪器"] }
+      { key: "trainBike", pair: "火车 - 自行车", answer: "交通工具", options: ["交通工具", "都有轮子", "都很快", "都很重"] },
+      { key: "watchRuler", pair: "手表 - 尺子", answer: "测量工具", options: ["测量工具", "都有数字", "都能戴在手上", "都是文具"] }
     ]
-  },
-  {
-    id: "delayedRecall",
-    domain: "延迟回忆",
-    title: "无提示延迟回忆",
-    maxScore: 5,
-    type: "recall",
-    modality: "语音识别",
-    prompt: "刚才我给您读了几个词，请尽量回忆一下，告诉我这些词都有什么。",
-    scoring: "只对未经提示自由回忆正确的词给分，每词 1 分。"
   },
   {
     id: "orientation",
@@ -197,13 +205,57 @@ const tasks = [
     type: "orientation",
     modality: "选择题+定位",
     prompt: "请选择现在的时间和地点。",
+    instruction: "告诉我今天是什么日期。然后请告诉我这是什么地方，它在哪个城市。",
     scoring: "星期、月份、年份、日期、地点、城市各 1 分。"
+  }
+];
+
+const rubricGroups = [
+  {
+    title: "视空间与执行功能",
+    items: [
+      { title: "交替连线测验", prompt: "请您按照从数字到汉字并逐渐升高的顺序画一条连线。从 1 连向甲，再连向 2，并一直连下去，到戊结束。", scoring: "完全按照 1-甲-2-乙-3-丙-4-丁-5-戊 的顺序进行连线且没有任何交叉线时给 1 分。出现任何错误而没有立刻自我纠正时，给 0 分。", image: true },
+      { title: "复制立方体", prompt: "请您照着这幅图在下面的空白处再画一遍，并尽可能精确。", scoring: "完全符合下列标准时给 1 分：图形为三维结构；所有的线都存在；无多余的线；相对的边基本平行，长度基本一致。只要违反其中任何一条，即为 0 分。", image: true },
+      { title: "画钟表", prompt: "请您在此处画一个钟表，填上所有的数字并指示出 11 点 10 分。", scoring: "轮廓 1 分：表面必须是个圆，允许有轻微缺陷。数字 1 分：数字完整、无多余、顺序正确且在所属象限内。指针 1 分：必须有两个指针且一起指向正确时间，时针明显短于分针，中心交点在表内且接近中心。", image: true }
+    ]
+  },
+  {
+    title: "命名与记忆",
+    items: [
+      { title: "命名", prompt: "请您告诉我这个动物的名字。", scoring: "每答对一个给 1 分。正确回答是：狮子；犀牛；骆驼或单峰骆驼。", image: true },
+      { title: "词语学习", prompt: "我会给您读几个词，您要注意听，一定要记住。读完后，把您记住的词告诉我。", scoring: "学习试次不记分。", image: false },
+      { title: "延迟回忆", prompt: "刚才我给您读了几个词让您记住，请您再尽量回忆一下，告诉我这些词都有什么？", scoring: "在未经提示下自由回忆正确的词，每词给 1 分。", image: false }
+    ]
+  },
+  {
+    title: "注意",
+    items: [
+      { title: "数字顺背", prompt: "下面我说一些数字，您仔细听，当我说完时您就跟着照样背出来。", scoring: "复述准确给 1 分。", image: false },
+      { title: "数字倒背", prompt: "下面我再说一些数字，您仔细听，但是当我说完时您必须按照原数倒着背出来。", scoring: "倒背正确回答为 2-4-7，复述准确给 1 分。", image: false },
+      { title: "警觉性", prompt: "下面我要读出一系列数字，请注意听。每当我读到 1 的时候，您就拍一下手。当我读其他数字时不要拍手。", scoring: "完全正确或只有一次错误给 1 分，否则不给分。错误指读 1 时没有拍手，或读其他数字时拍手。", image: false },
+      { title: "连续减 7", prompt: "从 100 中减去一个 7，而后从得数中再减去一个 7，一直往下减。", scoring: "全部错误记 0 分，1 个正确给 1 分，2-3 个正确给 2 分，4-5 个正确给 3 分。每一个减数单独评定。", image: false }
+    ]
+  },
+  {
+    title: "语言与抽象",
+    items: [
+      { title: "句子复述", prompt: "我说完后请您把我说的话尽可能原原本本地重复出来。", scoring: "复述正确，每句话分别给 1 分。复述必须准确，省略、替换或增加不得分。", image: false },
+      { title: "词语流畅性", prompt: "请您尽可能快、尽可能多地说出您所知道的动物的名称。时间是 1 分钟。", scoring: "1 分钟内说出的动物名称不少于 11 个给 1 分。龙、凤凰、麒麟等神化动物也算正确。", image: false },
+      { title: "词语相似性", prompt: "请您说说两个词在什么方面相类似，或者说它们有什么共性。", scoring: "火车和自行车：运输工具、交通工具、旅行用的。手表和尺子：测量仪器、测量用的。每组正确给 1 分。", image: false }
+    ]
+  },
+  {
+    title: "定向",
+    items: [
+      { title: "时间地点定向", prompt: "告诉我今天是什么日期。再问：告诉我这是什么地方，它在哪个城市？", scoring: "星期、月份、年份、日期、地点、城市每正确回答一项给 1 分。必须回答精确日期和地点，日期多一天或少一天均不给分。", image: false }
+    ]
   }
 ];
 
 const root = document.querySelector("#app");
 const educationLevels = ["", "小学", "初中", "中专", "高中", "大专", "本科及以上"];
-const initialState = safeJson(localStorage.getItem("moca-game-draft"));
+const persistedState = safeJson(localStorage.getItem("moca-game-draft"));
+const initialState = persistedState?.view === "setup" ? null : persistedState;
 
 let state = initialState || createInitialState();
 let activeCanvas = null;
@@ -222,6 +274,8 @@ let vigilanceTimer = null;
 let fluencyTimer = null;
 let trailGuideFrame = null;
 let trailGuideTick = 0;
+let trailDragStart = null;
+let trailDragPoint = null;
 
 migrateState();
 render();
@@ -239,6 +293,8 @@ function createInitialState() {
     trail: { sequence: [], errors: 0, undoCount: 0 },
     memoryWaitStartedAt: null,
     resumeAfterMemory2Index: null,
+    playedInstructionKeys: {},
+    setupAttempted: false,
     adminSessions: [],
     selectedSession: null
   };
@@ -277,6 +333,8 @@ function migrateState() {
   state.responses = state.responses || {};
   state.drawings = state.drawings || {};
   state.trail = state.trail || { sequence: [], errors: 0, undoCount: 0 };
+  state.playedInstructionKeys = state.playedInstructionKeys || {};
+  state.setupAttempted = Boolean(state.setupAttempted);
   state.resumeAfterMemory2Index = Number.isInteger(state.resumeAfterMemory2Index) ? state.resumeAfterMemory2Index : null;
 }
 
@@ -291,6 +349,10 @@ function resetState() {
   menuOpen = false;
   playState = "开始";
   voiceState = "待说";
+}
+
+function isParticipantComplete() {
+  return ["name", "birthYear", "sex", "educationLevel"].every((key) => String(state.participant[key] || "").trim());
 }
 
 function html(strings, ...values) {
@@ -354,7 +416,10 @@ function render() {
   const current = tasks[state.activeTaskIndex] || tasks[0];
   if (state.view === "test") beginTask(current.id);
   root.innerHTML = renderShell(current);
-  if (state.view === "test") setupCurrentTask(current);
+  if (state.view === "test") {
+    setupCurrentTask(current);
+    scheduleTaskInstruction(current);
+  }
 }
 
 function renderSetup() {
@@ -365,36 +430,39 @@ function renderSetup() {
         <div class="brand-row">
           <img class="logo-image bounce-in" src="${LOGO_SRC}" alt="MoCA Quest" />
           <div>
-            <p class="eyebrow">欢迎来闯关</p>
             <h1>脑力闯关</h1>
           </div>
         </div>
         <div class="setup-grid">
-          ${inputField("participant.name", "姓名", state.participant.name, "")}
-          ${inputField("participant.birthYear", "出生年份", state.participant.birthYear, "", "number")}
-          ${segmentedField("sex", "性别", state.participant.sex, ["男", "女"])}
-          ${selectField("participant.educationLevel", "教育水平", state.participant.educationLevel, educationLevels)}
+          ${inputField("participant.name", "姓名", state.participant.name, "", "text", isSetupFieldInvalid("name"))}
+          ${inputField("participant.birthYear", "出生年份", state.participant.birthYear, "", "number", isSetupFieldInvalid("birthYear"))}
+          ${segmentedField("sex", "性别", state.participant.sex, ["男", "女"], isSetupFieldInvalid("sex"))}
+          ${selectField("participant.educationLevel", "教育水平", state.participant.educationLevel, educationLevels, isSetupFieldInvalid("educationLevel"))}
         </div>
         <div class="setup-actions">
-          <button class="primary big-button" data-action="startSession">开始游戏</button>
+          <button class="primary big-button pulse" data-action="startSession">开始游戏</button>
         </div>
       </section>
     </div>
   `;
 }
 
-function inputField(path, label, value, placeholder, type = "text") {
+function isSetupFieldInvalid(key) {
+  return state.setupAttempted && !String(state.participant[key] || "").trim();
+}
+
+function inputField(path, label, value, placeholder, type = "text", invalid = false) {
   return html`
-    <label class="field">
+    <label class="field ${invalid ? "invalid" : ""}">
       <span>${label}</span>
       <input data-bind="${path}" type="${type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" />
     </label>
   `;
 }
 
-function selectField(path, label, value, options) {
+function selectField(path, label, value, options, invalid = false) {
   return html`
-    <label class="field">
+    <label class="field ${invalid ? "invalid" : ""}">
       <span>${label}</span>
       <select data-bind="${path}">
         ${options.map((option) => `<option value="${escapeHtml(option)}" ${option === value ? "selected" : ""}>${option || "请选择"}</option>`).join("")}
@@ -403,9 +471,9 @@ function selectField(path, label, value, options) {
   `;
 }
 
-function segmentedField(key, label, value, options) {
+function segmentedField(key, label, value, options, invalid = false) {
   return html`
-    <div class="field segmented-field">
+    <div class="field segmented-field ${invalid ? "invalid" : ""}">
       <span>${label}</span>
       <div class="segmented-options">
         ${options.map((option) => `<button type="button" class="segment-option ${value === option ? "picked" : ""}" data-action="chooseParticipant" data-key="${key}" data-value="${escapeHtml(option)}">${escapeHtml(option)}</button>`).join("")}
@@ -428,10 +496,10 @@ function renderShell(current) {
               <span>${escapeHtml(state.participant.name || "未填写姓名")}</span>
             </div>
           </div>
-          <button class="drawer-item" data-action="navView" data-view="test">任务</button>
-          <button class="drawer-item" data-action="navView" data-view="results">结果</button>
+          <button class="drawer-item" data-action="navView" data-view="test">当前任务</button>
+          <button class="drawer-item" data-action="navView" data-view="results">本次结果</button>
+          <button class="drawer-item" data-action="navView" data-view="design">评分标准</button>
           <button class="drawer-item" data-action="navView" data-view="admin">后台</button>
-          <button class="drawer-item" data-action="navView" data-view="design">技术细节</button>
           <button class="drawer-item" data-action="goHome">返回首页</button>
           <div class="drawer-score"><span>${state.view === "test" ? `${state.activeTaskIndex + 1}/${tasks.length}` : `${totals.totalScore}/30`}</span></div>
           <nav class="drawer-task-list">
@@ -471,8 +539,8 @@ function renderTaskNav(task, index) {
 function viewTitle() {
   if (state.view === "results") return "闯关结果";
   if (state.view === "admin") return "后台数据库";
-  if (state.view === "design") return "技术细节";
-  return "任务";
+  if (state.view === "design") return "评分标准";
+  return "当前任务";
 }
 
 function renderMainView(current) {
@@ -486,11 +554,10 @@ function renderTask(task) {
   const step = getTaskStep(task);
   return html`
     <section class="single-page task-page">
+      <button class="edge-arrow edge-arrow-left" data-action="previousTask" aria-label="上一题" ${state.activeTaskIndex === 0 && step === 0 ? "disabled" : ""}>‹</button>
       <div class="task-workspace">${renderTaskWorkspace(task, step)}</div>
-      <footer class="task-footer">
-        <button class="ghost" data-action="previousTask" ${state.activeTaskIndex === 0 && step === 0 ? "disabled" : ""}>上一题</button>
-        <button class="primary" data-action="nextTask">${nextLabel(task, step)}</button>
-      </footer>
+      <button class="edge-arrow edge-arrow-right" data-action="nextTask" aria-label="确定">›</button>
+      <button class="primary confirm-task-button" data-action="nextTask">${confirmLabel(task, step)}</button>
     </section>
   `;
 }
@@ -504,17 +571,14 @@ function getTaskStepCount(task) {
   if (task.type === "naming") return task.items.length;
   if (task.type === "serial7") return 5;
   if (task.type === "sentence") return task.sentences.length;
-  if (task.type === "abstractionSpeech") return task.items.length;
+  if (task.type === "abstractionChoice") return task.items.length;
   if (task.type === "orientation") return orientationPrompts.length;
   return 1;
 }
 
-function nextLabel(task, step) {
-  if (step < getTaskStepCount(task) - 1) return "下一题";
-  if (task.id === "trail" && state.trail.sequence.length === TRAIL_EXPECTED.length) return "确认";
-  const hasPendingMemory2 = task.id !== "memory2" && state.memoryWaitStartedAt && !isMemory2Submitted();
-  if (hasPendingMemory2) return "下一题";
-  return state.activeTaskIndex === tasks.length - 1 ? "查看结果" : "下一题";
+function confirmLabel(task, step) {
+  if (state.activeTaskIndex === tasks.length - 1 && step >= getTaskStepCount(task) - 1) return "完成";
+  return "确定";
 }
 
 function renderTaskWorkspace(task, step) {
@@ -527,8 +591,7 @@ function renderTaskWorkspace(task, step) {
   if (task.type === "serial7") return renderSerial7Task(step);
   if (task.type === "sentence") return renderSentenceTask(task, step);
   if (task.type === "fluency") return renderFluencyTask();
-  if (task.type === "abstractionSpeech") return renderAbstractionTask(task, step);
-  if (task.type === "recall") return renderRecallTask();
+  if (task.type === "abstractionChoice") return renderAbstractionTask(task, step);
   if (task.type === "orientation") return renderOrientationTask(step);
   return "";
 }
@@ -565,7 +628,7 @@ function renderNamingTask(task, step) {
     <div class="naming-page">
       <div class="animal-emoji pop-in" role="img" aria-label="${escapeHtml(item.answer)}">${animalEmojis[item.key]}</div>
       <div class="animal-side">
-        <h4>这只小动物叫什么名字？</h4>
+        <h4>这是什么动物？</h4>
         <div class="option-grid">
           ${item.options.map((option) => `<button class="option ${response.answer[item.key] === option ? "picked" : ""}" data-action="chooseNaming" data-value="${escapeHtml(option)}">${escapeHtml(option)}</button>`).join("")}
         </div>
@@ -576,11 +639,23 @@ function renderNamingTask(task, step) {
 
 function renderMemoryTask(task) {
   const response = getResponse(task.id);
+  const selected = response.answer.selectedWords || [];
+  const complete = selected.length === WORDS.length;
   return html`
-    <div class="speech-page">
-      ${renderAudioWave()}
-      ${renderAudioButton("playCurrentAudio")}
-      <textarea class="transcript-input" data-voice-manual>${escapeHtml(response.answer.freeText || "")}</textarea>
+    <div class="memory-page">
+      <div class="memory-audio">
+        ${renderAudioWave()}
+        ${task.trial === 1 ? renderAudioButton("playCurrentAudio") : ""}
+      </div>
+      <div class="memory-choice-panel">
+        <strong>请选择 5 个词</strong>
+        <span>${selected.length}/5</span>
+      </div>
+      <div class="option-grid memory-options">
+        ${task.options.map((word) => `<button class="option ${selected.includes(word) ? "picked" : ""}" data-action="toggleMemoryWord" data-word="${escapeHtml(word)}">${escapeHtml(word)}</button>`).join("")}
+      </div>
+      ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
+      ${task.trial === 1 && complete ? `<p class="task-ok">选对后再继续。</p>` : ""}
     </div>
   `;
 }
@@ -598,7 +673,7 @@ function renderChoiceTask(task) {
           ${DIGIT_PAD.slice(0, 9).map((digit) => `<button data-action="appendDigit" data-digit="${digit}">${digit}</button>`).join("")}
           <button class="key-action" data-action="backspaceDigit">删除</button>
           <button data-action="appendDigit" data-digit="0">0</button>
-          <button class="key-action confirm" data-action="confirmDigit" ${sequence.length === 0 ? "disabled" : ""}>确认</button>
+          <button class="key-action" data-action="confirmDigit" ${sequence.length === 0 ? "disabled" : ""}>确定</button>
         </div>
       ` : renderAudioButton("playCurrentAudio")}
     </div>
@@ -613,7 +688,7 @@ function renderVigilanceTask() {
     <div class="vigilance-page">
       <strong class="tap-instruction">听到 1 敲一下</strong>
       ${renderAudioWave()}
-      ${started ? `<button class="tap-button pulse" data-action="tapVigilance">敲一下</button><span class="tap-count">已敲 ${taps.length} 次</span>` : `<button class="primary circle-button" data-action="playCurrentAudio">开始</button>`}
+      ${started ? `<button class="tap-button pulse" data-action="tapVigilance">敲一下</button><span class="tap-count">已敲 ${taps.length} 次</span>` : `<button class="primary circle-button pulse" data-action="playCurrentAudio">开始</button>`}
     </div>
   `;
 }
@@ -626,9 +701,9 @@ function renderSerial7Task(step) {
     <div class="serial-page">
       <div class="math-question">${previous} - 7 = ?</div>
       <div class="serial-display">${escapeHtml(values[step] || " ")}</div>
-      <div class="keypad">
+      <div class="keypad serial-keypad">
         ${DIGIT_PAD.map((digit) => `<button data-action="inputSerialDigit" data-digit="${digit}">${digit}</button>`).join("")}
-        <button class="key-wide" data-action="backspaceSerial">退格</button>
+        <button class="key-action" data-action="backspaceSerial">删除</button>
       </div>
     </div>
   `;
@@ -648,7 +723,7 @@ function renderFluencyTask() {
   return html`
     <div class="fluency-page">
       ${renderAudioWave()}
-      <button class="timer-button ${running ? "running" : ""}" data-action="startFluency">${running ? remaining : "开始"}</button>
+      <button class="timer-button ${running ? "running" : "pulse"}" data-action="startFluency">${running ? remaining : "开始"}</button>
       <strong>已识别 ${animals.length} 个</strong>
       <textarea class="transcript-input" data-fluency-manual>${escapeHtml((response.answer.rawTranscript || animals.join("、")) || "点击开始后说动物名")}</textarea>
     </div>
@@ -657,22 +732,14 @@ function renderFluencyTask() {
 
 function renderAbstractionTask(task, step) {
   const response = getResponse(task.id);
-  const value = response.answer.transcript?.[step] || "";
+  const item = task.items[step];
+  const value = response.answer[item.key] || "";
   return html`
-    <div class="speech-page">
-      <div class="pair-title">${escapeHtml(task.items[step].pair)}</div>
-      ${renderSpeechControls(value || "等待语音识别...")}
-    </div>
-  `;
-}
-
-function renderRecallTask() {
-  const response = getResponse("delayedRecall");
-  return html`
-    <div class="speech-page">
-      ${renderAudioWave()}
-      ${renderAudioButton("playCurrentAudio")}
-      <textarea class="transcript-input" data-recall-free-text>${escapeHtml(response.answer.freeText || "")}</textarea>
+    <div class="abstraction-page">
+      <div class="pair-title">${escapeHtml(item.pair)}</div>
+      <div class="option-grid">
+        ${item.options.map((option) => `<button class="option ${value === option ? "picked" : ""}" data-action="chooseAbstraction" data-key="${item.key}" data-value="${escapeHtml(option)}">${escapeHtml(option)}</button>`).join("")}
+      </div>
     </div>
   `;
 }
@@ -713,19 +780,19 @@ function renderSpeechControls(transcript) {
 
 function renderAudioWave() {
   const active = playState === "播放中..." || recognizing || recordingAudio;
-  const label = playState === "播放中..." ? "播放中..." : recognizing || recordingAudio ? "请说" : "准备好了";
+  const label = playState === "播放中..." ? "播放中..." : recognizing || recordingAudio ? "请说" : "";
   return html`
     <div class="audio-wave ${active ? "active" : ""}" aria-label="${escapeHtml(label)}">
       <span></span><span></span><span></span><span></span><span></span>
     </div>
-    <strong class="voice-status">${escapeHtml(label)}</strong>
+    ${label ? `<strong class="voice-status">${escapeHtml(label)}</strong>` : ""}
   `;
 }
 
 function renderAudioButton(action) {
-  if (playState === "播放中...") return `<button class="primary sound-button" disabled>播放中...</button>`;
-  if (recognizing || recordingAudio) return `<button class="ghost sound-button" data-action="toggleVoiceInput">请说</button>`;
-  return `<button class="primary sound-button" data-action="${action}">开始</button>`;
+  if (playState === "播放中...") return `<button class="primary circle-button pulse sound-button" disabled>播放中</button>`;
+  if (recognizing || recordingAudio) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">请说</button>`;
+  return `<button class="primary circle-button pulse sound-button" data-action="${action}">开始</button>`;
 }
 
 function renderResults() {
@@ -734,11 +801,15 @@ function renderResults() {
   return html`
     <section class="single-page results-page">
       <div class="result-hero ${success ? "celebrate" : "soft-alert"}">
-        <div class="confetti"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="confetti"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="result-sparkles"><i></i><i></i><i></i><i></i></div>
         <img class="result-logo ${success ? "bounce-in" : "floaty"}" src="${LOGO_SRC}" alt="" />
         <span>${success ? "闯关完成" : "闯关结束"}</span>
         <strong>${totals.totalScore}<em>/30</em></strong>
         <p>${success ? "表现很棒，继续保持。" : "这次有点吃力，建议再做一次专业评估。"}</p>
+        <div class="result-medals">
+          <b>专注</b><b>记忆</b><b>反应</b>
+        </div>
       </div>
       <div class="control-row results-actions">
         <button class="primary" data-action="saveSession">保存到后台数据库</button>
@@ -867,12 +938,34 @@ function prettyJson(value) {
 function renderDesign() {
   return html`
     <section class="single-page design-page">
-      <div class="design-note">
-        <h3>核心设计</h3>
-        <p>每道题是一张横屏任务页。选择、语音、画图、定位和行为记录统一写入后台；作答端保持简洁卡通风格。</p>
+      <div class="rubric-page-head">
+        <h3>评分标准</h3>
+        <p>点击每个项目查看任务要求和评分标准。</p>
       </div>
-      <div class="design-grid">
-        ${tasks.map((task) => `<article><span>${escapeHtml(task.domain)}</span><strong>${escapeHtml(task.title)}</strong><small>${escapeHtml(task.modality)}</small></article>`).join("")}
+      <div class="rubric-layout">
+        ${rubricGroups.map((group) => renderRubricGroup(group)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderRubricGroup(group) {
+  return html`
+    <section class="rubric-group">
+      <h4>${escapeHtml(group.title)}</h4>
+      <div class="rubric-cards">
+        ${group.items.map((item) => `
+          <details class="rubric-card">
+            <summary>${escapeHtml(item.title)}</summary>
+            <div class="rubric-card-body">
+              <strong>任务要求</strong>
+              <p>${escapeHtml(item.prompt)}</p>
+              <strong>评分标准</strong>
+              <p>${escapeHtml(item.scoring)}</p>
+              ${item.image ? `<img class="rubric-sheet-image" src="${MOCA_SHEET_IMAGE}" alt="MoCA 原表图片" />` : ""}
+            </div>
+          </details>
+        `).join("")}
       </div>
     </section>
   `;
@@ -959,20 +1052,66 @@ function setupTrailCanvas() {
   canvas.onpointerdown = (event) => {
     const point = canvasPoint(event, canvas);
     const node = nearestTrailNode(point, canvas);
-    if (!node || state.trail.sequence.includes(node.label)) return;
-    const expected = TRAIL_EXPECTED[state.trail.sequence.length];
-    if (node.label !== expected) state.trail.errors += 1;
-    state.trail.sequence.push(node.label);
-    const response = getResponse("trail");
-    response.behavior.sequence = [...state.trail.sequence];
-    response.behavior.errors = state.trail.errors;
+    if (!node || !isTrailDragStartAllowed(node.label)) return;
+    trailDragStart = node;
+    trailDragPoint = point;
+    canvas.setPointerCapture(event.pointerId);
+    drawTrailCanvas(canvas);
+  };
+  canvas.onpointermove = (event) => {
+    if (!trailDragStart) return;
+    trailDragPoint = canvasPoint(event, canvas);
+    drawTrailCanvas(canvas);
+  };
+  canvas.onpointerup = (event) => {
+    if (!trailDragStart) return;
+    const point = canvasPoint(event, canvas);
+    const endNode = nearestTrailNode(point, canvas);
+    commitTrailDrag(trailDragStart, endNode, canvas);
+    trailDragStart = null;
+    trailDragPoint = null;
+    canvas.releasePointerCapture(event.pointerId);
     drawTrailCanvas(canvas);
     state.drawings.trail = canvas.toDataURL("image/png");
     saveDraft();
     render();
   };
+  canvas.onpointercancel = () => {
+    trailDragStart = null;
+    trailDragPoint = null;
+    drawTrailCanvas(canvas);
+  };
   if (shouldShowTrailGuide()) startTrailGuide();
   else drawTrailCanvas(canvas);
+}
+
+function isTrailDragStartAllowed(label) {
+  const sequence = state.trail.sequence || [];
+  if (sequence.length === 0) return label === TRAIL_EXPECTED[0];
+  return label === sequence[sequence.length - 1] && sequence.length < TRAIL_EXPECTED.length;
+}
+
+function commitTrailDrag(startNode, endNode, canvas) {
+  const sequence = state.trail.sequence || [];
+  const expectedStart = sequence.length === 0 ? TRAIL_EXPECTED[0] : sequence[sequence.length - 1];
+  const expectedEnd = TRAIL_EXPECTED[sequence.length === 0 ? 1 : sequence.length];
+  if (!endNode || startNode.label !== expectedStart || endNode.label !== expectedEnd) {
+    state.trail.errors += 1;
+  } else {
+    if (sequence.length === 0) sequence.push(startNode.label);
+    sequence.push(endNode.label);
+  }
+  const response = getResponse("trail");
+  response.behavior.sequence = [...sequence];
+  response.behavior.errors = state.trail.errors;
+  response.behavior.mode = "drag-line";
+  response.behavior.lastDrag = {
+    from: startNode.label,
+    to: endNode?.label || "",
+    at: new Date().toISOString()
+  };
+  state.trail.sequence = sequence;
+  if (canvas) response.drawingImage = canvas.toDataURL("image/png");
 }
 
 function startTrailGuide() {
@@ -1016,14 +1155,10 @@ function drawTrailCanvas(canvas, tick = 0) {
       x: guide[0].x + (guide[1].x - guide[0].x) * progress,
       y: guide[0].y + (guide[1].y - guide[0].y) * progress
     };
-    activeCtx.fillStyle = "#ff7f68";
-    activeCtx.beginPath();
-    activeCtx.arc(moving.x, moving.y, 12 + (tick % 18) * 0.6, 0, Math.PI * 2);
-    activeCtx.fill();
+    drawFingerCue(activeCtx, moving.x, moving.y, tick);
   }
 
-  const complete = state.trail.sequence.length === TRAIL_EXPECTED.length;
-  activeCtx.strokeStyle = complete ? "#ff9f43" : "#20a66b";
+  activeCtx.strokeStyle = "#20a66b";
   activeCtx.lineWidth = 5;
   activeCtx.beginPath();
   state.trail.sequence.forEach((label, index) => {
@@ -1034,11 +1169,22 @@ function drawTrailCanvas(canvas, tick = 0) {
   });
   activeCtx.stroke();
 
+  if (trailDragStart && trailDragPoint) {
+    activeCtx.strokeStyle = "rgba(32, 166, 107, 0.72)";
+    activeCtx.lineWidth = 6;
+    activeCtx.setLineDash([12, 10]);
+    activeCtx.beginPath();
+    activeCtx.moveTo(trailDragStart.x, trailDragStart.y);
+    activeCtx.lineTo(trailDragPoint.x, trailDragPoint.y);
+    activeCtx.stroke();
+    activeCtx.setLineDash([]);
+  }
+
   nodes.forEach((node) => {
     const used = state.trail.sequence.includes(node.label);
     activeCtx.beginPath();
-    activeCtx.fillStyle = used ? (complete ? "#fff1da" : "#e8f8ef") : "#ffffff";
-    activeCtx.strokeStyle = used ? (complete ? "#ff9f43" : "#20a66b") : "#243447";
+    activeCtx.fillStyle = used ? "#e8f8ef" : "#ffffff";
+    activeCtx.strokeStyle = used ? "#20a66b" : "#243447";
     activeCtx.lineWidth = 3;
     activeCtx.arc(node.x, node.y, node.r, 0, Math.PI * 2);
     activeCtx.fill();
@@ -1049,6 +1195,42 @@ function drawTrailCanvas(canvas, tick = 0) {
     activeCtx.textBaseline = "middle";
     activeCtx.fillText(node.label, node.x, node.y);
   });
+}
+
+function drawFingerCue(ctx, x, y, tick) {
+  const bob = Math.sin(tick / 8) * 2;
+  ctx.save();
+  ctx.translate(x, y + bob);
+  ctx.rotate(-0.25);
+  ctx.fillStyle = "#ffcfb6";
+  ctx.strokeStyle = "#9b4c3d";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  roundedRectPath(ctx, -8, -18, 16, 34, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#fff7ef";
+  ctx.beginPath();
+  ctx.arc(0, -16, 7, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function roundedRectPath(ctx, x, y, width, height, radius) {
+  if (typeof ctx.roundRect === "function") {
+    ctx.roundRect(x, y, width, height, radius);
+    return;
+  }
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  ctx.lineTo(x + r, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
 }
 
 function shouldShowTrailGuide() {
@@ -1116,6 +1298,12 @@ root.addEventListener("click", async (event) => {
   const current = tasks[state.activeTaskIndex];
 
   if (action === "startSession") {
+    if (!isParticipantComplete()) {
+      state.setupAttempted = true;
+      saveDraft();
+      render();
+      return;
+    }
     const participant = { ...state.participant };
     const adminSessions = state.adminSessions || [];
     state = createInitialState();
@@ -1141,12 +1329,14 @@ root.addEventListener("click", async (event) => {
     render();
   }
   if (action === "goHome") {
+    resetState();
     state.view = "setup";
     menuOpen = false;
     render();
   }
   if (action === "chooseParticipant") {
     state.participant[target.dataset.key] = target.dataset.value;
+    state.setupAttempted = false;
     saveDraft();
     render();
   }
@@ -1174,7 +1364,15 @@ root.addEventListener("click", async (event) => {
     const response = getResponse(current.id);
     const item = current.items[getTaskStep(current)];
     response.answer[item.key] = target.dataset.value;
-    await nextTask();
+    saveDraft();
+    render();
+  }
+  if (action === "toggleMemoryWord") toggleMemoryWord(target.dataset.word);
+  if (action === "chooseAbstraction") {
+    const response = getResponse("abstraction");
+    response.answer[target.dataset.key] = target.dataset.value;
+    saveDraft();
+    render();
   }
   if (action === "playCurrentAudio") playCurrentAudio();
   if (action === "toggleVoiceInput") toggleVoiceInput();
@@ -1185,7 +1383,7 @@ root.addEventListener("click", async (event) => {
   if (action === "backspaceSerial") backspaceSerial();
   if (action === "chooseOrientation") {
     applyOrientationChoice(target.dataset.key, target.dataset.value);
-    await nextTask();
+    render();
   }
   if (action === "tapVigilance") tapVigilance();
   if (action === "startFluency") startFluency();
@@ -1225,10 +1423,6 @@ root.addEventListener("input", (event) => {
     applyManualVoiceText(target.value);
     saveDraft();
   }
-  if (target.dataset.recallFreeText !== undefined) {
-    getResponse("delayedRecall").answer.freeText = target.value;
-    saveDraft();
-  }
   if (target.dataset.fluencyManual !== undefined) {
     const response = getResponse("fluency");
     response.answer.rawTranscript = target.value;
@@ -1250,6 +1444,10 @@ async function nextTask() {
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
   const step = getTaskStep(task);
+  if (!canConfirmTask(task, response)) {
+    render();
+    return;
+  }
   if (step < getTaskStepCount(task) - 1) {
     response.answer.step = step + 1;
     render();
@@ -1265,6 +1463,23 @@ async function nextTask() {
     state.activeTaskIndex = nextIndex;
   }
   render();
+}
+
+function canConfirmTask(task, response) {
+  if (task.type === "memory") {
+    const selected = response.answer.selectedWords || [];
+    if (selected.length !== WORDS.length) {
+      response.behavior.selectionWarning = "请先选满 5 个词";
+      return false;
+    }
+    const correct = selected.every((word) => WORDS.includes(word)) && WORDS.every((word) => selected.includes(word));
+    if (task.trial === 1 && !correct) {
+      response.behavior.selectionWarning = "还有词没有选对，请再听一遍或重新选择";
+      return false;
+    }
+    delete response.behavior.selectionWarning;
+  }
+  return true;
 }
 
 function nextTaskIndexAfterSubmit(task) {
@@ -1332,19 +1547,43 @@ async function submitActiveTask() {
   saveDraft();
 }
 
+function scheduleTaskInstruction(task) {
+  const step = getTaskStep(task);
+  const key = `${task.id}:${step}`;
+  if (state.playedInstructionKeys[key]) return;
+  const text = taskInstructionText(task, step);
+  if (!text) return;
+  state.playedInstructionKeys[key] = true;
+  saveDraft();
+  window.setTimeout(() => {
+    if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
+    speakText(text, { rate: 0.82, pitch: 1.18 });
+  }, 260);
+}
+
+function taskInstructionText(task, step) {
+  if (task.type === "naming") return "请您告诉我这个动物的名字。这是什么动物？";
+  if (task.type === "sentence") {
+    return step === 0
+      ? "现在我要对您说一句话，我说完后请您把我说的话尽可能原原本本地重复出来。"
+      : "现在我再说另一句话，我说完后请您也把它尽可能原原本本地重复出来。";
+  }
+  if (task.type === "abstractionChoice") return `请您说说${task.items[step].pair}在什么方面相类似？`;
+  if (task.type === "orientation") return orientationPrompts[step].label;
+  return task.instruction || task.prompt;
+}
+
 function playCurrentAudio() {
   const task = tasks[state.activeTaskIndex];
   const step = getTaskStep(task);
-  if (task.type === "memory") return speakText(WORDS.join("，"), { rate: 0.78, done: () => startVoiceInput() });
+  if (task.type === "memory") return speakItemsSlow(WORDS, { gapMs: 1000, rate: 0.72 });
   if (task.type === "choice") return playDigitStimulus(task);
   if (task.type === "vigilance") return startVigilance();
   if (task.type === "sentence") return speakText(task.sentences[step], { rate: 0.86, done: () => startVoiceInput() });
-  if (task.type === "abstractionSpeech") return speakText(task.items[step].pair, { rate: 0.86, done: () => startVoiceInput() });
-  if (task.type === "recall") return speakText(task.prompt, { rate: 0.86, done: () => startVoiceInput() });
 }
 
 function speakText(text, options = {}) {
-  const { rate = 0.86, pitch = 1.04, done, onStart } = options;
+  const { rate = 0.82, pitch = 1.18, done, onStart } = options;
   if (!("speechSynthesis" in window)) {
     if (done) done();
     return;
@@ -1403,7 +1642,7 @@ function speakItemsSlow(items, options = {}) {
     const utterance = new SpeechSynthesisUtterance(value);
     utterance.lang = "zh-CN";
     utterance.rate = rate;
-    utterance.pitch = 1.04;
+    utterance.pitch = 1.18;
     const voice = pickNaturalVoice();
     if (voice) utterance.voice = voice;
     utterance.onend = () => {
@@ -1422,7 +1661,7 @@ function playDigitStimulus(task) {
   response.answer.audioReady = false;
   response.behavior.digitPlayback = [];
   speakItemsSlow(task.stimulus.split(""), {
-    gapMs: 650,
+    gapMs: 1000,
     rate: 0.66,
     onItemStart: (digit, index) => response.behavior.digitPlayback.push({ digit, index, at: Date.now() }),
     done: () => {
@@ -1541,7 +1780,7 @@ function applyVoiceText(text) {
   const response = getResponse(task.id);
   const step = getTaskStep(task);
   if (task.type === "memory") response.answer.freeText = text;
-  if (task.type === "sentence" || task.type === "abstractionSpeech") {
+  if (task.type === "sentence") {
     response.answer.transcript = response.answer.transcript || {};
     response.answer.transcript[step] = text;
   }
@@ -1549,7 +1788,6 @@ function applyVoiceText(text) {
     response.answer.rawTranscript = text;
     response.answer.animals = extractAnimalNames(text);
   }
-  if (task.type === "recall") response.answer.freeText = text;
   if (task.type === "orientation") applyOrientationText(response, step, text);
   response.behavior.voiceEvents = response.behavior.voiceEvents || [];
   response.behavior.voiceEvents.push({ step, text, at: new Date().toISOString() });
@@ -1561,7 +1799,7 @@ function applyManualVoiceText(text) {
   const response = getResponse(task.id);
   const step = getTaskStep(task);
   if (task.type === "memory") response.answer.freeText = text;
-  if (task.type === "sentence" || task.type === "abstractionSpeech") {
+  if (task.type === "sentence") {
     response.answer.transcript = response.answer.transcript || {};
     response.answer.transcript[step] = text;
   }
@@ -1619,8 +1857,18 @@ function orientationOptions(prompt) {
     const expected = getResponse("orientation").answer.expectedCity || getResponse("orientation").behavior.location?.city || "南京市";
     return optionObjects([expected, "上海市", "北京市", "杭州市", "苏州市"], expected).slice(0, 4);
   }
-  const expectedPlace = getResponse("orientation").answer.expectedPlace || getResponse("orientation").behavior.location?.place || "当前位置";
-  return optionObjects([expectedPlace, "社区中心", "医院", "学校", "家里"], expectedPlace).slice(0, 4);
+  const expectedPlace = currentPlaceName();
+  return optionObjects([expectedPlace, "社区卫生服务中心", "综合医院门诊", "学校教室", "家里客厅"], expectedPlace).slice(0, 4);
+}
+
+function currentPlaceName() {
+  const response = getResponse("orientation");
+  const location = response.behavior.location || {};
+  return response.answer.expectedPlace || location.place || firstLocationPart(location.address) || "社区测评室";
+}
+
+function firstLocationPart(address) {
+  return String(address || "").split(/[，,]/).map((part) => part.trim()).filter(Boolean)[0] || "";
 }
 
 function optionObjects(values, correct) {
@@ -1643,6 +1891,21 @@ function dateOptionLabel(value) {
   return `${Number(month)}月${Number(day)}日`;
 }
 
+function toggleMemoryWord(word) {
+  const response = getResponse(tasks[state.activeTaskIndex].id);
+  response.answer.selectedWords = response.answer.selectedWords || [];
+  delete response.behavior.selectionWarning;
+  if (response.answer.selectedWords.includes(word)) {
+    response.answer.selectedWords = response.answer.selectedWords.filter((entry) => entry !== word);
+  } else if (response.answer.selectedWords.length < WORDS.length) {
+    response.answer.selectedWords.push(word);
+  } else {
+    response.behavior.selectionWarning = "最多选择 5 个词";
+  }
+  saveDraft();
+  render();
+}
+
 function firstNumber(text) {
   return numbersInText(text)[0] || "";
 }
@@ -1656,10 +1919,6 @@ async function appendDigit(digit) {
   const response = getResponse(task.id);
   response.answer.sequence = response.answer.sequence || [];
   if (response.answer.sequence.length < task.answer.length) response.answer.sequence.push(digit);
-  if (response.answer.sequence.length >= task.answer.length) {
-    await nextTask();
-    return;
-  }
   render();
 }
 
@@ -1700,7 +1959,7 @@ function startVigilance() {
   response.behavior.vigilanceDigits = [];
   window.clearInterval(vigilanceTimer);
   speakItemsSlow(VIGILANCE_DIGITS, {
-    gapMs: 650,
+    gapMs: 1000,
     rate: 0.66,
     onItemStart: (digit, index) => response.behavior.vigilanceDigits.push({ digit, index, at: Date.now() }),
     done: () => {
@@ -1791,7 +2050,7 @@ function locationStatus() {
   if (!location) return "定位未获取";
   if (location.error) return location.error;
   if (location.city || location.place) return `已获取：${location.city || ""} ${location.place || ""}`;
-  return "已记录当前位置";
+  return "已记录定位信息";
 }
 
 async function requestJson(path, options, fallback) {
@@ -1874,15 +2133,13 @@ async function scoreTaskWithAi(task) {
 }
 
 function needsAiScore(task) {
-  return ["trail", "drawing", "sentence", "fluency", "abstractionSpeech", "recall"].includes(task.type);
+  return ["trail", "drawing", "sentence", "fluency"].includes(task.type);
 }
 
 function clientAutoScoreForAi(task, response) {
   if (task.type === "trail") return scoreTrail().score;
   if (task.type === "sentence") return scoreSentenceTranscript(task, response);
   if (task.type === "fluency") return uniqueWords(response.answer?.animals || []).length >= 11 ? 1 : 0;
-  if (task.type === "abstractionSpeech") return scoreAbstractionSpeech(task, response);
-  if (task.type === "recall") return scoreRecallText(response);
   if (task.type === "orientation") return scoreOrientationByInputs(response);
   return null;
 }
@@ -1892,14 +2149,13 @@ function computeTaskScore(task, response = getResponse(task.id)) {
   if (task.type === "trail") return scoreTrail().score;
   if (task.id === "cube" || task.id === "clock") return aiScore ?? 0;
   if (task.type === "naming") return task.items.reduce((sum, item) => sum + (response.answer?.[item.key] === item.answer ? 1 : 0), 0);
-  if (task.type === "memory") return 0;
+  if (task.type === "memory") return task.trial === 2 ? scoreMemoryChoices(response) : 0;
   if (task.type === "choice") return (response.answer?.sequence || []).join("") === task.answer ? 1 : 0;
   if (task.type === "vigilance") return scoreVigilance(response);
   if (task.type === "serial7") return scoreSerial7(response).score;
   if (task.type === "sentence") return aiScore ?? 0;
   if (task.type === "fluency") return aiScore ?? (uniqueWords(response.answer?.animals || []).length >= 11 ? 1 : 0);
-  if (task.type === "abstractionSpeech") return aiScore ?? scoreAbstractionSpeech(task, response);
-  if (task.type === "recall") return aiScore ?? 0;
+  if (task.type === "abstractionChoice") return scoreAbstractionChoice(task, response);
   if (task.type === "orientation") return aiScore ?? scoreOrientationByInputs(response);
   return 0;
 }
@@ -1964,17 +2220,13 @@ function scoreSentenceTranscript(task, response) {
   return task.sentences.reduce((sum, sentence, index) => sum + (normalizeText(transcript[index]) === normalizeText(sentence) ? 1 : 0), 0);
 }
 
-function scoreAbstractionSpeech(task, response) {
-  const transcript = response.answer?.transcript || {};
-  return task.items.reduce((sum, item, index) => {
-    const text = normalizeText(transcript[index] || "");
-    return sum + ((item.accepted || []).some((keyword) => text.includes(normalizeText(keyword))) ? 1 : 0);
-  }, 0);
+function scoreAbstractionChoice(task, response) {
+  return task.items.reduce((sum, item) => sum + (response.answer?.[item.key] === item.answer ? 1 : 0), 0);
 }
 
-function scoreRecallText(response) {
-  const text = normalizeText(response.answer?.freeText || "");
-  return WORDS.reduce((sum, word) => sum + (text.includes(normalizeText(word)) ? 1 : 0), 0);
+function scoreMemoryChoices(response) {
+  const selected = response.answer?.selectedWords || [];
+  return selected.reduce((sum, word) => sum + (WORDS.includes(word) ? 1 : 0), 0);
 }
 
 function scoreOrientationByInputs(response) {
