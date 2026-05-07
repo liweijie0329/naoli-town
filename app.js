@@ -1460,7 +1460,7 @@ function cubeReferenceSvg() {
   return `
     <svg class="reference-svg" viewBox="0 0 180 160" role="img" aria-label="立方体参考图">
       <path d="M28 56 L102 56 L148 18 L74 18 Z" fill="#f6fbff" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
-      <path d="M102 56 L148 18 L148 94 L102 132 Z" fill="#dbe7ef" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
+      <path d="M102 56 L148 18 L148 132 L102 132 Z" fill="#dbe7ef" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
       <path d="M28 56 L102 56 L102 132 L28 132 Z" fill="#ffffff" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
     </svg>
   `;
