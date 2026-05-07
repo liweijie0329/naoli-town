@@ -265,10 +265,10 @@ const rubricGroups = [
 
 const root = document.querySelector("#app");
 const educationLevels = ["", "小学", "初中", "中专", "高中", "大专", "本科及以上"];
-const persistedState = safeJson(localStorage.getItem("moca-game-draft"));
-const initialState = persistedState?.view === "setup" ? null : persistedState;
 
-let state = initialState || createInitialState();
+localStorage.removeItem("moca-game-draft");
+
+let state = createInitialState();
 let activeCanvas = null;
 let activeCtx = null;
 let drawing = false;
@@ -293,6 +293,12 @@ updateViewportMetrics();
 bindViewportMetrics();
 migrateState();
 render();
+
+window.addEventListener("pageshow", (event) => {
+  if (!event.persisted) return;
+  resetState();
+  render();
+});
 
 function updateViewportMetrics() {
   const viewport = window.visualViewport;
