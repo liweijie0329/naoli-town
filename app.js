@@ -13,6 +13,8 @@ const ABSTRACTION_DISTRACTORS = ["电脑", "学校", "无聊", "天气", "杯子
 const CITY_DISTRACTORS = ["北京市", "上海市", "杭州市", "苏州市", "广州市", "深圳市", "成都市", "武汉市", "西安市", "青岛市", "厦门市", "天津市"];
 const PLACE_SEARCH_TERMS = ["医院", "学校", "社区中心", "大学", "公园", "图书馆", "体育中心", "博物馆"];
 const MIN_PLACE_DISTRACTOR_KM = 10;
+const DRAWING_IDLE_HINT_MS = 5000;
+const DRAWING_CONFIRM_NUDGE_MS = 10000;
 const VOICE_PROFILES = {
   cartoon: { label: "卡通童声", hints: ["xiaoxiao", "xiaoyi", "xiaobei", "tingting", "美佳", "sin-ji"], rateScale: 0.96, pitchOffset: 0.1 },
   gentle: { label: "温柔女声", hints: ["xiaoxiao", "ting-ting", "tingting", "mei-jia", "meijia", "female", "美佳"], rateScale: 1, pitchOffset: -0.04 },
@@ -292,6 +294,7 @@ let trailGuideTick = 0;
 let trailDragStart = null;
 let trailDragPoint = null;
 let viewportRenderTimer = null;
+let drawingIdleTimers = [];
 
 updateViewportMetrics();
 bindViewportMetrics();
@@ -525,6 +528,7 @@ function finishTask(taskId) {
 function render() {
   saveDraft();
   stopTrailGuide();
+  stopDrawingIdleTimers();
   if (state.view === "setup") {
     root.innerHTML = renderSetup();
     return;
@@ -697,10 +701,11 @@ function renderTaskActions(task, step) {
   const secondary = taskActionSecondaryButtons(task);
   const showConfirm = shouldShowConfirmButton(task);
   if (!secondary && !showConfirm) return `<div class="task-actions spacer"></div>`;
+  const confirmClass = `confirm-button ${shouldNudgeConfirm(task) ? "attention-nudge" : ""}`;
   return html`
     <div class="task-actions">
       <div class="task-actions-left">${secondary || ""}</div>
-      ${showConfirm ? `<button class="confirm-button" data-action="nextTask">${confirmLabel(task, step)}</button>` : ""}
+      ${showConfirm ? `<button class="${confirmClass}" data-action="nextTask">${confirmLabel(task, step)}</button>` : ""}
     </div>
   `;
 }
@@ -720,11 +725,12 @@ function taskActionSecondaryButtons(task) {
 function shouldShowConfirmButton(task) {
   if (task.type === "memory") return task.trial === 2 || Boolean(getResponse(task.id).answer.audioReady);
   if (task.type === "choice") return Boolean(getResponse(task.id).answer.audioReady);
-  if (task.type === "vigilance") {
-    const answer = getResponse(task.id).answer || {};
-    return Boolean(answer.startedAt) && !answer.running;
-  }
+  if (task.type === "vigilance") return false;
   return true;
+}
+
+function shouldNudgeConfirm(task) {
+  return task?.type === "drawing" && Boolean(getResponse(task.id).behavior.confirmNudge);
 }
 
 function getTaskStep(task) {
@@ -775,10 +781,32 @@ function renderDrawingTask(task) {
       ${task.drawingKind === "cube" ? `<div class="reference-panel">${cubeReferenceSvg()}</div>` : ""}
       <div class="canvas-wrap">
         ${task.drawingKind === "clock" ? `<div class="clock-label">11:10</div>` : ""}
-        <canvas id="taskCanvas" class="task-canvas" aria-label="${escapeHtml(task.title)}画图区域"></canvas>
+        <div class="canvas-surface">
+          <canvas id="taskCanvas" class="task-canvas" aria-label="${escapeHtml(task.title)}画图区域"></canvas>
+          ${renderDrawingHint(task)}
+        </div>
       </div>
     </div>
   `;
+}
+
+function renderDrawingHint(task) {
+  const visible = Boolean(getResponse(task.id).behavior.idleHintVisible);
+  if (task.drawingKind === "cube") {
+    return html`
+      <svg class="drawing-hint ${visible ? "visible" : ""}" viewBox="0 0 100 100" aria-hidden="true">
+        <line x1="34" y1="25" x2="34" y2="78"></line>
+      </svg>
+    `;
+  }
+  if (task.drawingKind === "clock") {
+    return html`
+      <svg class="drawing-hint ${visible ? "visible" : ""}" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="53" r="32"></circle>
+      </svg>
+    `;
+  }
+  return "";
 }
 
 function renderNamingTask(task, step) {
@@ -946,11 +974,12 @@ function renderSpeechControls(transcript) {
 function renderAudioWave() {
   const active = playState === "播放中..." || recognizing || recordingAudio;
   const label = playState === "播放中..." ? "播放中..." : voiceState && voiceState !== "待说" ? voiceState : recognizing || recordingAudio ? "请说" : "";
+  const showLabel = label && label !== "播放中...";
   return html`
     <div class="audio-wave ${active ? "active" : ""}" aria-label="${escapeHtml(label)}">
       <span></span><span></span><span></span><span></span><span></span>
     </div>
-    ${label ? `<strong class="voice-status">${escapeHtml(label)}</strong>` : ""}
+    ${showLabel ? `<strong class="voice-status">${escapeHtml(label)}</strong>` : ""}
   `;
 }
 
@@ -1237,6 +1266,7 @@ function setupFreeCanvas(task) {
 
   canvas.onpointerdown = (event) => {
     drawing = true;
+    markDrawingInteraction(task);
     canvas.setPointerCapture(event.pointerId);
     const point = canvasPoint(event, canvas);
     activeCtx.beginPath();
@@ -1256,6 +1286,54 @@ function setupFreeCanvas(task) {
     state.drawings[task.id] = canvas.toDataURL("image/png");
     saveDraft();
   };
+  startDrawingIdleHints(task);
+}
+
+function startDrawingIdleHints(task) {
+  if (!shouldStartDrawingIdleHints(task)) return;
+  drawingIdleTimers.push(window.setTimeout(() => showDrawingIdleHint(task), DRAWING_IDLE_HINT_MS));
+  drawingIdleTimers.push(window.setTimeout(() => nudgeDrawingConfirm(task), DRAWING_CONFIRM_NUDGE_MS));
+}
+
+function shouldStartDrawingIdleHints(task) {
+  if (!["cube", "clock"].includes(task.id)) return false;
+  const response = getResponse(task.id);
+  return !Number(response.behavior.strokes || 0) && !state.drawings[task.id] && !response.drawingImage;
+}
+
+function showDrawingIdleHint(task) {
+  if (!isActiveTask(task) || !shouldStartDrawingIdleHints(task)) return;
+  const response = getResponse(task.id);
+  response.behavior.idleHintVisible = true;
+  saveDraft();
+  document.querySelector(".drawing-hint")?.classList.add("visible");
+}
+
+function nudgeDrawingConfirm(task) {
+  if (!isActiveTask(task) || !shouldStartDrawingIdleHints(task)) return;
+  const response = getResponse(task.id);
+  response.behavior.confirmNudge = true;
+  saveDraft();
+  document.querySelector(".confirm-button")?.classList.add("attention-nudge");
+}
+
+function markDrawingInteraction(task) {
+  const response = getResponse(task.id);
+  if (!response.behavior.firstInteractionAt) response.behavior.firstInteractionAt = new Date().toISOString();
+  delete response.behavior.idleHintVisible;
+  delete response.behavior.confirmNudge;
+  stopDrawingIdleTimers();
+  document.querySelector(".drawing-hint")?.classList.remove("visible");
+  document.querySelector(".confirm-button")?.classList.remove("attention-nudge");
+}
+
+function stopDrawingIdleTimers() {
+  drawingIdleTimers.forEach((timer) => window.clearTimeout(timer));
+  drawingIdleTimers = [];
+}
+
+function isActiveTask(task) {
+  return state.view === "test" && tasks[state.activeTaskIndex]?.id === task?.id;
 }
 
 function setupTrailCanvas() {
@@ -1597,7 +1675,12 @@ root.addEventListener("click", async (event) => {
   if (action === "startFluency") startFluency();
   if (action === "clearDrawing") {
     delete state.drawings[current.id];
-    delete getResponse(current.id).drawingImage;
+    const response = getResponse(current.id);
+    delete response.drawingImage;
+    response.behavior.strokes = 0;
+    delete response.behavior.idleHintVisible;
+    delete response.behavior.confirmNudge;
+    delete response.behavior.firstInteractionAt;
     render();
   }
   if (action === "undoTrail") {
@@ -1676,7 +1759,6 @@ async function startNewSession(participant) {
   state.startedAt = new Date().toISOString();
   state.activeTaskIndex = 0;
   state.view = "test";
-  await requestStartupPermissions();
   render();
 }
 
@@ -1731,6 +1813,7 @@ function goPreviousStep() {
   const step = getTaskStep(current);
   if (step > 0) {
     response.answer.step = step - 1;
+    resetInstructionPlayback(current, step - 1);
     saveDraft();
     render();
     return;
@@ -1740,7 +1823,9 @@ function goPreviousStep() {
   if (previousIndex >= 0) {
     const previous = tasks[previousIndex];
     state.activeTaskIndex = previousIndex;
-    getResponse(previous.id).answer.step = Math.max(0, getTaskStepCount(previous) - 1);
+    const previousStep = Math.max(0, getTaskStepCount(previous) - 1);
+    getResponse(previous.id).answer.step = previousStep;
+    resetInstructionPlayback(previous, previousStep);
     saveDraft();
   }
   render();
@@ -1904,6 +1989,11 @@ function scheduleTaskInstruction(task) {
   }, 260);
 }
 
+function resetInstructionPlayback(task, step = getTaskStep(task)) {
+  if (!task) return;
+  delete state.playedInstructionKeys[`${task.id}:${step}`];
+}
+
 function taskInstructionText(task, step) {
   if (task.type === "naming") return "请您告诉我这个动物的名字。这是什么动物？";
   if (task.type === "sentence") {
@@ -1912,7 +2002,7 @@ function taskInstructionText(task, step) {
       : "现在我再说另一句话，我说完后请您也把它尽可能原原本本地重复出来。";
   }
   if (task.type === "serial7") {
-    return step === 0 ? task.instruction : "再减 7，等于多少？";
+    return step === 0 ? "100 减 7 等于多少？" : "再减 7，等于多少？";
   }
   if (task.type === "abstractionChoice") {
     const item = task.items[step];
@@ -2537,9 +2627,23 @@ function startVigilance() {
     done: () => {
       window.clearInterval(vigilanceTimer);
       response.answer.running = false;
-      render();
+      autoAdvanceVigilance();
     }
   });
+  render();
+}
+
+async function autoAdvanceVigilance() {
+  const task = tasks[state.activeTaskIndex];
+  if (state.view !== "test" || task?.id !== "vigilance") return;
+  await submitActiveTask();
+  const nextIndex = nextTaskIndexAfterSubmit(task);
+  if (nextIndex < 0) {
+    state.view = "results";
+    state.finishedAt = new Date().toISOString();
+  } else {
+    state.activeTaskIndex = nextIndex;
+  }
   render();
 }
 

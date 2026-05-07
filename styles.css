@@ -378,6 +378,10 @@ h4 {
   font-size: clamp(22px, 2.5vw, 28px);
 }
 
+.confirm-button.attention-nudge {
+  animation: confirmNudge 0.82s ease-in-out infinite;
+}
+
 .utility-button {
   min-width: clamp(108px, 14vw, 150px);
   min-height: clamp(52px, 7dvh, 66px);
@@ -998,6 +1002,14 @@ h4 {
   grid-template-rows: minmax(0, 1fr);
 }
 
+.canvas-surface {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
 .clock-label {
   justify-self: center;
   margin-bottom: 12px;
@@ -1016,6 +1028,29 @@ h4 {
   border-radius: 8px;
   background: #fff;
   touch-action: none;
+}
+
+.drawing-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.drawing-hint.visible {
+  opacity: 0.82;
+}
+
+.drawing-hint line,
+.drawing-hint circle {
+  fill: none;
+  stroke: #f28a3c;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 6 6;
+  filter: drop-shadow(0 4px 8px rgba(242, 138, 60, 0.22));
 }
 
 .redraw-button {
@@ -2239,6 +2274,18 @@ h4 {
   }
   50% {
     transform: scale(1.04);
+  }
+}
+
+@keyframes confirmNudge {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 5px 0 #bf533e;
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 8px 0 #bf533e, 0 12px 22px rgba(242, 126, 92, 0.34);
   }
 }
 
