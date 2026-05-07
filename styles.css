@@ -2479,3 +2479,751 @@ h4 {
     height: 92px;
   }
 }
+
+@media (max-width: 640px), (max-height: 560px) {
+  :root {
+    --bottom-safe: max(10px, env(safe-area-inset-bottom));
+    --setup-control-height: 52px;
+  }
+
+  body {
+    font-size: 18px;
+  }
+
+  h1 {
+    font-size: clamp(36px, 10vw, 44px);
+  }
+
+  h2 {
+    font-size: clamp(20px, 5.8vw, 26px);
+  }
+
+  h3,
+  h4 {
+    font-size: clamp(22px, 6vw, 28px);
+  }
+
+  .setup-screen {
+    place-items: stretch;
+    padding: 10px;
+    overflow: auto;
+  }
+
+  .floating-stars i {
+    width: 22px;
+    height: 22px;
+  }
+
+  .setup-panel {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(104px, 0.72fr);
+    gap: 10px;
+    align-self: stretch;
+    width: 100%;
+    min-height: 0;
+    padding: 14px;
+    overflow: hidden;
+  }
+
+  .setup-panel::after,
+  .play-orbit {
+    display: none;
+  }
+
+  .setup-left {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .brand-row {
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .logo-image {
+    width: 58px;
+    height: 58px;
+  }
+
+  .setup-grid {
+    gap: 7px;
+    min-height: 0;
+  }
+
+  .field {
+    gap: 4px;
+    font-size: 17px;
+  }
+
+  .field input,
+  .field select,
+  .segment-option {
+    font-size: 19px;
+  }
+
+  .segmented-options {
+    gap: 8px;
+  }
+
+  .setup-play-zone {
+    min-height: 104px;
+  }
+
+  .setup-start-button {
+    width: clamp(112px, 34vw, 150px);
+    height: clamp(112px, 34vw, 150px);
+    border-width: 5px;
+    box-shadow:
+      0 7px 0 var(--leaf-dark),
+      0 14px 26px rgba(18, 122, 73, 0.2);
+  }
+
+  .setup-start-button span {
+    font-size: clamp(28px, 8vw, 38px);
+  }
+
+  .setup-start-button small {
+    margin-top: 2px;
+    font-size: clamp(18px, 5vw, 25px);
+  }
+
+  .page-shell {
+    grid-template-rows: 56px minmax(0, 1fr);
+  }
+
+  .page-header {
+    gap: 8px;
+    padding: 6px 8px;
+  }
+
+  .icon-button {
+    width: 42px;
+    height: 42px;
+    font-size: 24px;
+  }
+
+  .header-title h2 {
+    font-size: clamp(20px, 5.6vw, 25px);
+  }
+
+  .header-prompt {
+    margin-top: 1px;
+    font-size: clamp(13px, 3.8vw, 16px);
+    line-height: 1.2;
+    -webkit-line-clamp: 1;
+  }
+
+  .header-progress {
+    width: 66px;
+    gap: 4px;
+    font-size: 16px;
+  }
+
+  .progress-track {
+    height: 7px;
+  }
+
+  .drawer-panel {
+    width: min(320px, 88vw);
+    gap: 7px;
+    padding: 14px;
+  }
+
+  .drawer-logo {
+    width: 46px;
+    height: 46px;
+  }
+
+  .drawer-item {
+    min-height: 42px;
+    font-size: 18px;
+  }
+
+  .drawer-score {
+    min-height: 58px;
+    font-size: 26px;
+  }
+
+  .drawer-task {
+    min-height: 42px;
+    padding: 6px 9px;
+  }
+
+  .task-page {
+    gap: 6px;
+    padding: 6px 42px var(--bottom-safe);
+  }
+
+  .edge-arrow {
+    width: 34px;
+    height: 76px;
+    font-size: 42px;
+    border-width: 1px;
+  }
+
+  .edge-arrow-left {
+    left: 4px;
+  }
+
+  .edge-arrow-right {
+    right: 4px;
+  }
+
+  .task-actions {
+    min-height: 46px;
+    gap: 8px;
+    padding: 0;
+  }
+
+  .task-actions-left {
+    gap: 6px;
+  }
+
+  .confirm-button {
+    min-width: 96px;
+    min-height: 44px;
+    padding: 8px 15px;
+    font-size: 20px;
+    box-shadow: 0 4px 0 #bf533e;
+  }
+
+  .utility-button {
+    min-width: 78px;
+    min-height: 42px;
+    padding: 7px 12px;
+    font-size: 18px;
+    box-shadow: 0 3px 0 #cddbd2;
+  }
+
+  .trail-page,
+  .drawing-page,
+  .naming-page,
+  .memory-page,
+  .speech-page,
+  .abstraction-page,
+  .orientation-page,
+  .digit-page,
+  .vigilance-page,
+  .serial-page,
+  .fluency-page,
+  .wait-card {
+    border-width: 1px;
+  }
+
+  .trail-page {
+    padding: 8px;
+  }
+
+  .drawing-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(118px, 0.32fr) minmax(0, 1fr);
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .drawing-page.cube-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(118px, 0.32fr) minmax(0, 1fr);
+  }
+
+  .drawing-page.clock-page {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .reference-svg {
+    width: min(230px, 86%);
+    max-height: 96%;
+  }
+
+  .clock-label {
+    margin-bottom: 6px;
+    font-size: clamp(34px, 10vw, 44px);
+  }
+
+  .redraw-button {
+    right: 8px;
+    bottom: 8px;
+  }
+
+  .naming-page {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .animal-emoji {
+    width: min(136px, 42vw);
+    font-size: clamp(88px, 27vw, 120px);
+  }
+
+  .animal-side {
+    width: 100%;
+  }
+
+  .animal-side h4 {
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .option-grid {
+    gap: 8px;
+  }
+
+  .option {
+    min-height: 52px;
+    padding: 8px 10px;
+    font-size: clamp(18px, 5vw, 22px);
+  }
+
+  .memory-page {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .memory-choice-panel {
+    gap: 10px;
+    font-size: clamp(20px, 5.6vw, 24px);
+  }
+
+  .memory-choice-panel span {
+    min-width: 64px;
+    min-height: 38px;
+  }
+
+  .memory-wait-copy {
+    font-size: clamp(18px, 5vw, 23px);
+  }
+
+  .speech-page,
+  .abstraction-page,
+  .orientation-page,
+  .digit-page,
+  .vigilance-page,
+  .serial-page,
+  .fluency-page,
+  .wait-card {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .audio-wave {
+    width: 138px;
+    height: 62px;
+    gap: 7px;
+  }
+
+  .audio-wave span {
+    width: 9px;
+  }
+
+  .voice-status {
+    font-size: 17px;
+  }
+
+  .circle-button,
+  .timer-button,
+  .sound-button {
+    width: 112px;
+    height: 112px;
+    min-width: 112px;
+    min-height: 112px;
+    font-size: 22px;
+  }
+
+  .digit-answer {
+    min-height: 46px;
+    gap: 6px;
+  }
+
+  .digit-answer span {
+    width: 38px;
+    height: 46px;
+    font-size: 24px;
+  }
+
+  .keypad,
+  .digit-keypad,
+  .serial-keypad {
+    grid-template-columns: repeat(3, clamp(54px, 15vw, 70px));
+    gap: 8px;
+  }
+
+  .keypad button,
+  .keypad-spacer {
+    min-height: 44px;
+  }
+
+  .keypad button {
+    font-size: 21px;
+  }
+
+  .tap-instruction {
+    font-size: clamp(28px, 8vw, 38px);
+    text-align: center;
+  }
+
+  .tap-button {
+    width: min(260px, 90%);
+    min-height: 112px;
+    font-size: 28px;
+  }
+
+  .math-question {
+    font-size: clamp(30px, 8vw, 38px);
+  }
+
+  .serial-display {
+    width: 168px;
+    height: 56px;
+    font-size: 30px;
+  }
+
+  .word-pair {
+    gap: 10px;
+  }
+
+  .word-card {
+    min-width: min(132px, 40vw);
+    min-height: 94px;
+    padding: 8px;
+  }
+
+  .word-card span {
+    font-size: clamp(32px, 10vw, 42px);
+  }
+
+  .word-card strong {
+    font-size: clamp(23px, 7vw, 30px);
+  }
+
+  .hand-cue {
+    right: -10px;
+    bottom: -10px;
+    font-size: 34px;
+  }
+
+  .pair-title,
+  .orientation-question {
+    max-width: 96%;
+    font-size: clamp(24px, 7vw, 30px);
+  }
+
+  .transcript-input {
+    width: 96%;
+    height: 82px;
+    font-size: 16px;
+  }
+
+  .results-page,
+  .design-page,
+  .admin-page {
+    gap: 10px;
+    padding: 10px;
+    overflow: auto;
+  }
+
+  .results-page {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .result-hero {
+    gap: 6px;
+    padding: 10px;
+  }
+
+  .result-logo {
+    width: 76px;
+    height: 76px;
+  }
+
+  .result-hero strong {
+    font-size: clamp(46px, 13vw, 64px);
+  }
+
+  .result-hero p {
+    font-size: 18px;
+    text-align: center;
+  }
+
+  .radar-card {
+    width: min(230px, 46dvh);
+  }
+
+  .result-medals {
+    gap: 7px;
+  }
+
+  .result-medals b {
+    min-width: 66px;
+    min-height: 36px;
+    font-size: 15px;
+  }
+
+  .results-actions {
+    justify-content: center;
+  }
+
+  .results-actions .primary,
+  .results-actions .ghost,
+  .admin-toolbar .primary,
+  .admin-toolbar .secondary {
+    min-height: 42px;
+    padding: 8px 12px;
+    font-size: 16px;
+  }
+
+  .admin-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(190px, 0.6fr) minmax(260px, 1fr);
+  }
+
+  .admin-toolbar {
+    justify-content: start;
+    overflow-x: auto;
+  }
+
+  .admin-head,
+  .admin-row {
+    grid-template-columns: 1.1fr 0.55fr 0.55fr 1fr;
+    gap: 6px;
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+
+  .detail-header {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .detail-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .design-page {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .rubric-page-head {
+    display: grid;
+    gap: 4px;
+    padding: 12px;
+  }
+
+  .rubric-page-head p {
+    font-size: 16px;
+  }
+
+  .rubric-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .rubric-group {
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .rubric-group h4 {
+    font-size: 22px;
+  }
+
+  .rubric-card summary {
+    min-height: 48px;
+    padding: 10px;
+    font-size: 19px;
+  }
+
+  .rubric-card-body p {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 430px) {
+  :root {
+    --setup-control-height: 48px;
+  }
+
+  .setup-screen {
+    padding: 8px;
+  }
+
+  .setup-panel {
+    padding: 12px;
+  }
+
+  .logo-image {
+    width: 52px;
+    height: 52px;
+  }
+
+  .setup-grid {
+    gap: 6px;
+  }
+
+  .field {
+    font-size: 16px;
+  }
+
+  .field input,
+  .field select,
+  .segment-option {
+    font-size: 18px;
+  }
+
+  .task-page {
+    padding-inline: 36px;
+  }
+
+  .edge-arrow {
+    width: 30px;
+    height: 68px;
+    font-size: 36px;
+  }
+
+  .confirm-button {
+    min-width: 84px;
+    min-height: 42px;
+    padding: 7px 12px;
+    font-size: 18px;
+  }
+
+  .utility-button {
+    min-width: 68px;
+    min-height: 40px;
+    padding: 6px 10px;
+    font-size: 17px;
+  }
+
+  .task-actions {
+    gap: 6px;
+  }
+
+  .drawing-page,
+  .drawing-page.cube-page {
+    grid-template-rows: minmax(104px, 0.3fr) minmax(0, 1fr);
+  }
+
+  .drawing-page.clock-page {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .option {
+    min-height: 48px;
+  }
+
+  .memory-page .option {
+    min-height: 44px;
+    font-size: 17px;
+  }
+
+  .circle-button,
+  .timer-button,
+  .sound-button {
+    width: 100px;
+    height: 100px;
+    min-width: 100px;
+    min-height: 100px;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  :root {
+    --setup-control-height: 44px;
+  }
+
+  .setup-panel {
+    grid-template-columns: minmax(0, 1fr) minmax(112px, 0.32fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .brand-row {
+    margin-bottom: 6px;
+  }
+
+  .logo-image {
+    width: 44px;
+    height: 44px;
+  }
+
+  h1 {
+    font-size: 32px;
+  }
+
+  .setup-grid {
+    gap: 5px;
+  }
+
+  .field {
+    font-size: 15px;
+  }
+
+  .field input,
+  .field select,
+  .segment-option {
+    font-size: 17px;
+  }
+
+  .setup-start-button {
+    width: 104px;
+    height: 104px;
+  }
+
+  .setup-start-button span {
+    font-size: 27px;
+  }
+
+  .setup-start-button small {
+    font-size: 17px;
+  }
+
+  .page-shell {
+    grid-template-rows: 50px minmax(0, 1fr);
+  }
+
+  .page-header {
+    padding-block: 4px;
+  }
+
+  .icon-button {
+    width: 38px;
+    height: 38px;
+  }
+
+  .header-prompt {
+    display: none;
+  }
+
+  .task-page {
+    padding-top: 4px;
+    padding-bottom: 6px;
+  }
+
+  .drawing-page,
+  .drawing-page.cube-page {
+    grid-template-columns: minmax(150px, 0.8fr) minmax(0, 1.4fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .naming-page {
+    grid-template-columns: minmax(120px, 0.5fr) minmax(0, 1fr);
+  }
+
+  .animal-emoji {
+    width: min(128px, 30dvh);
+    font-size: min(106px, 24dvh);
+  }
+
+  .option {
+    min-height: 42px;
+  }
+
+  .circle-button,
+  .timer-button,
+  .sound-button {
+    width: 92px;
+    height: 92px;
+    min-width: 92px;
+    min-height: 92px;
+  }
+}

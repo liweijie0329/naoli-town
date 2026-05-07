@@ -304,7 +304,7 @@ function bindViewportMetrics() {
 
   window.addEventListener("resize", updateAndRender, { passive: true });
   window.addEventListener("orientationchange", updateAndRender, { passive: true });
-  window.visualViewport?.addEventListener("resize", updateOnly, { passive: true });
+  window.visualViewport?.addEventListener("resize", updateAndRender, { passive: true });
   window.visualViewport?.addEventListener("scroll", updateOnly, { passive: true });
 }
 
