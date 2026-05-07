@@ -22,6 +22,9 @@ const contentTypes = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".ogg": "audio/ogg",
   ".ico": "image/x-icon"
 };
 
@@ -178,6 +181,15 @@ async function handleApi(req, res, url) {
       rubricMatched: true,
       comment:
         "本地演示环境已直接返回 AI 评分；生产环境请设置 AI_SCORE_ENDPOINT 接入真实模型评分服务。"
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/asr") {
+    await readBody(req);
+    sendJson(res, 501, {
+      error: "Local ASR is not configured",
+      message: "Cloudflare Workers AI Whisper 只在绑定了 AI 的 Cloudflare Pages Functions 中运行。本地调试请使用 wrangler pages dev --ai=AI。"
     });
     return;
   }

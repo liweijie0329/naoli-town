@@ -18,6 +18,8 @@ const MIN_PLACE_DISTRACTOR_KM = 10;
 const DRAWING_CONFIRM_NUDGE_MS = 10000;
 const SPEECH_VOLUME = 1;
 const STATIC_TTS_MANIFEST_SRC = "./assets/audio/manifest.json";
+const ASR_ENDPOINT = "/api/asr";
+const PREFER_CLOUDFLARE_ASR = true;
 const SPEECH_RECOGNITION_RESTART_DELAY_MS = 260;
 const SPEECH_RECOGNITION_BLOCKING_ERRORS = ["not-allowed", "service-not-allowed", "audio-capture", "network"];
 const SPEECH_RECOGNITION_RECORDING_FALLBACK_ERRORS = ["service-not-allowed", "network"];
@@ -2562,6 +2564,13 @@ async function startVoiceInput() {
   voiceState = voicePromptText();
   speechRecognitionLastError = null;
   beginLiveTranscriptSession({ resetFinal: true });
+  if (PREFER_CLOUDFLARE_ASR) {
+    recordSpeechRecognitionEvent("cloudflare-asr-preferred");
+    const recordingStarted = await startAudioRecording({ transcribeOnStop: true });
+    voiceState = recordingStarted ? voicePromptText() : "当前浏览器不能录音或识别";
+    render();
+    return recordingStarted;
+  }
   speechRecognition = speechRecognition || initSpeechRecognition();
   const micReady = await primeMicrophonePermission();
   if (!micReady && !speechRecognition) {
@@ -2667,7 +2676,8 @@ function stopVoiceInput(options = {}) {
   if (shouldRender) render();
 }
 
-async function startAudioRecording() {
+async function startAudioRecording(options = {}) {
+  const { transcribeOnStop = false } = options;
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
     voiceState = "当前浏览器不能录音";
     render();
@@ -2686,7 +2696,7 @@ async function startAudioRecording() {
     mediaRecorder.ondataavailable = (event) => {
       if (event.data?.size) audioChunks.push(event.data);
     };
-    mediaRecorder.onstop = () => {
+    mediaRecorder.onstop = async () => {
       const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || "audio/webm" });
       response.behavior.audioRecordings = response.behavior.audioRecordings || [];
       response.behavior.audioRecordings.push({ step, mimeType: blob.type, size: blob.size, endedAt: new Date().toISOString() });
@@ -2697,6 +2707,9 @@ async function startAudioRecording() {
         saveDraft();
       };
       if (blob.size) reader.readAsDataURL(blob);
+      if (transcribeOnStop && blob.size) {
+        await transcribeAudioBlob(blob, task.id, step);
+      }
     };
     mediaRecorder.start();
     recordingAudio = true;
@@ -2716,6 +2729,77 @@ async function getReusableMicStream() {
   micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
   state.permissions.microphone = "granted";
   return micStream;
+}
+
+async function transcribeAudioBlob(blob, taskId, step) {
+  const task = tasks.find((entry) => entry.id === taskId);
+  if (!task || !["sentence", "fluency"].includes(task.type)) return;
+  const response = getResponse(task.id);
+  response.behavior.speechRecognition = response.behavior.speechRecognition || [];
+  response.behavior.speechRecognition.push({
+    step,
+    eventType: "cloudflare-asr-upload",
+    mimeType: blob.type,
+    size: blob.size,
+    at: new Date().toISOString()
+  });
+  voiceState = "正在转文字";
+  render();
+  try {
+    const result = await requestJson(`${ASR_ENDPOINT}?taskId=${encodeURIComponent(task.id)}&step=${encodeURIComponent(step)}`, {
+      method: "POST",
+      headers: { "content-type": blob.type || "audio/webm" },
+      body: blob
+    }, (error) => {
+      throw error;
+    });
+    const text = String(result?.text || result?.transcription || "").trim();
+    response.behavior.speechRecognition.push({
+      step,
+      eventType: "cloudflare-asr-result",
+      provider: result?.provider || "cloudflare-workers-ai",
+      model: result?.model || "",
+      text,
+      at: new Date().toISOString()
+    });
+    if (text) applyVoiceTextForTask(task, response, step, text);
+    voiceState = text ? "转文字完成" : "没有识别到文字";
+    render();
+  } catch (error) {
+    response.behavior.speechRecognition.push({
+      step,
+      eventType: "cloudflare-asr-error",
+      message: error?.message || "ASR failed",
+      at: new Date().toISOString()
+    });
+    voiceState = "转文字失败，可手动输入";
+    saveDraft();
+    render();
+  }
+}
+
+function applyVoiceTextForTask(task, response, step, text) {
+  if (!text) return;
+  if (task.type === "sentence") {
+    response.answer.transcript = response.answer.transcript || {};
+    response.answer.interimTranscript = response.answer.interimTranscript || {};
+    response.answer.transcript[step] = text;
+    response.answer.interimTranscript[step] = "";
+  }
+  if (task.type === "fluency") {
+    response.answer.rawTranscript = text;
+    response.answer.interimTranscript = "";
+    response.answer.animals = extractAnimalNames(text);
+  }
+  response.behavior.liveTranscript = response.behavior.liveTranscript || {};
+  response.behavior.liveTranscript[step] = {
+    finalText: text,
+    interimText: "",
+    updatedAt: new Date().toISOString()
+  };
+  response.behavior.voiceEvents = response.behavior.voiceEvents || [];
+  response.behavior.voiceEvents.push({ step, text, finalText: text, interimText: "", eventType: "cloudflare-asr", at: new Date().toISOString() });
+  saveDraft();
 }
 
 function releaseMicStream() {
