@@ -287,6 +287,9 @@ let micStream = null;
 let recordingAudio = false;
 let speechRecognitionWanted = false;
 let speechRecognitionBlocked = false;
+let speechSessionBaseFinal = "";
+let activeSpeechTaskId = null;
+let activeSpeechStep = 0;
 let audioChunks = [];
 let speechPlaybackId = 0;
 let speechItemTimer = null;
@@ -893,21 +896,21 @@ function renderSerial7Task(step) {
 
 function renderSentenceTask(task, step) {
   const response = getResponse(task.id);
-  const value = response.answer.transcript?.[step] || "";
-  return renderSpeechCard(value || "等待语音识别...");
+  return renderSpeechCard(getLiveTranscript(task, response, step));
 }
 
 function renderFluencyTask() {
   const response = getResponse("fluency");
   const remaining = response.answer.remaining ?? 60;
   const running = Boolean(response.answer.running);
-  const animals = uniqueWords(response.answer.animals || []);
+  const live = getLiveTranscript(tasks.find((task) => task.id === "fluency"), response, 0);
+  const animals = uniqueWords(extractAnimalNames(`${live.finalText} ${live.interimText}`));
   return html`
     <div class="fluency-page">
       ${renderAudioWave()}
       <button class="timer-button ${running ? "running" : "pulse"}" data-action="startFluency">${running ? remaining : "开始"}</button>
       <strong>已识别 ${animals.length} 个</strong>
-      <textarea class="transcript-input" data-fluency-manual>${escapeHtml((response.answer.rawTranscript || animals.join("、")) || "点击开始后说动物名")}</textarea>
+      ${renderLiveTranscriptBox(live, "说出的动物名会实时显示在这里")}
     </div>
   `;
 }
@@ -947,13 +950,12 @@ function renderOrientationTask(step) {
   `;
 }
 
-function renderSpeechCard(transcript) {
-  const value = transcript === "等待语音识别..." ? "" : transcript;
+function renderSpeechCard(live) {
   return html`
     <div class="speech-page">
       ${renderAudioWave()}
       ${renderAudioButton("playCurrentAudio")}
-      <textarea class="transcript-input" data-voice-manual placeholder="语音识别结果会显示在这里，也可以手动修改。">${escapeHtml(value)}</textarea>
+      ${renderLiveTranscriptBox(live, "复述内容会实时显示在这里")}
     </div>
   `;
 }
@@ -964,6 +966,35 @@ function renderSpeechControls(transcript) {
     ${renderAudioWave()}
     ${renderAudioButton("playCurrentAudio")}
     <textarea class="transcript-input" data-voice-manual placeholder="语音识别结果会显示在这里，也可以手动修改。">${escapeHtml(value)}</textarea>
+  `;
+}
+
+function getLiveTranscript(task, response, step = 0) {
+  if (task?.type === "sentence") {
+    return {
+      finalText: response.answer.transcript?.[step] || "",
+      interimText: response.answer.interimTranscript?.[step] || ""
+    };
+  }
+  if (task?.type === "fluency") {
+    return {
+      finalText: response.answer.rawTranscript || "",
+      interimText: response.answer.interimTranscript || ""
+    };
+  }
+  return { finalText: "", interimText: "" };
+}
+
+function renderLiveTranscriptBox(live, placeholder) {
+  const finalText = live?.finalText || "";
+  const interimText = live?.interimText || "";
+  const empty = !finalText && !interimText;
+  return html`
+    <div class="live-transcript-box ${empty ? "empty-live" : ""}" aria-live="polite">
+      ${finalText ? `<span class="live-transcript-final">${escapeHtml(finalText)}</span>` : ""}
+      ${interimText ? `<span class="live-transcript-interim">${escapeHtml(interimText)}</span>` : ""}
+      ${empty ? `<span class="live-transcript-placeholder">${escapeHtml(placeholder)}</span>` : ""}
+    </div>
   `;
 }
 
@@ -2307,18 +2338,21 @@ function initSpeechRecognition() {
     render();
   };
   recognition.onresult = (event) => {
-    let text = "";
-    for (let i = 0; i < event.results.length; i += 1) text += event.results[i][0].transcript;
-    applyVoiceText(text);
+    const transcript = recognitionTranscriptFromEvent(event);
+    applyLiveVoiceText(transcript);
     voiceState = "正在识别";
     render();
   };
   recognition.onend = () => {
     recognizing = false;
     if (speechRecognitionWanted && recordingAudio && !speechRecognitionBlocked) {
+      promoteLiveInterimTranscript();
+      speechSessionBaseFinal = currentLiveFinalText();
       window.setTimeout(() => startSpeechRecognitionSafe(), 250);
       return;
     }
+    promoteLiveInterimTranscript();
+    activeSpeechTaskId = null;
     voiceState = recordingAudio ? "已录音，识别已暂停" : "待说";
     render();
   };
@@ -2341,6 +2375,7 @@ function toggleVoiceInput() {
 
 async function startVoiceInput() {
   voiceState = voicePromptText();
+  beginLiveTranscriptSession({ resetFinal: true });
   const recordingStarted = await startAudioRecording();
   speechRecognition = speechRecognition || initSpeechRecognition();
   if (!speechRecognition) {
@@ -2366,6 +2401,10 @@ function startSpeechRecognitionSafe() {
 function stopVoiceInput(options = {}) {
   const { releaseMic = false, shouldRender = true } = options;
   speechRecognitionWanted = false;
+  if (!recognizing) {
+    promoteLiveInterimTranscript();
+    activeSpeechTaskId = null;
+  }
   if (speechRecognition && recognizing) speechRecognition.stop();
   if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
   if (releaseMic) releaseMicStream();
@@ -2460,6 +2499,97 @@ function speechRecognitionErrorText(error) {
   if (error === "audio-capture") return "没有检测到麦克风";
   if (error === "network") return "浏览器语音识别服务不可用，请换 Chrome/Edge 或接入云端识别";
   return "识别未完成，请再试一次";
+}
+
+function recognitionTranscriptFromEvent(event) {
+  let finalPart = "";
+  let interimText = "";
+  for (let i = 0; i < event.results.length; i += 1) {
+    const result = event.results[i];
+    const text = result?.[0]?.transcript || "";
+    if (result?.isFinal) finalPart = joinTranscriptText(finalPart, text);
+    else interimText = joinTranscriptText(interimText, text);
+  }
+  return {
+    finalText: joinTranscriptText(speechSessionBaseFinal, finalPart),
+    interimText
+  };
+}
+
+function joinTranscriptText(...parts) {
+  return parts
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
+function beginLiveTranscriptSession({ resetFinal = false } = {}) {
+  const task = tasks[state.activeTaskIndex];
+  if (!["sentence", "fluency"].includes(task?.type)) return;
+  const response = getResponse(task.id);
+  const step = getTaskStep(task);
+  activeSpeechTaskId = task.id;
+  activeSpeechStep = step;
+  if (resetFinal) setLiveVoiceText(task, response, step, { finalText: "", interimText: "", eventType: "reset" });
+  else setLiveVoiceText(task, response, step, { finalText: currentLiveFinalText(), interimText: "", eventType: "start" });
+  speechSessionBaseFinal = currentLiveFinalText();
+}
+
+function currentLiveFinalText() {
+  const { task, step } = activeVoiceContext();
+  if (!["sentence", "fluency"].includes(task?.type)) return "";
+  const response = getResponse(task.id);
+  return getLiveTranscript(task, response, step).finalText || "";
+}
+
+function applyLiveVoiceText({ finalText = "", interimText = "" } = {}) {
+  const { task, step } = activeVoiceContext();
+  if (["sentence", "fluency"].includes(task?.type)) {
+    const response = getResponse(task.id);
+    setLiveVoiceText(task, response, step, { finalText, interimText, eventType: interimText ? "interim" : "final" });
+    return;
+  }
+  applyVoiceText(joinTranscriptText(finalText, interimText));
+}
+
+function setLiveVoiceText(task, response, step, { finalText = "", interimText = "", eventType = "update" } = {}) {
+  if (task.type === "sentence") {
+    response.answer.transcript = response.answer.transcript || {};
+    response.answer.interimTranscript = response.answer.interimTranscript || {};
+    response.answer.transcript[step] = finalText;
+    response.answer.interimTranscript[step] = interimText;
+  }
+  if (task.type === "fluency") {
+    response.answer.rawTranscript = finalText;
+    response.answer.interimTranscript = interimText;
+    response.answer.animals = extractAnimalNames(finalText);
+  }
+  response.behavior.liveTranscript = response.behavior.liveTranscript || {};
+  response.behavior.liveTranscript[step] = {
+    finalText,
+    interimText,
+    updatedAt: new Date().toISOString()
+  };
+  response.behavior.voiceEvents = response.behavior.voiceEvents || [];
+  response.behavior.voiceEvents.push({ step, text: joinTranscriptText(finalText, interimText), finalText, interimText, eventType, at: new Date().toISOString() });
+  saveDraft();
+}
+
+function promoteLiveInterimTranscript() {
+  const { task, step } = activeVoiceContext();
+  if (!["sentence", "fluency"].includes(task?.type)) return;
+  const response = getResponse(task.id);
+  const live = getLiveTranscript(task, response, step);
+  if (!live.interimText) return;
+  const finalText = joinTranscriptText(live.finalText, live.interimText);
+  setLiveVoiceText(task, response, step, { finalText, interimText: "", eventType: "promote" });
+  speechSessionBaseFinal = finalText;
+}
+
+function activeVoiceContext() {
+  const task = tasks.find((entry) => entry.id === activeSpeechTaskId) || tasks[state.activeTaskIndex];
+  const step = activeSpeechTaskId ? activeSpeechStep : getTaskStep(task);
+  return { task, step };
 }
 
 function applyVoiceText(text) {
