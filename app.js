@@ -759,7 +759,7 @@ function renderAdmin() {
       <div class="admin-table">
         <div class="admin-head"><span>参加者</span><span>总分</span><span>原始分</span><span>保存时间</span></div>
         ${(state.adminSessions || []).map((session) => `
-          <button class="admin-row" data-action="selectSavedSession" data-id="${session.id}">
+          <button class="admin-row ${state.selectedSession?.id === session.id ? "active" : ""}" data-action="selectSavedSession" data-id="${session.id}">
             <span>${escapeHtml(session.participant?.name || session.id.slice(0, 8))}</span>
             <strong>${session.totalScore ?? "-"}/30</strong>
             <span>${session.rawScore ?? "-"}</span>
@@ -767,9 +767,101 @@ function renderAdmin() {
           </button>
         `).join("") || `<p class="empty">暂无保存记录</p>`}
       </div>
-      <pre class="json-preview">${escapeHtml(state.selectedSession ? JSON.stringify(state.selectedSession, null, 2) : databaseSchemaText())}</pre>
+      ${state.selectedSession ? renderSessionDetail(state.selectedSession) : `<pre class="json-preview">${escapeHtml(databaseSchemaText())}</pre>`}
     </section>
   `;
+}
+
+function renderSessionDetail(session) {
+  const participant = session.participant || {};
+  const itemResponses = Array.isArray(session.itemResponses) ? session.itemResponses : [];
+  return html`
+    <aside class="admin-detail">
+      <div class="detail-header">
+        <span>测评详情</span>
+        <strong>${escapeHtml(participant.name || session.id || "未命名")}</strong>
+      </div>
+      <div class="detail-summary">
+        ${detailMetric("总分", `${session.totalScore ?? "-"}/30`)}
+        ${detailMetric("原始分", session.rawScore ?? "-")}
+        ${detailMetric("教育加分", session.educationBonus ?? "-")}
+        ${detailMetric("题目数", itemResponses.length || session.itemCount || "-")}
+        ${detailMetric("出生年份", participant.birthYear || "-")}
+        ${detailMetric("性别", participant.sex || participant.gender || "-")}
+        ${detailMetric("教育水平", participant.educationLevel || "-")}
+        ${detailMetric("保存时间", session.savedAt ? new Date(session.savedAt).toLocaleString() : "-")}
+      </div>
+      <div class="item-detail-list">
+        ${itemResponses.map((item, index) => renderItemDetail(item, index)).join("") || `<p class="empty">这条记录没有题目明细</p>`}
+      </div>
+    </aside>
+  `;
+}
+
+function detailMetric(label, value) {
+  return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+}
+
+function renderItemDetail(item, index) {
+  return html`
+    <details class="item-detail" ${index === 0 ? "open" : ""}>
+      <summary>
+        <span>${String(index + 1).padStart(2, "0")}</span>
+        <strong>${escapeHtml(item.title || item.taskId || "未命名题目")}</strong>
+        <em>${escapeHtml(item.score ?? "-")}/${escapeHtml(item.maxScore ?? "-")}</em>
+      </summary>
+      <div class="item-detail-body">
+        <div class="detail-chips">
+          <span>${escapeHtml(item.domain || "未分类")}</span>
+          <span>${escapeHtml(item.modality || "未记录")}</span>
+          <span>${escapeHtml(item.durationMs ?? "-")} ms</span>
+        </div>
+        ${renderDetailJson("答案 answer_json", item.answer || {})}
+        ${renderDetailJson("行为记录 behavior_json", item.behavior || {})}
+        ${renderDetailJson("AI 评分 ai_json", item.ai || null)}
+        ${renderDrawingPreview(item.drawingImage)}
+      </div>
+    </details>
+  `;
+}
+
+function renderDetailJson(label, value) {
+  return html`
+    <section class="detail-block">
+      <h4>${escapeHtml(label)}</h4>
+      <pre>${escapeHtml(prettyJson(value))}</pre>
+    </section>
+  `;
+}
+
+function renderDrawingPreview(image) {
+  if (!image || typeof image !== "string") {
+    return html`
+      <section class="detail-block">
+        <h4>画图 drawing_image</h4>
+        <p class="detail-empty">这道题没有画图图片</p>
+      </section>
+    `;
+  }
+  return html`
+    <section class="detail-block">
+      <h4>画图 drawing_image</h4>
+      <div class="drawing-preview">
+        <img src="${escapeHtml(image)}" alt="画图作答图片" />
+      </div>
+    </section>
+  `;
+}
+
+function prettyJson(value) {
+  if (typeof value === "string") {
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2);
+    } catch {
+      return value;
+    }
+  }
+  return JSON.stringify(value ?? null, null, 2);
 }
 
 function renderDesign() {
