@@ -271,6 +271,7 @@ const educationLevels = ["", "小学", "初中", "中专", "高中", "大专", "
 localStorage.removeItem("moca-game-draft");
 
 let state = createInitialState();
+let activeRubricItem = null;
 let activeCanvas = null;
 let activeCtx = null;
 let drawing = false;
@@ -1070,19 +1071,24 @@ function renderAdmin() {
         <button class="secondary" data-action="exportCsv">导出 CSV</button>
       </div>
       <div class="admin-table">
-        <div class="admin-head"><span>参加者</span><span>总分</span><span>原始分</span><span>保存时间</span></div>
+        <div class="admin-head"><span>参加者</span><span>总分</span><span>原始分</span><span>教育加分</span><span>保存时间</span></div>
         ${(state.adminSessions || []).map((session) => `
-          <button class="admin-row ${state.selectedSession?.id === session.id ? "active" : ""}" data-action="selectSavedSession" data-id="${session.id}">
+          <div class="admin-row">
             <span>${escapeHtml(session.participant?.name || session.id.slice(0, 8))}</span>
             <strong>${session.totalScore ?? "-"}/30</strong>
             <span>${session.rawScore ?? "-"}</span>
-            <span>${session.finishedAt ? new Date(session.finishedAt).toLocaleString() : "-"}</span>
-          </button>
+            <span>${session.educationBonus ?? 0}</span>
+            <span>${formatSavedTime(session)}</span>
+          </div>
         `).join("") || `<p class="empty">暂无保存记录</p>`}
       </div>
-      ${state.selectedSession ? renderSessionDetail(state.selectedSession) : `<pre class="json-preview">${escapeHtml(databaseSchemaText())}</pre>`}
     </section>
   `;
+}
+
+function formatSavedTime(session) {
+  const value = session.savedAt || session.finishedAt || session.startedAt;
+  return value ? new Date(value).toLocaleString() : "-";
 }
 
 function renderSessionDetail(session) {
@@ -1185,31 +1191,60 @@ function renderDesign() {
         <p>点击每个项目查看任务要求和评分标准。</p>
       </div>
       <div class="rubric-layout">
-        ${rubricGroups.map((group) => renderRubricGroup(group)).join("")}
+        ${rubricGroups.map((group, groupIndex) => renderRubricGroup(group, groupIndex)).join("")}
+      </div>
+      ${activeRubricItem ? renderRubricModal(activeRubricItem) : ""}
+    </section>
+  `;
+}
+
+function renderRubricGroup(group, groupIndex) {
+  return html`
+    <section class="rubric-group">
+      <h4>${escapeHtml(group.title)}</h4>
+      <div class="rubric-cards">
+        ${group.items.map((item, itemIndex) => `
+          <button class="rubric-card" data-action="openRubric" data-group="${groupIndex}" data-item="${itemIndex}">
+            <span>${escapeHtml(item.title)}</span>
+            <em>点击查看</em>
+          </button>
+        `).join("")}
       </div>
     </section>
   `;
 }
 
-function renderRubricGroup(group) {
+function getRubricItem(groupIndex, itemIndex) {
+  const group = rubricGroups[groupIndex];
+  const item = group?.items?.[itemIndex];
+  return item ? { ...item, groupTitle: group.title } : null;
+}
+
+function renderRubricModal(item) {
   return html`
-    <section class="rubric-group">
-      <h4>${escapeHtml(group.title)}</h4>
-      <div class="rubric-cards">
-        ${group.items.map((item) => `
-          <details class="rubric-card">
-            <summary>${escapeHtml(item.title)}</summary>
-            <div class="rubric-card-body">
-              <strong>任务要求</strong>
-              <p>${escapeHtml(item.prompt)}</p>
-              <strong>评分标准</strong>
-              <p>${escapeHtml(item.scoring)}</p>
-              ${item.image ? `<img class="rubric-sheet-image" src="${MOCA_SHEET_IMAGE}" alt="MoCA 原表图片" />` : ""}
-            </div>
-          </details>
-        `).join("")}
-      </div>
-    </section>
+    <div class="rubric-modal" role="dialog" aria-modal="true" aria-label="${escapeHtml(item.title)}评分标准">
+      <button class="rubric-modal-backdrop" data-action="closeRubric" aria-label="关闭评分标准"></button>
+      <article class="rubric-modal-panel">
+        <header class="rubric-modal-head">
+          <div>
+            <span>${escapeHtml(item.groupTitle)}</span>
+            <h3>${escapeHtml(item.title)}</h3>
+          </div>
+          <button class="icon-button" data-action="closeRubric" aria-label="关闭">×</button>
+        </header>
+        <div class="rubric-modal-body">
+          <section>
+            <strong>任务要求</strong>
+            <p>${escapeHtml(item.prompt)}</p>
+          </section>
+          <section>
+            <strong>评分标准</strong>
+            <p>${escapeHtml(item.scoring)}</p>
+          </section>
+          ${item.image ? `<img class="rubric-sheet-image large" src="${MOCA_SHEET_IMAGE}" alt="MoCA 原表图片" />` : ""}
+        </div>
+      </article>
+    </div>
   `;
 }
 
@@ -1597,6 +1632,7 @@ root.addEventListener("click", async (event) => {
   if (action === "navView") {
     state.view = target.dataset.view;
     menuOpen = false;
+    activeRubricItem = null;
     if (state.view === "test") requestImmediateInstructionPlayback(tasks[state.activeTaskIndex]);
     if (state.view === "admin") await loadSessions(false);
     render();
@@ -1654,6 +1690,14 @@ root.addEventListener("click", async (event) => {
   if (action === "backspaceSerial") backspaceSerial();
   if (action === "chooseOrientation") {
     applyOrientationChoice(target.dataset.key, target.dataset.value);
+    render();
+  }
+  if (action === "openRubric") {
+    activeRubricItem = getRubricItem(Number(target.dataset.group), Number(target.dataset.item));
+    render();
+  }
+  if (action === "closeRubric") {
+    activeRubricItem = null;
     render();
   }
   if (action === "tapVigilance") tapVigilance();
@@ -2847,6 +2891,7 @@ function localListSessions() {
     participant: session.participant,
     startedAt: session.startedAt,
     finishedAt: session.finishedAt,
+    savedAt: session.savedAt,
     totalDurationMs: session.totalDurationMs,
     rawScore: session.rawScore,
     educationBonus: session.educationBonus,
