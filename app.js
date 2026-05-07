@@ -13,7 +13,6 @@ const ABSTRACTION_DISTRACTORS = ["电脑", "学校", "无聊", "天气", "杯子
 const CITY_DISTRACTORS = ["北京市", "上海市", "杭州市", "苏州市", "广州市", "深圳市", "成都市", "武汉市", "西安市", "青岛市", "厦门市", "天津市"];
 const PLACE_SEARCH_TERMS = ["医院", "学校", "社区中心", "大学", "公园", "图书馆", "体育中心", "博物馆"];
 const MIN_PLACE_DISTRACTOR_KM = 10;
-const DRAWING_IDLE_HINT_MS = 5000;
 const DRAWING_CONFIRM_NUDGE_MS = 10000;
 const VOICE_PROFILES = {
   cartoon: { label: "卡通童声", hints: ["xiaoxiao", "xiaoyi", "xiaobei", "tingting", "美佳", "sin-ji"], rateScale: 0.96, pitchOffset: 0.1 },
@@ -783,30 +782,10 @@ function renderDrawingTask(task) {
         ${task.drawingKind === "clock" ? `<div class="clock-label">11:10</div>` : ""}
         <div class="canvas-surface">
           <canvas id="taskCanvas" class="task-canvas" aria-label="${escapeHtml(task.title)}画图区域"></canvas>
-          ${renderDrawingHint(task)}
         </div>
       </div>
     </div>
   `;
-}
-
-function renderDrawingHint(task) {
-  const visible = Boolean(getResponse(task.id).behavior.idleHintVisible);
-  if (task.drawingKind === "cube") {
-    return html`
-      <svg class="drawing-hint ${visible ? "visible" : ""}" viewBox="0 0 100 100" aria-hidden="true">
-        <line x1="34" y1="25" x2="34" y2="78"></line>
-      </svg>
-    `;
-  }
-  if (task.drawingKind === "clock") {
-    return html`
-      <svg class="drawing-hint ${visible ? "visible" : ""}" viewBox="0 0 100 100" aria-hidden="true">
-        <circle cx="50" cy="53" r="32"></circle>
-      </svg>
-    `;
-  }
-  return "";
 }
 
 function renderNamingTask(task, step) {
@@ -1291,7 +1270,6 @@ function setupFreeCanvas(task) {
 
 function startDrawingIdleHints(task) {
   if (!shouldStartDrawingIdleHints(task)) return;
-  drawingIdleTimers.push(window.setTimeout(() => showDrawingIdleHint(task), DRAWING_IDLE_HINT_MS));
   drawingIdleTimers.push(window.setTimeout(() => nudgeDrawingConfirm(task), DRAWING_CONFIRM_NUDGE_MS));
 }
 
@@ -1299,14 +1277,6 @@ function shouldStartDrawingIdleHints(task) {
   if (!["cube", "clock"].includes(task.id)) return false;
   const response = getResponse(task.id);
   return !Number(response.behavior.strokes || 0) && !state.drawings[task.id] && !response.drawingImage;
-}
-
-function showDrawingIdleHint(task) {
-  if (!isActiveTask(task) || !shouldStartDrawingIdleHints(task)) return;
-  const response = getResponse(task.id);
-  response.behavior.idleHintVisible = true;
-  saveDraft();
-  document.querySelector(".drawing-hint")?.classList.add("visible");
 }
 
 function nudgeDrawingConfirm(task) {
@@ -1320,10 +1290,8 @@ function nudgeDrawingConfirm(task) {
 function markDrawingInteraction(task) {
   const response = getResponse(task.id);
   if (!response.behavior.firstInteractionAt) response.behavior.firstInteractionAt = new Date().toISOString();
-  delete response.behavior.idleHintVisible;
   delete response.behavior.confirmNudge;
   stopDrawingIdleTimers();
-  document.querySelector(".drawing-hint")?.classList.remove("visible");
   document.querySelector(".confirm-button")?.classList.remove("attention-nudge");
 }
 
@@ -1678,7 +1646,6 @@ root.addEventListener("click", async (event) => {
     const response = getResponse(current.id);
     delete response.drawingImage;
     response.behavior.strokes = 0;
-    delete response.behavior.idleHintVisible;
     delete response.behavior.confirmNudge;
     delete response.behavior.firstInteractionAt;
     render();

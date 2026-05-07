@@ -1030,29 +1030,6 @@ h4 {
   touch-action: none;
 }
 
-.drawing-hint {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.18s ease;
-}
-
-.drawing-hint.visible {
-  opacity: 0.82;
-}
-
-.drawing-hint line,
-.drawing-hint circle {
-  fill: none;
-  stroke: #f28a3c;
-  stroke-width: 4;
-  stroke-linecap: round;
-  stroke-dasharray: 6 6;
-  filter: drop-shadow(0 4px 8px rgba(242, 138, 60, 0.22));
-}
-
 .redraw-button {
   position: absolute;
   right: 12px;
