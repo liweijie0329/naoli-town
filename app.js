@@ -282,6 +282,8 @@ let recognizing = false;
 let mediaRecorder = null;
 let micStream = null;
 let recordingAudio = false;
+let speechRecognitionWanted = false;
+let speechRecognitionBlocked = false;
 let audioChunks = [];
 let speechPlaybackId = 0;
 let speechItemTimer = null;
@@ -467,6 +469,7 @@ function saveDraft() {
 function resetState() {
   stopTimers();
   stopAudioPlayback();
+  stopVoiceInput({ releaseMic: true, shouldRender: false });
   localStorage.removeItem("moca-game-draft");
   state = createInitialState();
   menuOpen = false;
@@ -930,9 +933,11 @@ function renderOrientationTask(step) {
   return html`
     <div class="orientation-page">
       <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
-      <div class="option-grid orientation-options">
-        ${options.map((option) => `<button class="option ${picked === option.value ? "picked" : ""}" data-action="chooseOrientation" data-key="${prompt.key}" data-value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</button>`).join("")}
-      </div>
+      ${options.length ? `
+        <div class="option-grid orientation-options">
+          ${options.map((option) => `<button class="option ${picked === option.value ? "picked" : ""}" data-action="chooseOrientation" data-key="${prompt.key}" data-value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</button>`).join("")}
+        </div>
+      ` : `<p class="task-warning">${escapeHtml(locationStatus())}，正在根据真实定位生成选项。</p>`}
     </div>
   `;
 }
@@ -2216,11 +2221,19 @@ function initSpeechRecognition() {
   };
   recognition.onend = () => {
     recognizing = false;
+    if (speechRecognitionWanted && recordingAudio && !speechRecognitionBlocked) {
+      window.setTimeout(() => startSpeechRecognitionSafe(), 250);
+      return;
+    }
     voiceState = recordingAudio ? "已录音，识别已暂停" : "待说";
     render();
   };
   recognition.onerror = (event) => {
     recognizing = false;
+    if (["not-allowed", "service-not-allowed", "audio-capture", "network"].includes(event?.error)) {
+      speechRecognitionBlocked = true;
+      speechRecognitionWanted = false;
+    }
     voiceState = speechRecognitionErrorText(event?.error);
     render();
   };
@@ -2241,6 +2254,13 @@ async function startVoiceInput() {
     render();
     return;
   }
+  speechRecognitionWanted = true;
+  speechRecognitionBlocked = false;
+  startSpeechRecognitionSafe();
+}
+
+function startSpeechRecognitionSafe() {
+  if (!speechRecognition || recognizing || !speechRecognitionWanted || speechRecognitionBlocked) return;
   try {
     speechRecognition.start();
   } catch {
@@ -2249,16 +2269,15 @@ async function startVoiceInput() {
   }
 }
 
-function stopVoiceInput() {
+function stopVoiceInput(options = {}) {
+  const { releaseMic = false, shouldRender = true } = options;
+  speechRecognitionWanted = false;
   if (speechRecognition && recognizing) speechRecognition.stop();
   if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
-  if (micStream) {
-    micStream.getTracks().forEach((track) => track.stop());
-    micStream = null;
-  }
+  if (releaseMic) releaseMicStream();
   recordingAudio = false;
   voiceState = "待说";
-  render();
+  if (shouldRender) render();
 }
 
 async function startAudioRecording() {
@@ -2269,7 +2288,7 @@ async function startAudioRecording() {
   }
   if (mediaRecorder && mediaRecorder.state === "recording") return true;
   try {
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    micStream = await getReusableMicStream();
     micPermissionReady = true;
     audioChunks = [];
     const options = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? { mimeType: "audio/webm;codecs=opus", audioBitsPerSecond: 32000 } : { audioBitsPerSecond: 32000 };
@@ -2303,6 +2322,19 @@ async function startAudioRecording() {
     render();
     return false;
   }
+}
+
+async function getReusableMicStream() {
+  if (micStream && micStream.getAudioTracks().some((track) => track.readyState === "live")) return micStream;
+  micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  state.permissions.microphone = "granted";
+  return micStream;
+}
+
+function releaseMicStream() {
+  if (!micStream) return;
+  micStream.getTracks().forEach((track) => track.stop());
+  micStream = null;
 }
 
 function voicePromptText() {
@@ -2423,21 +2455,21 @@ function orientationOptions(prompt) {
     return optionObjects(stableOptionValues(response, "orientation:weekday", today.weekday, distractors), today.weekday);
   }
   if (prompt.key === "city") {
-    const expected = cleanCityName(response.answer.expectedCity || response.behavior.location?.city || "南京市");
+    const expected = cleanCityName(response.answer.expectedCity || response.behavior.location?.city || "");
+    if (!expected) return [];
     return optionObjects(stableOptionValues(response, `orientation:city:${expected}`, expected, CITY_DISTRACTORS), expected);
   }
   const expectedPlace = currentPlaceName();
   const location = response.behavior.location || {};
-  const sameCityDistractors = Array.isArray(location.placeDistractors) && location.placeDistractors.length
-    ? location.placeDistractors.map((entry) => entry.name)
-    : fallbackSameCityPlaceDistractors(expectedPlace, cleanCityName(response.answer.expectedCity || location.city || "本市"));
+  if (!expectedPlace) return [];
+  const sameCityDistractors = Array.isArray(location.placeDistractors) ? location.placeDistractors.map((entry) => entry.name) : [];
   return optionObjects(stableOptionValues(response, `orientation:place:${expectedPlace}`, expectedPlace, sameCityDistractors), expectedPlace);
 }
 
 function currentPlaceName() {
   const response = getResponse("orientation");
   const location = response.behavior.location || {};
-  return response.answer.expectedPlace || location.place || generalizePlaceName(firstLocationPart(location.address)) || "社区中心";
+  return response.answer.expectedPlace || location.place || generalizePlaceName(firstLocationPart(location.address)) || "";
 }
 
 function placeNameFromReverse(data, loc) {
@@ -2473,13 +2505,7 @@ async function sameCityPlaceDistractors(loc) {
       // Keep trying other search terms.
     }
   }
-  if (collected.length >= 3) return shuffle(collected).slice(0, 6);
-  return fallbackSameCityPlaceDistractors(loc.place, loc.city).map((name, index) => ({
-    name,
-    distanceKm: MIN_PLACE_DISTRACTOR_KM + 2 + index * 3,
-    synthetic: true,
-    source: "same-city-fallback"
-  }));
+  return shuffle(collected).slice(0, 6);
 }
 
 function isSameCityPlace(entry, city) {
@@ -2487,12 +2513,6 @@ function isSameCityPlace(entry, city) {
   const text = [address.city, address.town, address.county, address.state, entry.display_name].filter(Boolean).join(" ");
   const clean = cleanCityName(city);
   return !clean || text.includes(clean) || clean.includes(cleanCityName(text));
-}
-
-function fallbackSameCityPlaceDistractors(expectedPlace, city) {
-  const prefix = cleanCityName(city).replace(/市$/, "") || "本市";
-  return [`${prefix}人民医院`, `${prefix}实验学校`, `${prefix}社区中心`, `${prefix}体育中心`, `${prefix}图书馆`, `${prefix}文化公园`]
-    .filter((name) => name && name !== expectedPlace);
 }
 
 function distanceKmBetween(lat1, lon1, lat2, lon2) {
@@ -2530,7 +2550,7 @@ function cleanCityName(value) {
   if (cityMatch) return cityMatch[0];
   const countyMatch = text.match(/[^省市自治区县区,，\s]{2,12}(县|区)/);
   if (countyMatch) return countyMatch[0];
-  return text.split(/[，,\s]/).find(Boolean) || "南京市";
+  return text.split(/[，,\s]/).find(Boolean) || "";
 }
 
 function generalizePlaceName(value) {
@@ -2538,7 +2558,7 @@ function generalizePlaceName(value) {
   if (/医院|门诊|卫生院|卫生服务/.test(text)) return shortNamedPlace(text, "医院");
   if (/学校|大学|学院|中学|小学/.test(text)) return shortNamedPlace(text, "学校");
   if (/社区|街道|居委|服务中心/.test(text)) return shortNamedPlace(text, "社区中心");
-  return "社区中心";
+  return specificPlaceName(text) || "";
 }
 
 function shortNamedPlace(text, fallbackSuffix) {
