@@ -14,6 +14,9 @@
   --violet: #7568e8;
   --mint: #dff7ea;
   --shadow: 0 18px 44px rgba(36, 52, 71, 0.13);
+  --app-height: 100dvh;
+  --app-width: 100vw;
+  --bottom-safe: max(22px, env(safe-area-inset-bottom));
 }
 
 * {
@@ -24,8 +27,10 @@ html,
 body,
 #app {
   width: 100%;
-  height: 100dvh;
-  min-height: 100dvh;
+  height: var(--app-height);
+  min-height: 0;
+  max-height: var(--app-height);
+  overflow: hidden;
 }
 
 body {
@@ -379,7 +384,8 @@ h4 {
 .app-shell {
   position: relative;
   width: 100%;
-  height: 100%;
+  height: var(--app-height);
+  max-height: var(--app-height);
   overflow: hidden;
 }
 
@@ -417,7 +423,7 @@ h4 {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-rows: clamp(82px, 13dvh, 118px) minmax(0, 1fr);
+  grid-template-rows: clamp(64px, 10dvh, 98px) minmax(0, 1fr);
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -647,8 +653,10 @@ h4 {
   position: relative;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
-  gap: clamp(8px, 1.5dvh, 14px);
-  padding: clamp(10px, 2dvh, 18px) clamp(68px, 8vw, 92px) max(10px, env(safe-area-inset-bottom));
+  gap: clamp(6px, 1.1dvh, 10px);
+  padding: clamp(8px, 1.4dvh, 14px) clamp(68px, 8vw, 92px) var(--bottom-safe);
+  max-height: 100%;
+  overflow: hidden;
 }
 
 .task-copy {
@@ -757,11 +765,13 @@ h4 {
 }
 
 .task-actions {
+  position: relative;
+  z-index: 6;
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 12px;
-  min-height: clamp(58px, 9dvh, 78px);
+  min-height: clamp(52px, 7.2dvh, 68px);
   padding: 0 clamp(4px, 1vw, 10px);
 }
 
@@ -2158,11 +2168,12 @@ h4 {
   }
 
   .page-shell {
-    grid-template-rows: clamp(92px, 10dvh, 116px) minmax(0, 1fr);
+    grid-template-rows: clamp(68px, 9dvh, 92px) minmax(0, 1fr);
   }
 
   .task-page {
     padding-inline: 58px;
+    padding-bottom: var(--bottom-safe);
   }
 
   .drawing-page {
@@ -2189,9 +2200,81 @@ h4 {
   }
 }
 
+@media (max-height: 820px) {
+  .setup-screen {
+    padding: 14px;
+  }
+
+  .setup-panel {
+    width: min(640px, 94vw);
+    padding: 22px;
+  }
+
+  .brand-row {
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+
+  .logo-image {
+    width: 78px;
+    height: 78px;
+  }
+
+  h1 {
+    font-size: 42px;
+  }
+
+  .setup-grid {
+    gap: 10px;
+  }
+
+  .field {
+    gap: 6px;
+    font-size: 18px;
+  }
+
+  .field input,
+  .field select,
+  .segment-option {
+    min-height: 56px;
+    font-size: 21px;
+  }
+
+  .setup-actions {
+    margin-top: 16px;
+  }
+
+  .big-button {
+    min-height: 62px;
+    font-size: 25px;
+  }
+
+  .page-shell {
+    grid-template-rows: 76px minmax(0, 1fr);
+  }
+
+  .page-header {
+    padding-top: 8px;
+    padding-bottom: 7px;
+  }
+
+  .header-prompt {
+    -webkit-line-clamp: 1;
+  }
+
+  .task-page {
+    padding-top: 7px;
+    padding-bottom: var(--bottom-safe);
+  }
+
+  .task-copy {
+    padding: 14px;
+  }
+}
+
 @media (max-height: 720px) {
   .page-shell {
-    grid-template-rows: 84px minmax(0, 1fr);
+    grid-template-rows: 64px minmax(0, 1fr);
   }
 
   .page-header {
@@ -2254,12 +2337,12 @@ h4 {
   }
 
   .task-actions {
-    min-height: 56px;
+    min-height: 50px;
   }
 
   .confirm-button,
   .utility-button {
-    min-height: 50px;
+    min-height: 46px;
     font-size: 20px;
   }
 

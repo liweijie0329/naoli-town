@@ -277,9 +277,36 @@ let trailGuideFrame = null;
 let trailGuideTick = 0;
 let trailDragStart = null;
 let trailDragPoint = null;
+let viewportRenderTimer = null;
 
+updateViewportMetrics();
+bindViewportMetrics();
 migrateState();
 render();
+
+function updateViewportMetrics() {
+  const viewport = window.visualViewport;
+  const width = Math.floor(viewport?.width || window.innerWidth || document.documentElement.clientWidth || 1024);
+  const height = Math.floor(viewport?.height || window.innerHeight || document.documentElement.clientHeight || 768);
+  document.documentElement.style.setProperty("--app-width", `${Math.max(320, width)}px`);
+  document.documentElement.style.setProperty("--app-height", `${Math.max(360, height)}px`);
+}
+
+function bindViewportMetrics() {
+  const updateOnly = () => updateViewportMetrics();
+  const updateAndRender = () => {
+    updateViewportMetrics();
+    window.clearTimeout(viewportRenderTimer);
+    viewportRenderTimer = window.setTimeout(() => {
+      if (state.view !== "setup") render();
+    }, 160);
+  };
+
+  window.addEventListener("resize", updateAndRender, { passive: true });
+  window.addEventListener("orientationchange", updateAndRender, { passive: true });
+  window.visualViewport?.addEventListener("resize", updateOnly, { passive: true });
+  window.visualViewport?.addEventListener("scroll", updateOnly, { passive: true });
+}
 
 function createInitialState() {
   return {
