@@ -1192,7 +1192,7 @@ function renderDesign() {
     <section class="single-page design-page">
       <div class="rubric-page-head">
         <h3>评分标准</h3>
-        <p>点击每个项目查看任务要求和评分标准。</p>
+        <p>点击查看MoCA量表</p>
       </div>
       <div class="rubric-layout">
         ${rubricGroups.map((group, groupIndex) => renderRubricGroup(group, groupIndex)).join("")}

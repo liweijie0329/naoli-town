@@ -2105,10 +2105,12 @@ h4 {
 }
 
 .design-page {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 16px;
   padding: 24px;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .rubric-page-head {
@@ -2134,12 +2136,12 @@ h4 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   min-height: 0;
-  overflow: auto;
+  overflow: visible;
 }
 
 .rubric-group {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
   gap: 10px;
   min-width: 0;
   min-height: 230px;
@@ -2157,7 +2159,7 @@ h4 {
   align-content: start;
   gap: 10px;
   min-height: 0;
-  overflow: auto;
+  overflow: visible;
 }
 
 .rubric-card {
@@ -3193,10 +3195,6 @@ h4 {
 
   .detail-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .design-page {
-    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .rubric-page-head {
