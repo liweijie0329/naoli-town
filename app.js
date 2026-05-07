@@ -1000,7 +1000,7 @@ function renderLiveTranscriptBox(live, placeholder) {
 }
 
 function renderAudioWave() {
-  const active = playState === "播放中..." || recognizing || recordingAudio;
+  const active = playState === "播放中..." || recognizing || recordingAudio || speechRecognitionWanted;
   const label = playState === "播放中..." ? "播放中..." : voiceState && voiceState !== "待说" ? voiceState : recognizing || recordingAudio ? "请说" : "";
   const showLabel = label && label !== "播放中...";
   return html`
@@ -1016,7 +1016,7 @@ function renderAudioButton(action) {
   if (playState === "播放中..." && !(action === "playCurrentAudio" && current?.type === "sentence" && speechPlaybackPurpose === "instruction")) {
     return `<button class="primary circle-button pulse sound-button" disabled>播放中</button>`;
   }
-  if (recognizing || recordingAudio) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">停止</button>`;
+  if (recognizing || recordingAudio || speechRecognitionWanted) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">停止</button>`;
   return `<button class="primary circle-button pulse sound-button" data-action="${action}">开始</button>`;
 }
 
@@ -2357,7 +2357,7 @@ function initSpeechRecognition() {
   };
   recognition.onend = () => {
     recognizing = false;
-    if (speechRecognitionWanted && recordingAudio && !speechRecognitionBlocked) {
+    if (speechRecognitionWanted && !speechRecognitionBlocked) {
       promoteLiveInterimTranscript();
       speechSessionBaseFinal = currentLiveFinalText();
       window.setTimeout(() => startSpeechRecognitionSafe(), 250);
@@ -2370,6 +2370,7 @@ function initSpeechRecognition() {
   };
   recognition.onerror = (event) => {
     recognizing = false;
+    recordSpeechRecognitionEvent("error", { error: event?.error || "unknown" });
     if (["not-allowed", "service-not-allowed", "audio-capture", "network"].includes(event?.error)) {
       speechRecognitionBlocked = true;
       speechRecognitionWanted = false;
@@ -2388,25 +2389,35 @@ function toggleVoiceInput() {
 async function startVoiceInput() {
   voiceState = voicePromptText();
   beginLiveTranscriptSession({ resetFinal: true });
-  const recordingStarted = await startAudioRecording();
   speechRecognition = speechRecognition || initSpeechRecognition();
-  if (!speechRecognition) {
-    voiceState = recordingStarted ? "已录音，但此浏览器不支持自动转文字" : "当前浏览器不能录音或识别";
+  if (speechRecognition) {
+    speechRecognitionWanted = true;
+    speechRecognitionBlocked = false;
+    recordingAudio = false;
+    recordSpeechRecognitionEvent("start-request", { engine: speechRecognition.constructor?.name || "SpeechRecognition" });
+    startSpeechRecognitionSafe();
     render();
     return;
   }
-  speechRecognitionWanted = true;
-  speechRecognitionBlocked = false;
-  startSpeechRecognitionSafe();
+
+  recordSpeechRecognitionEvent("unsupported", { message: "SpeechRecognition API is not available" });
+  const recordingStarted = await startAudioRecording();
+  voiceState = recordingStarted ? "已录音，但此浏览器不支持自动转文字" : "当前浏览器不能录音或识别";
+  render();
 }
 
 function startSpeechRecognitionSafe() {
-  if (!speechRecognition || recognizing || !speechRecognitionWanted || speechRecognitionBlocked) return;
+  if (!speechRecognition || recognizing || !speechRecognitionWanted || speechRecognitionBlocked) return false;
   try {
     speechRecognition.start();
+    return true;
   } catch {
-    voiceState = recordingAudio ? "已录音，识别启动失败" : "识别启动失败";
+    speechRecognitionBlocked = true;
+    speechRecognitionWanted = false;
+    recordSpeechRecognitionEvent("start-failed", { message: "SpeechRecognition.start() failed" });
+    voiceState = "识别启动失败，请再点一次开始";
     render();
+    return false;
   }
 }
 
@@ -2602,6 +2613,20 @@ function activeVoiceContext() {
   const task = tasks.find((entry) => entry.id === activeSpeechTaskId) || tasks[state.activeTaskIndex];
   const step = activeSpeechTaskId ? activeSpeechStep : getTaskStep(task);
   return { task, step };
+}
+
+function recordSpeechRecognitionEvent(eventType, details = {}) {
+  const { task, step } = activeVoiceContext();
+  if (!task) return;
+  const response = getResponse(task.id);
+  response.behavior.speechRecognition = response.behavior.speechRecognition || [];
+  response.behavior.speechRecognition.push({
+    step,
+    eventType,
+    ...details,
+    at: new Date().toISOString()
+  });
+  saveDraft();
 }
 
 function applyVoiceText(text) {
