@@ -63,6 +63,7 @@ const animalAliasPairs = [
   ["公鸡", "鸡"], ["母鸡", "鸡"],
   ["鸭子", "鸭"], ["鹅子", "鹅"],
   ["兔子", "兔"], ["老鼠", "鼠"], ["耗子", "鼠"], ["老虎", "虎"], ["猴子", "猴"],
+  ["鲸鱼", "鲸"], ["鱼儿", "鱼"],
   ["大象", "大象"], ["长颈鹿", "长颈鹿"], ["猫头鹰", "猫头鹰"]
 ];
 
@@ -3158,7 +3159,7 @@ async function flushFluencyLiveAsr(recorder) {
 }
 
 function applyFluencyLiveText(response, step, text) {
-  response.answer.rawTranscript = joinTranscriptText(response.answer.rawTranscript, text);
+  response.answer.rawTranscript = fluencyTranscriptFromAsrText(text, response.answer.rawTranscript);
   response.answer.interimTranscript = "";
   response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
   response.behavior.liveTranscript = response.behavior.liveTranscript || {};
@@ -3370,9 +3371,9 @@ function applyVoiceTextForTask(task, response, step, text) {
     response.answer.interimTranscript[step] = "";
   }
   if (task.type === "fluency") {
-    response.answer.rawTranscript = text;
+    response.answer.rawTranscript = fluencyTranscriptFromAsrText(text, response.answer.rawTranscript);
     response.answer.interimTranscript = "";
-    response.answer.animals = extractAnimalNames(text);
+    response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
   }
   response.behavior.liveTranscript = response.behavior.liveTranscript || {};
   response.behavior.liveTranscript[step] = {
@@ -3489,9 +3490,10 @@ function setLiveVoiceText(task, response, step, { finalText = "", interimText = 
     response.answer.interimTranscript[step] = interimText;
   }
   if (task.type === "fluency") {
-    response.answer.rawTranscript = finalText;
-    response.answer.interimTranscript = interimText;
-    response.answer.animals = extractAnimalNames(joinTranscriptText(finalText, interimText));
+    const transcript = joinTranscriptText(finalText, interimText);
+    response.answer.rawTranscript = fluencyTranscriptFromAsrText(transcript);
+    response.answer.interimTranscript = "";
+    response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
   }
   response.behavior.liveTranscript = response.behavior.liveTranscript || {};
   response.behavior.liveTranscript[step] = {
@@ -3548,8 +3550,8 @@ function applyVoiceText(text) {
     response.answer.interimTranscript[step] = "";
   }
   if (task.type === "fluency") {
-    response.answer.rawTranscript = text;
-    response.answer.animals = extractAnimalNames(text);
+    response.answer.rawTranscript = fluencyTranscriptFromAsrText(text, response.answer.rawTranscript);
+    response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
   }
   if (task.type === "orientation") applyOrientationText(response, step, text);
   response.behavior.voiceEvents = response.behavior.voiceEvents || [];
@@ -4215,6 +4217,17 @@ function uniqueWords(words) {
 }
 
 function extractAnimalNames(text) {
+  return uniqueWords(animalMatchesFromText(text).map((match) => match.canonical));
+}
+
+function fluencyTranscriptFromAsrText(text, existingText = "") {
+  const existingAnimals = extractAnimalNames(existingText);
+  const newAnimals = extractAnimalNames(text).filter((animal) => !existingAnimals.includes(animal));
+  const animals = uniqueWords(existingAnimals.concat(newAnimals));
+  return animals.join(" ");
+}
+
+function animalMatchesFromText(text) {
   const normalized = normalizeText(text);
   const aliases = animalAliasEntries();
   const matches = [];
@@ -4227,7 +4240,7 @@ function extractAnimalNames(text) {
       index = normalized.indexOf(alias, index + 1);
     }
   });
-  return uniqueWords(matches.sort((a, b) => a.start - b.start).map((match) => match.canonical));
+  return matches.sort((a, b) => a.start - b.start);
 }
 
 function animalAliasEntries() {
