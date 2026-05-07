@@ -754,6 +754,7 @@ function renderAdmin() {
       <div class="admin-toolbar">
         <button class="primary" data-action="loadSessions">刷新数据库</button>
         <button class="secondary" data-action="saveSession">保存当前测评</button>
+        <button class="secondary" data-action="exportCsv">导出 CSV</button>
       </div>
       <div class="admin-table">
         <div class="admin-head"><span>参加者</span><span>总分</span><span>原始分</span><span>保存时间</span></div>
@@ -1117,6 +1118,7 @@ root.addEventListener("click", async (event) => {
     render();
   }
   if (action === "loadSessions") await loadSessions(true);
+  if (action === "exportCsv") await exportSessionsCsv();
   if (action === "selectSavedSession") await selectSavedSession(target.dataset.id);
 });
 
@@ -2027,6 +2029,93 @@ async function loadSessions(shouldRender = false) {
 async function selectSavedSession(id) {
   state.selectedSession = await requestJson(`/api/sessions/${encodeURIComponent(id)}`, undefined, () => readLocalSessions().find((entry) => entry.id === id) || null);
   render();
+}
+
+async function exportSessionsCsv() {
+  const sessions = await requestJson("/api/sessions", undefined, () => localListSessions());
+  if (!sessions.length) {
+    window.alert("暂无可导出的测评数据");
+    return;
+  }
+
+  const fullSessions = await Promise.all(sessions.map((session) => (
+    requestJson(`/api/sessions/${encodeURIComponent(session.id)}`, undefined, () => readLocalSessions().find((entry) => entry.id === session.id) || session)
+  )));
+  const rows = fullSessions.flatMap(csvRowsForSession);
+  const csv = rowsToCsv(rows);
+  const filename = `cognition-hearing-game-${formatDateForFilename(new Date())}.csv`;
+  downloadTextFile(filename, csv, "text/csv;charset=utf-8");
+}
+
+function csvRowsForSession(session) {
+  const participant = session.participant || {};
+  const itemResponses = Array.isArray(session.itemResponses) && session.itemResponses.length
+    ? session.itemResponses
+    : [{ taskId: "", title: "", domain: "", modality: "", maxScore: "", score: "", answer: {}, behavior: {}, ai: null }];
+
+  return itemResponses.map((item) => ({
+    session_id: session.id || "",
+    participant_name: participant.name || "",
+    birth_year: participant.birthYear || "",
+    gender: participant.sex || participant.gender || "",
+    education_level: participant.educationLevel || "",
+    session_started_at: session.startedAt || "",
+    session_finished_at: session.finishedAt || "",
+    saved_at: session.savedAt || "",
+    total_duration_ms: session.totalDurationMs ?? "",
+    raw_score: session.rawScore ?? "",
+    education_bonus: session.educationBonus ?? "",
+    total_score: session.totalScore ?? "",
+    risk_band: session.riskBand || "",
+    domain_scores_json: stringifyForCsv(session.domainScores || {}),
+    task_id: item.taskId || "",
+    task_title: item.title || "",
+    domain: item.domain || "",
+    modality: item.modality || "",
+    max_score: item.maxScore ?? "",
+    score: item.score ?? "",
+    item_started_at: item.startedAt || "",
+    item_ended_at: item.endedAt || "",
+    item_duration_ms: item.durationMs ?? "",
+    answer_json: stringifyForCsv(item.answer || {}),
+    behavior_json: stringifyForCsv(item.behavior || {}),
+    ai_json: stringifyForCsv(item.ai || null),
+    drawing_image: item.drawingImage || ""
+  }));
+}
+
+function stringifyForCsv(value) {
+  return JSON.stringify(value ?? null);
+}
+
+function rowsToCsv(rows) {
+  const headers = Object.keys(rows[0] || {});
+  return [
+    headers.join(","),
+    ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header])).join(","))
+  ].join("\r\n");
+}
+
+function escapeCsvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function formatDateForFilename(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}`;
+}
+
+function downloadTextFile(filename, content, mimeType) {
+  const blob = new Blob(["\ufeff", content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function stopTimers() {
