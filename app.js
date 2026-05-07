@@ -295,6 +295,7 @@ let instructionTimer = null;
 let speechPlaybackPurpose = null;
 let micPermissionReady = false;
 let vigilanceTimer = null;
+let vigilancePointerTapAt = 0;
 let fluencyTimer = null;
 let trailGuideFrame = null;
 let trailGuideTick = 0;
@@ -1703,7 +1704,9 @@ root.addEventListener("click", async (event) => {
     activeRubricItem = null;
     render();
   }
-  if (action === "tapVigilance") tapVigilance();
+  if (action === "tapVigilance") {
+    if (Date.now() - vigilancePointerTapAt > 500) tapVigilance();
+  }
   if (action === "startFluency") startFluency();
   if (action === "clearDrawing") {
     delete state.drawings[current.id];
@@ -1748,6 +1751,14 @@ root.addEventListener("click", async (event) => {
   if (action === "exportCsv") await exportSessionsCsv();
   if (action === "selectSavedSession") await selectSavedSession(target.dataset.id);
 });
+
+root.addEventListener("pointerdown", (event) => {
+  const target = event.target.closest("[data-action='tapVigilance']");
+  if (!target) return;
+  event.preventDefault();
+  vigilancePointerTapAt = Date.now();
+  tapVigilance(vigilancePointerTapAt);
+}, { passive: false });
 
 root.addEventListener("input", (event) => {
   const target = event.target;
@@ -2786,11 +2797,11 @@ async function autoAdvanceVigilance() {
   render();
 }
 
-function tapVigilance() {
+function tapVigilance(at = Date.now()) {
   const response = getResponse("vigilance");
   if (!response.answer.startedAt) return;
   response.answer.taps = response.answer.taps || [];
-  response.answer.taps.push(Date.now());
+  response.answer.taps.push(at);
   render();
 }
 
