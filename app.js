@@ -1051,17 +1051,16 @@ function renderTranscriptEditor(live, kind) {
 }
 
 function renderAudioWave() {
-  const active = playState === "播放中..." || recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending || speechTranscribing;
+  const voiceInputActive = recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending;
+  const active = playState === "播放中..." || voiceInputActive || speechTranscribing;
   const label = speechTranscribing
     ? "请稍等"
     : playState === "播放中..."
       ? "播放中..."
-      : voiceState && voiceState !== "待说"
-        ? voiceState
-        : recognizing || recordingAudio || speechRecognitionStartPending
-          ? "请说"
-          : "";
-  const showLabel = label && label !== "播放中..." && !speechTranscribing;
+      : voiceInputActive
+        ? voiceState && voiceState !== "待说" ? voiceState : voicePromptText()
+        : "";
+  const showLabel = voiceInputActive && label && !speechTranscribing;
   return html`
     <div class="audio-wave ${active ? "active" : ""}" aria-label="${escapeHtml(label)}">
       <span></span><span></span><span></span><span></span><span></span>
