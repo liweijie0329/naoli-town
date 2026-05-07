@@ -20,6 +20,8 @@ const SPEECH_VOLUME = 1;
 const STATIC_TTS_MANIFEST_SRC = "./assets/audio/manifest.json";
 const ASR_ENDPOINT = "/api/asr";
 const ASR_TIMEOUT_MS = 90000;
+const FLUENCY_LIVE_ASR_INTERVAL_MS = 6500;
+const FLUENCY_LIVE_ASR_MIN_CHUNKS = 18;
 const PREFER_CLOUDFLARE_ASR = true;
 const MAX_DRAFT_AUDIO_RECORDING_BYTES = 700 * 1024;
 const RECORDER_MIME_TYPES = [
@@ -48,7 +50,20 @@ const animalEmojis = {
 const animalNameBank = [
   "狗", "猫", "牛", "马", "羊", "猪", "鸡", "鸭", "鹅", "兔", "鼠", "虎", "狮子", "犀牛", "骆驼",
   "大象", "猴", "猩猩", "熊", "鹿", "长颈鹿", "斑马", "豹子", "狼", "狐狸", "河马", "袋鼠", "熊猫",
-  "蛇", "乌龟", "鳄鱼", "青蛙", "鱼", "鲸", "海豚", "鲨鱼", "鸟", "鹰", "孔雀", "企鹅", "龙", "凤凰", "麒麟"
+  "蛇", "乌龟", "鳄鱼", "青蛙", "鱼", "鲸", "海豚", "鲨鱼", "鸟", "鹰", "孔雀", "企鹅", "老虎", "猴子",
+  "兔子", "老鼠", "猫头鹰", "燕子", "麻雀", "鹦鹉", "鸽子", "蝴蝶", "蜜蜂", "蚂蚁", "蜻蜓", "蜗牛",
+  "螃蟹", "虾", "章鱼", "海星", "海马", "海狮", "海豹", "海龟", "金鱼", "鲤鱼", "鲫鱼"
+];
+
+const animalAliasPairs = [
+  ["小狗", "狗"], ["狗狗", "狗"], ["犬", "狗"],
+  ["小猫", "猫"], ["猫咪", "猫"],
+  ["黄牛", "牛"], ["水牛", "牛"], ["奶牛", "牛"],
+  ["山羊", "羊"], ["绵羊", "羊"],
+  ["公鸡", "鸡"], ["母鸡", "鸡"],
+  ["鸭子", "鸭"], ["鹅子", "鹅"],
+  ["兔子", "兔"], ["老鼠", "鼠"], ["耗子", "鼠"], ["老虎", "虎"], ["猴子", "猴"],
+  ["大象", "大象"], ["长颈鹿", "长颈鹿"], ["猫头鹰", "猫头鹰"]
 ];
 
 const orientationPrompts = [
@@ -2988,6 +3003,10 @@ async function startPcmAudioRecording(options = {}) {
     pcmRecorder = {
       chunks,
       context,
+      liveChunkIndex: 0,
+      liveRequestActive: false,
+      liveSequence: 0,
+      liveTimer: null,
       processor,
       response,
       sampleRate: context.sampleRate,
@@ -3000,6 +3019,7 @@ async function startPcmAudioRecording(options = {}) {
     recordingWillTranscribe = transcribeOnStop;
     recordingAudio = true;
     voiceState = voicePromptText();
+    if (task.type === "fluency" && transcribeOnStop) startFluencyLiveAsr(pcmRecorder);
     render();
     return true;
   } catch (error) {
@@ -3022,6 +3042,8 @@ async function finishPcmAudioRecording(recorder) {
   releaseMicAfterRecordingStop = false;
   let micReleased = false;
   try {
+    recorder.finished = true;
+    stopFluencyLiveAsr(recorder);
     cleanupPcmRecorder(recorder);
     const task = tasks.find((entry) => entry.id === recorder.taskId);
     const response = getResponse(recorder.taskId);
@@ -3062,6 +3084,7 @@ async function finishPcmAudioRecording(recorder) {
 
 function cleanupPcmRecorder(recorder) {
   if (!recorder) return;
+  stopFluencyLiveAsr(recorder);
   recorder.processor.onaudioprocess = null;
   try {
     recorder.processor.disconnect();
@@ -3070,6 +3093,82 @@ function cleanupPcmRecorder(recorder) {
     recorder.source.disconnect();
   } catch {}
   recorder.context.close?.().catch(() => {});
+}
+
+function startFluencyLiveAsr(recorder) {
+  stopFluencyLiveAsr(recorder);
+  recorder.liveChunkIndex = 0;
+  recorder.liveRequestActive = false;
+  recorder.liveSequence = 0;
+  recorder.liveTimer = window.setInterval(() => {
+    flushFluencyLiveAsr(recorder);
+  }, FLUENCY_LIVE_ASR_INTERVAL_MS);
+}
+
+function stopFluencyLiveAsr(recorder) {
+  if (!recorder?.liveTimer) return;
+  window.clearInterval(recorder.liveTimer);
+  recorder.liveTimer = null;
+}
+
+async function flushFluencyLiveAsr(recorder) {
+  if (!recorder || recorder.finished || recorder.liveRequestActive || recorder.taskId !== "fluency") return;
+  const endIndex = recorder.chunks.length;
+  if (endIndex - recorder.liveChunkIndex < FLUENCY_LIVE_ASR_MIN_CHUNKS) return;
+  const chunks = recorder.chunks.slice(recorder.liveChunkIndex, endIndex);
+  recorder.liveChunkIndex = endIndex;
+  recorder.liveRequestActive = true;
+  const sequence = recorder.liveSequence + 1;
+  recorder.liveSequence = sequence;
+  const blob = wavBlobFromFloat32Chunks(chunks, recorder.sampleRate);
+  const task = tasks.find((entry) => entry.id === "fluency");
+  const response = getResponse("fluency");
+  response.behavior.speechRecognition = response.behavior.speechRecognition || [];
+  response.behavior.speechRecognition.push({
+    step: recorder.step,
+    eventType: "cloudflare-asr-live-upload",
+    sequence,
+    size: blob.size,
+    at: new Date().toISOString()
+  });
+  try {
+    const result = await requestAsrJson(task, `live-${sequence}`, blob);
+    if (recorder.finished) return;
+    const text = String(result?.text || result?.transcription || "").trim();
+    response.behavior.speechRecognition.push({
+      step: recorder.step,
+      eventType: "cloudflare-asr-live-result",
+      sequence,
+      text,
+      at: new Date().toISOString()
+    });
+    if (text) applyFluencyLiveText(response, recorder.step, text);
+  } catch (error) {
+    response.behavior.speechRecognition.push({
+      step: recorder.step,
+      eventType: "cloudflare-asr-live-error",
+      sequence,
+      message: error?.message || "Live ASR failed",
+      at: new Date().toISOString()
+    });
+    saveDraft();
+  } finally {
+    recorder.liveRequestActive = false;
+  }
+}
+
+function applyFluencyLiveText(response, step, text) {
+  response.answer.rawTranscript = joinTranscriptText(response.answer.rawTranscript, text);
+  response.answer.interimTranscript = "";
+  response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
+  response.behavior.liveTranscript = response.behavior.liveTranscript || {};
+  response.behavior.liveTranscript[step] = {
+    finalText: response.answer.rawTranscript,
+    interimText: "",
+    updatedAt: new Date().toISOString()
+  };
+  saveDraft();
+  render();
 }
 
 function wavBlobFromFloat32Chunks(chunks, inputSampleRate) {
@@ -3392,7 +3491,7 @@ function setLiveVoiceText(task, response, step, { finalText = "", interimText = 
   if (task.type === "fluency") {
     response.answer.rawTranscript = finalText;
     response.answer.interimTranscript = interimText;
-    response.answer.animals = extractAnimalNames(finalText);
+    response.answer.animals = extractAnimalNames(joinTranscriptText(finalText, interimText));
   }
   response.behavior.liveTranscript = response.behavior.liveTranscript || {};
   response.behavior.liveTranscript[step] = {
@@ -4117,9 +4216,53 @@ function uniqueWords(words) {
 
 function extractAnimalNames(text) {
   const normalized = normalizeText(text);
-  const fromBank = animalNameBank.filter((name) => normalized.includes(name));
-  const fromSeparators = String(text || "").split(/[，,、\s]+/).map((word) => normalizeText(word)).filter(Boolean);
-  return uniqueWords(fromBank.concat(fromSeparators));
+  const aliases = animalAliasEntries();
+  const matches = [];
+  aliases.forEach(({ alias, canonical }) => {
+    let index = normalized.indexOf(alias);
+    while (index >= 0) {
+      const end = index + alias.length;
+      const overlaps = matches.some((match) => index < match.end && end > match.start);
+      if (!overlaps) matches.push({ start: index, end, canonical });
+      index = normalized.indexOf(alias, index + 1);
+    }
+  });
+  return uniqueWords(matches.sort((a, b) => a.start - b.start).map((match) => match.canonical));
+}
+
+function animalAliasEntries() {
+  const entries = [
+    ...animalNameBank.map((name) => [name, canonicalAnimalName(name)]),
+    ...animalAliasPairs
+  ];
+  const seen = new Set();
+  return entries
+    .map(([alias, canonical]) => ({ alias: normalizeText(alias), canonical: canonicalAnimalName(canonical) }))
+    .filter(({ alias }) => {
+      if (!alias || seen.has(alias)) return false;
+      seen.add(alias);
+      return true;
+    })
+    .sort((a, b) => b.alias.length - a.alias.length);
+}
+
+function canonicalAnimalName(name) {
+  const normalized = normalizeText(name);
+  const aliases = {
+    小狗: "狗",
+    狗狗: "狗",
+    犬: "狗",
+    小猫: "猫",
+    猫咪: "猫",
+    兔子: "兔",
+    老鼠: "鼠",
+    耗子: "鼠",
+    老虎: "虎",
+    猴子: "猴",
+    鸭子: "鸭",
+    鹅子: "鹅"
+  };
+  return aliases[normalized] || normalized;
 }
 
 function computeTotals() {
