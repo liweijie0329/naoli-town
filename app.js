@@ -286,6 +286,7 @@ let audioChunks = [];
 let speechPlaybackId = 0;
 let speechItemTimer = null;
 let speechTextFallbackTimer = null;
+let speechPlaybackPurpose = null;
 let micPermissionReady = false;
 let vigilanceTimer = null;
 let fluencyTimer = null;
@@ -969,7 +970,10 @@ function renderAudioWave() {
 }
 
 function renderAudioButton(action) {
-  if (playState === "播放中...") return `<button class="primary circle-button pulse sound-button" disabled>播放中</button>`;
+  const current = tasks[state.activeTaskIndex];
+  if (playState === "播放中..." && !(action === "playCurrentAudio" && current?.type === "sentence" && speechPlaybackPurpose === "instruction")) {
+    return `<button class="primary circle-button pulse sound-button" disabled>播放中</button>`;
+  }
   if (recognizing || recordingAudio) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">停止</button>`;
   return `<button class="primary circle-button pulse sound-button" data-action="${action}">开始</button>`;
 }
@@ -1588,6 +1592,7 @@ root.addEventListener("click", async (event) => {
   if (action === "navView") {
     state.view = target.dataset.view;
     menuOpen = false;
+    if (state.view === "test") requestImmediateInstructionPlayback(tasks[state.activeTaskIndex]);
     if (state.view === "admin") await loadSessions(false);
     render();
   }
@@ -1613,6 +1618,7 @@ root.addEventListener("click", async (event) => {
     state.activeTaskIndex = nextIndex;
     state.view = "test";
     menuOpen = false;
+    requestImmediateInstructionPlayback(tasks[nextIndex]);
     render();
   }
   if (action === "previousTask") {
@@ -1732,6 +1738,7 @@ async function startNewSession(participant) {
   state.startedAt = new Date().toISOString();
   state.activeTaskIndex = 0;
   state.view = "test";
+  requestImmediateInstructionPlayback(tasks[0]);
   render();
 }
 
@@ -1752,6 +1759,7 @@ async function nextTask() {
   }
   if (step < getTaskStepCount(task) - 1) {
     response.answer.step = step + 1;
+    requestImmediateInstructionPlayback(task, response.answer.step);
     render();
     return;
   }
@@ -1763,6 +1771,7 @@ async function nextTask() {
     state.finishedAt = new Date().toISOString();
   } else {
     state.activeTaskIndex = nextIndex;
+    requestImmediateInstructionPlayback(tasks[nextIndex]);
   }
   render();
 }
@@ -1787,7 +1796,7 @@ function goPreviousStep() {
   const step = getTaskStep(current);
   if (step > 0) {
     response.answer.step = step - 1;
-    resetInstructionPlayback(current, step - 1);
+    requestImmediateInstructionPlayback(current, step - 1);
     saveDraft();
     render();
     return;
@@ -1799,7 +1808,7 @@ function goPreviousStep() {
     state.activeTaskIndex = previousIndex;
     const previousStep = Math.max(0, getTaskStepCount(previous) - 1);
     getResponse(previous.id).answer.step = previousStep;
-    resetInstructionPlayback(previous, previousStep);
+    requestImmediateInstructionPlayback(previous, previousStep);
     saveDraft();
   }
   render();
@@ -1963,7 +1972,7 @@ function scheduleTaskInstruction(task) {
   window.setTimeout(() => {
     if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
     if (task.id === "memory1" && getResponse(task.id).answer.wordsPlaybackStarted) return;
-    speakText(text, { rate: 0.82, pitch: 1.18 });
+    speakText(text, { rate: 0.82, pitch: 1.18, purpose: "instruction" });
   }, force ? 0 : 260);
 }
 
@@ -2028,6 +2037,7 @@ function playSentenceForRepeat(task, step) {
   const text = task.sentences[step];
   return speakText(text, {
     rate: 0.86,
+    purpose: "sentence",
     fallbackMs: sentencePlaybackFallbackMs(text),
     done: () => startSentenceRepeat(task, step)
   });
@@ -2045,7 +2055,7 @@ function sentencePlaybackFallbackMs(text) {
 }
 
 function speakText(text, options = {}) {
-  const { rate = 0.82, pitch = 1.18, done, onStart, fallbackMs = 0 } = options;
+  const { rate = 0.82, pitch = 1.18, done, onStart, fallbackMs = 0, purpose = "speech" } = options;
   if (!("speechSynthesis" in window)) {
     if (done) done();
     return;
@@ -2061,6 +2071,7 @@ function speakText(text, options = {}) {
   utterance.onstart = () => {
     if (playbackId !== speechPlaybackId) return;
     playState = "播放中...";
+    speechPlaybackPurpose = purpose;
     if (onStart) onStart();
     render();
   };
@@ -2071,6 +2082,7 @@ function speakText(text, options = {}) {
     finished = true;
     clearSpeechTextFallbackTimer();
     playState = "开始";
+    speechPlaybackPurpose = null;
     render();
     if (done) done();
   };
@@ -2135,6 +2147,7 @@ function beginAudioPlayback() {
     speechItemTimer = null;
   }
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  speechPlaybackPurpose = null;
   return speechPlaybackId;
 }
 
@@ -2148,6 +2161,7 @@ function stopAudioPlayback() {
   }
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   if (playState === "播放中...") playState = "开始";
+  speechPlaybackPurpose = null;
 }
 
 function clearSpeechTextFallbackTimer() {
@@ -2664,6 +2678,7 @@ async function autoAdvanceVigilance() {
     state.finishedAt = new Date().toISOString();
   } else {
     state.activeTaskIndex = nextIndex;
+    requestImmediateInstructionPlayback(tasks[nextIndex]);
   }
   render();
 }
