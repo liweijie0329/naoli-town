@@ -26,6 +26,8 @@ npm start
 
 Cloudflare Pages + D1 的部署步骤见 [docs/cloudflare-d1.md](./docs/cloudflare-d1.md)。
 
+豆包语音合成接入见 [docs/doubao-tts.md](./docs/doubao-tts.md)。配置后 Web 端播放会优先调用 `/api/tts`，失败时自动回退到浏览器自带语音。
+
 如果云平台要求绑定付费信息，可以先走免费路线：
 
 - GitHub Pages / Cloudflare Pages：纯静态网页，任何平板可访问，数据保存在当前平板浏览器。

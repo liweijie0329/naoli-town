@@ -4,6 +4,7 @@ import { createReadStream } from "node:fs";
 import { extname, join, normalize, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
+import { base64ChunksToUint8Array, serializeTtsError, synthesizeDoubaoSpeech } from "./functions/_lib/doubao-tts.js";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const publicRoot = root;
@@ -178,6 +179,28 @@ async function handleApi(req, res, url) {
       comment:
         "本地演示环境已直接返回 AI 评分；生产环境请设置 AI_SCORE_ENDPOINT 接入真实模型评分服务。"
     });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/tts") {
+    const body = await readBody(req);
+    const payload = body ? JSON.parse(body) : {};
+
+    try {
+      const result = await synthesizeDoubaoSpeech(payload, process.env);
+      const bytes = base64ChunksToUint8Array(result.audioBase64Chunks);
+      res.writeHead(200, {
+        "content-type": result.mimeType,
+        "cache-control": "no-store",
+        "x-tts-provider": result.provider,
+        "x-tts-request-id": result.requestId,
+        "x-tts-voice-type": result.voiceType
+      });
+      res.end(Buffer.from(bytes));
+    } catch (error) {
+      const serialized = serializeTtsError(error);
+      sendJson(res, serialized.status, serialized.payload);
+    }
     return;
   }
 

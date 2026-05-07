@@ -17,6 +17,12 @@ const PLACE_SEARCH_TERMS = ["医院", "学校", "社区中心", "大学", "公�
 const MIN_PLACE_DISTRACTOR_KM = 10;
 const DRAWING_CONFIRM_NUDGE_MS = 10000;
 const SPEECH_VOLUME = 1;
+const REMOTE_TTS_ENDPOINT = "/api/tts";
+const REMOTE_TTS_TIMEOUT_MS = 12000;
+const REMOTE_TTS_CACHE_LIMIT = 24;
+const SPEECH_RECOGNITION_RESTART_DELAY_MS = 260;
+const SPEECH_RECOGNITION_BLOCKING_ERRORS = ["not-allowed", "service-not-allowed", "audio-capture", "network"];
+const SPEECH_RECOGNITION_RECORDING_FALLBACK_ERRORS = ["service-not-allowed", "network"];
 const VOICE_PROFILES = {
   cartoon: { label: "卡通童声", hints: ["xiaoxiao", "xiaoyi", "xiaobei", "tingting", "美佳", "sin-ji"], rateScale: 0.96, pitchOffset: 0.1 },
   gentle: { label: "温柔女声", hints: ["xiaoxiao", "ting-ting", "tingting", "mei-jia", "meijia", "female", "美佳"], rateScale: 1, pitchOffset: -0.04 },
@@ -295,9 +301,14 @@ let audioChunks = [];
 let speechPlaybackId = 0;
 let speechItemTimer = null;
 let speechTextFallbackTimer = null;
+let speechRecognitionRestartTimer = null;
+let remoteSpeechAudio = null;
+let remoteTtsCache = new Map();
 let instructionTimer = null;
 let speechPlaybackPurpose = null;
 let micPermissionReady = false;
+let speechRecognitionStartPending = false;
+let speechRecognitionLastError = null;
 let vigilanceTimer = null;
 let vigilancePointerTapAt = 0;
 let fluencyTimer = null;
@@ -912,6 +923,7 @@ function renderFluencyTask() {
       <button class="timer-button ${running ? "running" : "pulse"}" data-action="startFluency">${running ? remaining : "开始"}</button>
       <strong>已识别 ${animals.length} 个</strong>
       ${renderLiveTranscriptBox(live, "说出的动物名会实时显示在这里")}
+      ${renderTranscriptEditor(live, "fluency")}
     </div>
   `;
 }
@@ -957,6 +969,7 @@ function renderSpeechCard(live) {
       ${renderAudioWave()}
       ${renderAudioButton("playCurrentAudio")}
       ${renderLiveTranscriptBox(live, "复述内容会实时显示在这里")}
+      ${renderTranscriptEditor(live, "sentence")}
     </div>
   `;
 }
@@ -999,9 +1012,15 @@ function renderLiveTranscriptBox(live, placeholder) {
   `;
 }
 
+function renderTranscriptEditor(live, kind) {
+  const value = live?.finalText || "";
+  const attr = kind === "fluency" ? "data-fluency-manual" : "data-voice-manual";
+  return `<textarea class="transcript-input" ${attr} placeholder="语音识别结果会显示在这里，也可以手动修改。">${escapeHtml(value)}</textarea>`;
+}
+
 function renderAudioWave() {
-  const active = playState === "播放中..." || recognizing || recordingAudio || speechRecognitionWanted;
-  const label = playState === "播放中..." ? "播放中..." : voiceState && voiceState !== "待说" ? voiceState : recognizing || recordingAudio ? "请说" : "";
+  const active = playState === "播放中..." || recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending;
+  const label = playState === "播放中..." ? "播放中..." : voiceState && voiceState !== "待说" ? voiceState : recognizing || recordingAudio || speechRecognitionStartPending ? "请说" : "";
   const showLabel = label && label !== "播放中...";
   return html`
     <div class="audio-wave ${active ? "active" : ""}" aria-label="${escapeHtml(label)}">
@@ -1016,7 +1035,7 @@ function renderAudioButton(action) {
   if (playState === "播放中..." && !(action === "playCurrentAudio" && current?.type === "sentence" && speechPlaybackPurpose === "instruction")) {
     return `<button class="primary circle-button pulse sound-button" disabled>播放中</button>`;
   }
-  if (recognizing || recordingAudio || speechRecognitionWanted) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">停止</button>`;
+  if (recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">停止</button>`;
   return `<button class="primary circle-button pulse sound-button" data-action="${action}">开始</button>`;
 }
 
@@ -1748,7 +1767,7 @@ root.addEventListener("click", async (event) => {
   if (action === "tapVigilance") {
     if (Date.now() - vigilancePointerTapAt > 500) tapVigilance();
   }
-  if (action === "startFluency") startFluency();
+  if (action === "startFluency") await startFluency();
   if (action === "clearDrawing") {
     delete state.drawings[current.id];
     const response = getResponse(current.id);
@@ -1815,6 +1834,7 @@ root.addEventListener("input", (event) => {
   if (target.dataset.fluencyManual !== undefined) {
     const response = getResponse("fluency");
     response.answer.rawTranscript = target.value;
+    response.answer.interimTranscript = "";
     response.answer.animals = extractAnimalNames(target.value);
     saveDraft();
   }
@@ -1923,7 +1943,7 @@ async function skipTask() {
   const response = getResponse(task.id);
   response.answer.skipped = true;
   response.behavior.skippedAt = new Date().toISOString();
-  if (recognizing || recordingAudio) stopVoiceInput();
+  if (recognizing || recordingAudio || speechRecognitionStartPending || speechRecognitionWanted) stopVoiceInput();
   if (task.type === "fluency" && response.answer.running) {
     response.answer.running = false;
     window.clearInterval(fluencyTimer);
@@ -2050,7 +2070,7 @@ function taskIndex(taskId) {
 async function submitActiveTask() {
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
-  if (recognizing || recordingAudio) stopVoiceInput();
+  if (recognizing || recordingAudio || speechRecognitionStartPending || speechRecognitionWanted) stopVoiceInput();
   if (task.type === "fluency" && response.answer.running) {
     response.answer.running = false;
     window.clearInterval(fluencyTimer);
@@ -2156,14 +2176,22 @@ function prioritizeStartPlayback(task, step = getTaskStep(task)) {
   markCurrentInstructionHandled(task, step);
 }
 
-function playSentenceForRepeat(task, step) {
+async function playSentenceForRepeat(task, step) {
   const text = task.sentences[step];
+  await prepareSpeechInputBeforePlayback();
+  if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
   return speakText(text, {
     rate: 0.86,
     purpose: "sentence",
     fallbackMs: sentencePlaybackFallbackMs(text),
     done: () => startSentenceRepeat(task, step)
   });
+}
+
+async function prepareSpeechInputBeforePlayback() {
+  speechRecognition = speechRecognition || initSpeechRecognition();
+  if (micPermissionReady || !navigator.mediaDevices?.getUserMedia) return micPermissionReady;
+  return primeMicrophonePermission();
 }
 
 async function startSentenceRepeat(task, step) {
@@ -2177,28 +2205,11 @@ function sentencePlaybackFallbackMs(text) {
   return Math.max(3600, Math.min(10000, String(text || "").length * 360 + 1600));
 }
 
-function speakText(text, options = {}) {
+async function speakText(text, options = {}) {
   const { rate = 0.82, pitch = 1.18, done, onStart, fallbackMs = 0, purpose = "speech" } = options;
-  if (!("speechSynthesis" in window)) {
-    if (done) done();
-    return;
-  }
   const playbackId = beginAudioPlayback();
-  const profile = currentVoiceProfile();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "zh-CN";
-  utterance.rate = clampSpeech(rate * profile.rateScale, 0.55, 1.08);
-  utterance.pitch = clampSpeech(pitch + profile.pitchOffset, 0.72, 1.55);
-  utterance.volume = SPEECH_VOLUME;
-  const voice = pickNaturalVoice();
-  if (voice) utterance.voice = voice;
-  utterance.onstart = () => {
-    if (playbackId !== speechPlaybackId) return;
-    playState = "播放中...";
-    speechPlaybackPurpose = purpose;
-    if (onStart) onStart();
-    render();
-  };
+  const speechParams = speechParamsFor(rate, pitch);
+  startPlaybackUi(playbackId, purpose);
   let finished = false;
   const finish = () => {
     if (playbackId !== speechPlaybackId) return;
@@ -2210,9 +2221,46 @@ function speakText(text, options = {}) {
     render();
     if (done) done();
   };
+
+  const remoteStarted = await playRemoteTtsAudio(text, {
+    playbackId,
+    speechParams,
+    onStart,
+    done: finish
+  });
+  if (remoteStarted) return;
+  if (playbackId !== speechPlaybackId || finished) return;
+  if (!("speechSynthesis" in window)) {
+    finish();
+    return;
+  }
+  if (fallbackMs) speechTextFallbackTimer = window.setTimeout(finish, fallbackMs);
+  speakTextWithBrowser(text, { playbackId, speechParams, onStart, finish });
+}
+
+function startPlaybackUi(playbackId, purpose) {
+  if (playbackId !== speechPlaybackId) return;
+  playState = "播放中...";
+  speechPlaybackPurpose = purpose;
+  render();
+}
+
+function speakTextWithBrowser(text, { playbackId, speechParams, onStart, finish }) {
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = "zh-CN";
+  utterance.rate = speechParams.speedRatio;
+  utterance.pitch = speechParams.browserPitch;
+  utterance.volume = SPEECH_VOLUME;
+  const voice = pickNaturalVoice();
+  if (voice) utterance.voice = voice;
+  utterance.onstart = () => {
+    if (playbackId !== speechPlaybackId) return;
+    playState = "播放中...";
+    if (onStart) onStart();
+    render();
+  };
   utterance.onend = finish;
   utterance.onerror = finish;
-  if (fallbackMs) speechTextFallbackTimer = window.setTimeout(finish, fallbackMs);
   window.speechSynthesis.speak(utterance);
 }
 
@@ -2227,15 +2275,11 @@ function pickNaturalVoice() {
 
 function speakItemsSlow(items, options = {}) {
   const { gapMs = 1000, rate = 0.72, done, onItemStart } = options;
-  if (!("speechSynthesis" in window)) {
-    if (done) done();
-    return;
-  }
   const playbackId = beginAudioPlayback();
   playState = "播放中...";
   render();
   let index = 0;
-  const speakNext = () => {
+  const speakNext = async () => {
     if (playbackId !== speechPlaybackId) return;
     if (index >= items.length) {
       playState = "开始";
@@ -2244,30 +2288,172 @@ function speakItemsSlow(items, options = {}) {
       return;
     }
     const value = items[index];
-    if (onItemStart) onItemStart(value, index);
-    const utterance = new SpeechSynthesisUtterance(value);
-    const profile = currentVoiceProfile();
-    utterance.lang = "zh-CN";
-    utterance.rate = clampSpeech(rate * profile.rateScale, 0.55, 1.08);
-    utterance.pitch = clampSpeech(1.18 + profile.pitchOffset, 0.72, 1.55);
-    utterance.volume = SPEECH_VOLUME;
-    const voice = pickNaturalVoice();
-    if (voice) utterance.voice = voice;
-    utterance.onend = () => {
+    const speechParams = speechParamsFor(rate, 1.18);
+    const queueNext = () => {
       if (playbackId !== speechPlaybackId) return;
       index += 1;
       speechItemTimer = window.setTimeout(speakNext, gapMs);
     };
-    utterance.onerror = utterance.onend;
+    const itemStart = () => {
+      if (onItemStart) onItemStart(value, index);
+    };
+    const remoteStarted = await playRemoteTtsAudio(value, {
+      playbackId,
+      speechParams,
+      onStart: itemStart,
+      done: queueNext
+    });
+    if (remoteStarted) return;
+    if (playbackId !== speechPlaybackId) return;
+    if (!("speechSynthesis" in window)) {
+      itemStart();
+      queueNext();
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(value);
+    utterance.lang = "zh-CN";
+    utterance.rate = speechParams.speedRatio;
+    utterance.pitch = speechParams.browserPitch;
+    utterance.volume = SPEECH_VOLUME;
+    const voice = pickNaturalVoice();
+    if (voice) utterance.voice = voice;
+    utterance.onstart = itemStart;
+    utterance.onend = queueNext;
+    utterance.onerror = queueNext;
     window.speechSynthesis.speak(utterance);
   };
   speakNext();
+}
+
+function speechParamsFor(rate, pitch) {
+  const profile = currentVoiceProfile();
+  const browserPitch = clampSpeech(pitch + profile.pitchOffset, 0.72, 1.55);
+  return {
+    profile: state.voiceProfile,
+    speedRatio: clampSpeech(rate * profile.rateScale, 0.55, 1.08),
+    pitchRatio: clampSpeech(browserPitch / 1.18, 0.6, 1.4),
+    browserPitch
+  };
+}
+
+async function playRemoteTtsAudio(text, { playbackId, speechParams, onStart, done }) {
+  try {
+    const url = await fetchRemoteTtsAudio(text, speechParams);
+    if (playbackId !== speechPlaybackId) return true;
+    return await playRemoteAudioUrl(url, playbackId, onStart, done);
+  } catch {
+    return false;
+  }
+}
+
+async function fetchRemoteTtsAudio(text, speechParams) {
+  const cacheKey = remoteTtsCacheKey(text, speechParams);
+  const cached = remoteTtsCache.get(cacheKey);
+  if (cached) return cached.url;
+
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), REMOTE_TTS_TIMEOUT_MS);
+  try {
+    const response = await fetch(REMOTE_TTS_ENDPOINT, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        text,
+        profile: speechParams.profile,
+        speedRatio: speechParams.speedRatio,
+        pitchRatio: speechParams.pitchRatio,
+        volumeRatio: SPEECH_VOLUME,
+        format: "mp3"
+      }),
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const blob = await response.blob();
+    if (!blob.size) throw new Error("Empty TTS audio");
+    const url = URL.createObjectURL(blob);
+    remoteTtsCache.set(cacheKey, { url });
+    trimRemoteTtsCache();
+    return url;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+function playRemoteAudioUrl(url, playbackId, onStart, done) {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const resolveOnce = (value) => {
+      if (resolved) return;
+      resolved = true;
+      resolve(value);
+    };
+    const audio = new Audio(url);
+    remoteSpeechAudio = audio;
+    audio.volume = SPEECH_VOLUME;
+    audio.onended = () => {
+      if (remoteSpeechAudio === audio) remoteSpeechAudio = null;
+      if (done) done();
+    };
+    audio.onerror = () => {
+      if (remoteSpeechAudio === audio) remoteSpeechAudio = null;
+      if (resolved) {
+        if (done) done();
+      } else {
+        resolveOnce(false);
+      }
+    };
+    audio.play()
+      .then(() => {
+        if (playbackId !== speechPlaybackId) {
+          stopRemoteSpeechAudio();
+          resolveOnce(true);
+          return;
+        }
+        if (onStart) onStart();
+        resolveOnce(true);
+      })
+      .catch(() => {
+        if (remoteSpeechAudio === audio) remoteSpeechAudio = null;
+        resolveOnce(false);
+      });
+  });
+}
+
+function remoteTtsCacheKey(text, speechParams) {
+  return JSON.stringify([
+    text,
+    speechParams.profile,
+    speechParams.speedRatio,
+    speechParams.pitchRatio,
+    SPEECH_VOLUME
+  ]);
+}
+
+function trimRemoteTtsCache() {
+  while (remoteTtsCache.size > REMOTE_TTS_CACHE_LIMIT) {
+    const firstKey = remoteTtsCache.keys().next().value;
+    const entry = remoteTtsCache.get(firstKey);
+    if (entry?.url) URL.revokeObjectURL(entry.url);
+    remoteTtsCache.delete(firstKey);
+  }
+}
+
+function stopRemoteSpeechAudio() {
+  if (!remoteSpeechAudio) return;
+  remoteSpeechAudio.onended = null;
+  remoteSpeechAudio.onerror = null;
+  remoteSpeechAudio.pause();
+  remoteSpeechAudio.removeAttribute("src");
+  remoteSpeechAudio.load();
+  remoteSpeechAudio = null;
 }
 
 function beginAudioPlayback() {
   speechPlaybackId += 1;
   clearInstructionTimer();
   clearSpeechTextFallbackTimer();
+  stopRemoteSpeechAudio();
   prepareAudioOutputMode();
   if (speechItemTimer) {
     window.clearTimeout(speechItemTimer);
@@ -2279,7 +2465,7 @@ function beginAudioPlayback() {
 }
 
 function prepareAudioOutputMode() {
-  if (recordingAudio || recognizing) {
+  if (recordingAudio || recognizing || speechRecognitionStartPending || speechRecognitionWanted) {
     stopVoiceInput({ releaseMic: true, shouldRender: false });
     return;
   }
@@ -2288,9 +2474,10 @@ function prepareAudioOutputMode() {
 
 function stopAudioPlayback() {
   clearInstructionTimer();
-  if (!("speechSynthesis" in window) && !speechItemTimer && playState !== "播放中...") return;
+  if (!("speechSynthesis" in window) && !remoteSpeechAudio && !speechItemTimer && playState !== "播放中...") return;
   speechPlaybackId += 1;
   clearSpeechTextFallbackTimer();
+  stopRemoteSpeechAudio();
   if (speechItemTimer) {
     window.clearTimeout(speechItemTimer);
     speechItemTimer = null;
@@ -2344,87 +2531,176 @@ function initSpeechRecognition() {
   recognition.lang = "zh-CN";
   recognition.interimResults = true;
   recognition.continuous = true;
+  recognition.maxAlternatives = 1;
   recognition.onstart = () => {
+    speechRecognitionStartPending = false;
+    if (!speechRecognitionWanted) {
+      try {
+        recognition.stop();
+      } catch {
+        recognition.abort?.();
+      }
+      return;
+    }
     recognizing = true;
+    speechRecognitionLastError = null;
     voiceState = voicePromptText();
+    recordSpeechRecognitionEvent("started");
     render();
   };
   recognition.onresult = (event) => {
+    if (!speechRecognitionWanted) return;
     const transcript = recognitionTranscriptFromEvent(event);
     applyLiveVoiceText(transcript);
     voiceState = "正在识别";
     render();
   };
   recognition.onend = () => {
+    speechRecognitionStartPending = false;
     recognizing = false;
     promoteLiveInterimTranscript();
     recordSpeechRecognitionEvent("end", { finalText: currentLiveFinalText() });
-    speechRecognitionWanted = false;
+    if (speechRecognitionWanted && !speechRecognitionBlocked) {
+      voiceState = "继续听";
+      queueSpeechRecognitionRestart();
+      render();
+      return;
+    }
     activeSpeechTaskId = null;
-    voiceState = recordingAudio ? "已录音，识别已暂停" : "识别结束";
+    voiceState = recordingAudio
+      ? "已录音，识别已暂停"
+      : speechRecognitionLastError
+        ? speechRecognitionErrorText(speechRecognitionLastError)
+        : "识别结束";
     render();
   };
-  recognition.onerror = (event) => {
+  recognition.onerror = async (event) => {
+    speechRecognitionStartPending = false;
     recognizing = false;
-    recordSpeechRecognitionEvent("error", { error: event?.error || "unknown" });
-    if (["not-allowed", "service-not-allowed", "audio-capture", "network"].includes(event?.error)) {
+    const error = event?.error || "unknown";
+    speechRecognitionLastError = error;
+    recordSpeechRecognitionEvent("error", { error });
+    if (SPEECH_RECOGNITION_BLOCKING_ERRORS.includes(error)) {
       speechRecognitionBlocked = true;
       speechRecognitionWanted = false;
     }
     voiceState = speechRecognitionErrorText(event?.error);
     render();
+    if (SPEECH_RECOGNITION_RECORDING_FALLBACK_ERRORS.includes(error)) {
+      await fallbackToAudioRecording("识别服务不可用，已改为录音，可手动修改文字");
+    }
   };
   return recognition;
 }
 
 function toggleVoiceInput() {
-  if (recognizing || recordingAudio || speechRecognitionWanted) stopVoiceInput();
+  if (recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending) stopVoiceInput();
   else startVoiceInput();
 }
 
 async function startVoiceInput() {
+  clearSpeechRecognitionRestartTimer();
   voiceState = voicePromptText();
+  speechRecognitionLastError = null;
   beginLiveTranscriptSession({ resetFinal: true });
   speechRecognition = speechRecognition || initSpeechRecognition();
+  const micReady = await primeMicrophonePermission();
+  if (!micReady && !speechRecognition) {
+    recordSpeechRecognitionEvent("mic-unavailable", { permission: state.permissions.microphone });
+    activeSpeechTaskId = null;
+    voiceState = speechMicrophoneUnavailableText();
+    render();
+    return false;
+  }
+  if (!micReady && state.permissions.microphone === "denied") {
+    recordSpeechRecognitionEvent("mic-permission-denied");
+    activeSpeechTaskId = null;
+    voiceState = "请允许麦克风权限";
+    render();
+    return false;
+  }
   if (speechRecognition) {
     speechRecognitionWanted = true;
     speechRecognitionBlocked = false;
     recordingAudio = false;
     recordSpeechRecognitionEvent("start-request", { engine: speechRecognition.constructor?.name || "SpeechRecognition" });
-    startSpeechRecognitionSafe();
+    const started = startSpeechRecognitionSafe();
+    if (!started) await fallbackToAudioRecording("识别启动失败，已改为录音，可手动修改文字");
     render();
-    return;
+    return started || recordingAudio;
   }
 
   recordSpeechRecognitionEvent("unsupported", { message: "SpeechRecognition API is not available" });
   const recordingStarted = await startAudioRecording();
   voiceState = recordingStarted ? "已录音，但此浏览器不支持自动转文字" : "当前浏览器不能录音或识别";
   render();
+  return recordingStarted;
 }
 
 function startSpeechRecognitionSafe() {
-  if (!speechRecognition || recognizing || !speechRecognitionWanted || speechRecognitionBlocked) return false;
+  if (!speechRecognition || recognizing || speechRecognitionStartPending || !speechRecognitionWanted || speechRecognitionBlocked) return false;
   try {
+    speechRecognitionStartPending = true;
     speechRecognition.start();
     return true;
-  } catch {
+  } catch (error) {
+    speechRecognitionStartPending = false;
     speechRecognitionBlocked = true;
     speechRecognitionWanted = false;
-    recordSpeechRecognitionEvent("start-failed", { message: "SpeechRecognition.start() failed" });
+    recordSpeechRecognitionEvent("start-failed", {
+      message: error?.message || "SpeechRecognition.start() failed",
+      name: error?.name || "Error"
+    });
     voiceState = "识别启动失败，请再点一次开始";
     render();
     return false;
   }
 }
 
+function queueSpeechRecognitionRestart() {
+  clearSpeechRecognitionRestartTimer();
+  speechRecognitionRestartTimer = window.setTimeout(() => {
+    speechRecognitionRestartTimer = null;
+    if (!speechRecognitionWanted || speechRecognitionBlocked || recognizing || speechRecognitionStartPending) return;
+    startSpeechRecognitionSafe();
+  }, SPEECH_RECOGNITION_RESTART_DELAY_MS);
+}
+
+function clearSpeechRecognitionRestartTimer() {
+  if (!speechRecognitionRestartTimer) return;
+  window.clearTimeout(speechRecognitionRestartTimer);
+  speechRecognitionRestartTimer = null;
+}
+
+async function fallbackToAudioRecording(reason) {
+  if (recordingAudio || mediaRecorder?.state === "recording") return true;
+  recordSpeechRecognitionEvent("recording-fallback", { reason });
+  const recordingStarted = await startAudioRecording();
+  if (recordingStarted) {
+    voiceState = reason;
+    render();
+  }
+  return recordingStarted;
+}
+
 function stopVoiceInput(options = {}) {
   const { releaseMic = true, shouldRender = true } = options;
+  clearSpeechRecognitionRestartTimer();
+  const wasRecognitionPending = speechRecognitionStartPending;
   speechRecognitionWanted = false;
+  speechRecognitionStartPending = false;
+  speechRecognitionLastError = null;
   if (!recognizing) {
     promoteLiveInterimTranscript();
     activeSpeechTaskId = null;
   }
-  if (speechRecognition && recognizing) speechRecognition.stop();
+  if (speechRecognition && (recognizing || wasRecognitionPending)) {
+    try {
+      speechRecognition.stop();
+    } catch {
+      speechRecognition.abort?.();
+    }
+  }
   if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
   if (releaseMic) releaseMicStream();
   recordingAudio = false;
@@ -2491,6 +2767,14 @@ function releaseMicStream() {
 
 function voicePromptText() {
   return tasks[state.activeTaskIndex]?.type === "sentence" ? "请复述" : "请说";
+}
+
+function speechMicrophoneUnavailableText() {
+  if (!window.isSecureContext && location.hostname !== "localhost" && location.hostname !== "127.0.0.1") {
+    return "请用 HTTPS 页面打开麦克风";
+  }
+  if (state.permissions.microphone === "unsupported") return "当前浏览器不能录音";
+  return "请允许麦克风权限";
 }
 
 async function primeMicrophonePermission() {
@@ -2633,7 +2917,9 @@ function applyVoiceText(text) {
   if (task.type === "memory") response.answer.freeText = text;
   if (task.type === "sentence") {
     response.answer.transcript = response.answer.transcript || {};
+    response.answer.interimTranscript = response.answer.interimTranscript || {};
     response.answer.transcript[step] = text;
+    response.answer.interimTranscript[step] = "";
   }
   if (task.type === "fluency") {
     response.answer.rawTranscript = text;
@@ -2652,7 +2938,9 @@ function applyManualVoiceText(text) {
   if (task.type === "memory") response.answer.freeText = text;
   if (task.type === "sentence") {
     response.answer.transcript = response.answer.transcript || {};
+    response.answer.interimTranscript = response.answer.interimTranscript || {};
     response.answer.transcript[step] = text;
+    response.answer.interimTranscript[step] = "";
   }
   if (task.type === "orientation") applyOrientationText(response, step, text);
 }
@@ -2977,13 +3265,21 @@ function tapVigilance(at = Date.now()) {
   render();
 }
 
-function startFluency() {
+async function startFluency() {
   const response = getResponse("fluency");
   if (response.answer.running) return;
   response.answer.remaining = 60;
   response.answer.running = true;
   response.answer.timerStartedAt = Date.now();
-  startVoiceInput();
+  render();
+  const voiceStarted = await startVoiceInput();
+  if (!voiceStarted) {
+    response.answer.running = false;
+    window.clearInterval(fluencyTimer);
+    saveDraft();
+    render();
+    return;
+  }
   window.clearInterval(fluencyTimer);
   fluencyTimer = window.setInterval(() => {
     response.answer.remaining -= 1;
@@ -3496,6 +3792,7 @@ function downloadTextFile(filename, content, mimeType) {
 
 function stopTimers() {
   stopTrailGuide();
+  clearSpeechRecognitionRestartTimer();
   window.clearInterval(vigilanceTimer);
   window.clearInterval(fluencyTimer);
 }
