@@ -2060,9 +2060,13 @@ function playCurrentAudio() {
   const step = getTaskStep(task);
   if (task.type === "memory") {
     const response = getResponse(task.id);
+    markCurrentInstructionHandled(task, step);
     return playMemoryWords(response);
   }
-  if (task.type === "choice") return playDigitStimulus(task);
+  if (task.type === "choice") {
+    markCurrentInstructionHandled(task, step);
+    return playDigitStimulus(task);
+  }
   if (task.type === "vigilance") return startVigilance();
   if (task.type === "sentence") return playSentenceForRepeat(task, step);
 }
@@ -2080,6 +2084,13 @@ function playMemoryWords(response) {
       render();
     }
   });
+}
+
+function markCurrentInstructionHandled(task, step = getTaskStep(task)) {
+  if (!task) return;
+  state.playedInstructionKeys[`${task.id}:${step}`] = true;
+  immediateInstructionPlayback = false;
+  saveDraft();
 }
 
 function playSentenceForRepeat(task, step) {
