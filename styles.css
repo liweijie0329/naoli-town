@@ -145,8 +145,12 @@ h4 {
 .setup-panel {
   position: relative;
   z-index: 1;
-  width: min(680px, 94vw);
-  padding: 36px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(250px, 0.75fr);
+  gap: clamp(26px, 4vw, 54px);
+  align-items: center;
+  width: min(1100px, 94vw);
+  padding: clamp(28px, 4dvh, 42px) clamp(34px, 5vw, 60px);
   border: 2px solid var(--soft-line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.96);
@@ -168,7 +172,6 @@ h4 {
 }
 
 .brand-row,
-.setup-actions,
 .page-header,
 .task-badge-row,
 .task-footer,
@@ -186,7 +189,7 @@ h4 {
 
 .brand-row {
   gap: 18px;
-  margin-bottom: 30px;
+  margin-bottom: clamp(22px, 3dvh, 30px);
 }
 
 .logo-image {
@@ -207,6 +210,52 @@ h4 {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 15px;
+}
+
+.setup-left {
+  min-width: 0;
+}
+
+.setup-play-zone {
+  position: relative;
+  display: grid;
+  min-height: 100%;
+  place-items: center;
+}
+
+.play-orbit {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.play-orbit i {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--sun);
+  box-shadow: 0 8px 18px rgba(36, 52, 71, 0.08);
+  animation: floaty 2.8s ease-in-out infinite;
+}
+
+.play-orbit i:nth-child(1) {
+  left: 10%;
+  top: 18%;
+}
+
+.play-orbit i:nth-child(2) {
+  right: 8%;
+  top: 28%;
+  background: var(--sky);
+  animation-delay: 0.35s;
+}
+
+.play-orbit i:nth-child(3) {
+  right: 20%;
+  bottom: 12%;
+  background: var(--coral);
+  animation-delay: 0.7s;
 }
 
 .field {
@@ -274,15 +323,6 @@ h4 {
   background: #ecfbf2;
   color: var(--leaf-dark);
   box-shadow: 0 4px 0 rgba(18, 122, 73, 0.32);
-}
-
-.setup-actions {
-  justify-content: stretch;
-  margin-top: 26px;
-}
-
-.setup-actions .primary {
-  width: 100%;
 }
 
 .primary,
@@ -358,6 +398,39 @@ h4 {
   min-width: 178px;
   min-height: 76px;
   font-size: 28px;
+}
+
+.setup-start-button {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: clamp(190px, 22vw, 280px);
+  height: clamp(190px, 22vw, 280px);
+  min-height: 0;
+  place-items: center;
+  align-content: center;
+  border: 8px solid #e9fff1;
+  border-radius: 999px;
+  background: radial-gradient(circle at 34% 28%, #52d889, var(--leaf) 68%, var(--leaf-dark));
+  box-shadow:
+    0 12px 0 var(--leaf-dark),
+    0 24px 42px rgba(18, 122, 73, 0.24);
+  color: #fff;
+  text-align: center;
+}
+
+.setup-start-button span {
+  display: block;
+  font-size: clamp(40px, 5vw, 62px);
+  font-weight: 1000;
+  line-height: 0.98;
+}
+
+.setup-start-button small {
+  display: block;
+  margin-top: 8px;
+  font-size: clamp(25px, 3vw, 38px);
+  font-weight: 950;
 }
 
 .primary:hover,
@@ -760,8 +833,7 @@ h4 {
 }
 
 .edge-arrow-right {
-  right: 18px;
-  display: none;
+  right: clamp(8px, 1.8vw, 18px);
 }
 
 .task-actions {
@@ -847,8 +919,8 @@ h4 {
 }
 
 .reference-svg {
-  width: min(360px, 96%);
-  max-height: 92%;
+  width: min(520px, 100%);
+  max-height: 98%;
 }
 
 .canvas-wrap {
@@ -2163,8 +2235,8 @@ h4 {
 
 @media (orientation: portrait) {
   .setup-panel {
-    width: min(720px, 94vw);
-    padding: 28px;
+    width: min(900px, 94vw);
+    padding: 24px;
   }
 
   .page-shell {
@@ -2182,7 +2254,7 @@ h4 {
   }
 
   .reference-svg {
-    width: min(320px, 86%);
+    width: min(380px, 92%);
   }
 
   .rubric-layout,
@@ -2200,13 +2272,29 @@ h4 {
   }
 }
 
+@media (max-width: 760px) {
+  .setup-panel {
+    grid-template-columns: minmax(0, 1fr);
+    width: min(620px, 94vw);
+  }
+
+  .setup-play-zone {
+    min-height: auto;
+  }
+
+  .setup-start-button {
+    width: min(210px, 48vw);
+    height: min(210px, 48vw);
+  }
+}
+
 @media (max-height: 820px) {
   .setup-screen {
     padding: 14px;
   }
 
   .setup-panel {
-    width: min(640px, 94vw);
+    width: min(1020px, 94vw);
     padding: 22px;
   }
 
@@ -2240,13 +2328,22 @@ h4 {
     font-size: 21px;
   }
 
-  .setup-actions {
-    margin-top: 16px;
-  }
-
   .big-button {
     min-height: 62px;
     font-size: 25px;
+  }
+
+  .setup-start-button {
+    width: clamp(160px, 19vw, 220px);
+    height: clamp(160px, 19vw, 220px);
+  }
+
+  .setup-start-button span {
+    font-size: clamp(34px, 4.2vw, 48px);
+  }
+
+  .setup-start-button small {
+    font-size: clamp(22px, 2.5vw, 30px);
   }
 
   .page-shell {

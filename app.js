@@ -37,9 +37,9 @@ const tasks = [
     title: "交替连线",
     maxScore: 1,
     type: "trail",
-    modality: "点选连线",
-    prompt: "请按数字、汉字交替上升的规则点击圆圈，每个圆圈只点一次。",
-    instruction: "请按照从数字到汉字并逐渐升高的顺序画一条连线。从 1 连向甲，再连向 2，并一直连下去，到戊结束。",
+    modality: "拖拽连线",
+    prompt: "请从一个圆圈拖线连到另一个圆圈，按数字和汉字交替上升的规则完成。",
+    instruction: "请按数字和汉字交替上升的规则，把所有圆圈用一条线连起来。每次从当前圆圈拖到下一个圆圈。",
     scoring: "完全按照 1-甲-2-乙-3-丙-4-丁-5-戊，且没有任何交叉线，给 1 分；出现任何错误且未立刻自我纠正，给 0 分。"
   },
   {
@@ -318,7 +318,7 @@ function createInitialState() {
     participant: { name: "", birthYear: "", sex: "", educationLevel: "" },
     responses: {},
     drawings: {},
-    trail: { sequence: [], errors: 0, undoCount: 0 },
+    trail: createTrailState(),
     memoryWaitStartedAt: null,
     resumeAfterMemory2Index: null,
     playedInstructionKeys: {},
@@ -326,6 +326,71 @@ function createInitialState() {
     adminSessions: [],
     selectedSession: null
   };
+}
+
+function createTrailState(overrides = {}) {
+  return {
+    sequence: [],
+    edges: [],
+    errors: 0,
+    undoCount: 0,
+    correctStep: 0,
+    ...overrides
+  };
+}
+
+function normalizeTrailState(trail = {}) {
+  const base = createTrailState(trail);
+  const edges = Array.isArray(base.edges) && base.edges.length
+    ? base.edges
+    : trailEdgesFromSequence(base.sequence);
+  const summary = summarizeTrailEdges(edges);
+  return createTrailState({
+    ...base,
+    edges: summary.edges,
+    sequence: summary.sequence,
+    errors: summary.errors,
+    correctStep: summary.correctStep,
+    undoCount: Number(base.undoCount || 0)
+  });
+}
+
+function trailEdgesFromSequence(sequence = []) {
+  return sequence.slice(0, -1).map((from, index) => ({
+    from,
+    to: sequence[index + 1],
+    at: new Date().toISOString()
+  }));
+}
+
+function summarizeTrailEdges(edges = []) {
+  const sequence = [];
+  let errors = 0;
+  let correctStep = 0;
+  const normalizedEdges = edges
+    .filter((edge) => edge?.from && edge?.to && edge.from !== edge.to)
+    .map((edge) => {
+      const expectedFrom = TRAIL_EXPECTED[correctStep];
+      const expectedTo = TRAIL_EXPECTED[correctStep + 1];
+      const correct = edge.from === expectedFrom && edge.to === expectedTo;
+      if (correct) correctStep += 1;
+      else errors += 1;
+      if (!sequence.length) sequence.push(edge.from);
+      else if (sequence[sequence.length - 1] !== edge.from) sequence.push(edge.from);
+      sequence.push(edge.to);
+      return { ...edge, correct };
+    });
+  return { edges: normalizedEdges, sequence, errors, correctStep };
+}
+
+function rebuildTrailFromEdges() {
+  state.trail = normalizeTrailState(state.trail);
+}
+
+function trailEdgesForDrawing() {
+  return Array.isArray(state.trail.edges) && state.trail.edges.length
+    ? state.trail.edges
+    : trailEdgesFromSequence(state.trail.sequence || []);
 }
 
 function safeJson(raw) {
@@ -360,7 +425,7 @@ function migrateState() {
   delete state.participant.expectedCity;
   state.responses = state.responses || {};
   state.drawings = state.drawings || {};
-  state.trail = state.trail || { sequence: [], errors: 0, undoCount: 0 };
+  state.trail = normalizeTrailState(state.trail);
   state.playedInstructionKeys = state.playedInstructionKeys || {};
   state.setupAttempted = Boolean(state.setupAttempted);
   state.resumeAfterMemory2Index = Number.isInteger(state.resumeAfterMemory2Index) ? state.resumeAfterMemory2Index : null;
@@ -455,20 +520,26 @@ function renderSetup() {
     <div class="setup-screen">
       <div class="floating-stars"><i></i><i></i><i></i></div>
       <section class="setup-panel">
-        <div class="brand-row">
-          <img class="logo-image bounce-in" src="${LOGO_SRC}" alt="MoCA Quest" />
-          <div>
-            <h1>脑力闯关</h1>
+        <div class="setup-left">
+          <div class="brand-row">
+            <img class="logo-image bounce-in" src="${LOGO_SRC}" alt="MoCA Quest" />
+            <div>
+              <h1>脑力闯关</h1>
+            </div>
+          </div>
+          <div class="setup-grid">
+            ${inputField("participant.name", "姓名", state.participant.name, "", "text", isSetupFieldInvalid("name"))}
+            ${inputField("participant.birthYear", "出生年份", state.participant.birthYear, "", "number", isSetupFieldInvalid("birthYear"))}
+            ${segmentedField("sex", "性别", state.participant.sex, ["男", "女"], isSetupFieldInvalid("sex"))}
+            ${selectField("participant.educationLevel", "教育水平", state.participant.educationLevel, educationLevels, isSetupFieldInvalid("educationLevel"))}
           </div>
         </div>
-        <div class="setup-grid">
-          ${inputField("participant.name", "姓名", state.participant.name, "", "text", isSetupFieldInvalid("name"))}
-          ${inputField("participant.birthYear", "出生年份", state.participant.birthYear, "", "number", isSetupFieldInvalid("birthYear"))}
-          ${segmentedField("sex", "性别", state.participant.sex, ["男", "女"], isSetupFieldInvalid("sex"))}
-          ${selectField("participant.educationLevel", "教育水平", state.participant.educationLevel, educationLevels, isSetupFieldInvalid("educationLevel"))}
-        </div>
-        <div class="setup-actions">
-          <button class="primary big-button pulse" data-action="startSession">开始游戏</button>
+        <div class="setup-play-zone">
+          <div class="play-orbit"><i></i><i></i><i></i></div>
+          <button class="primary setup-start-button pulse" data-action="startSession">
+            <span>开始</span>
+            <small>游戏</small>
+          </button>
         </div>
       </section>
     </div>
@@ -583,6 +654,7 @@ function renderTask(task) {
   return html`
     <section class="single-page task-page">
       <button class="edge-arrow edge-arrow-left" data-action="previousTask" aria-label="上一题" ${state.activeTaskIndex === 0 && step === 0 ? "disabled" : ""}>‹</button>
+      <button class="edge-arrow edge-arrow-right" data-action="skipTask" aria-label="跳过本题">›</button>
       <div class="task-workspace">${renderTaskWorkspace(task, step)}</div>
       ${renderTaskActions(task, step)}
     </section>
@@ -1164,7 +1236,7 @@ function setupTrailCanvas() {
   canvas.onpointerdown = (event) => {
     const point = canvasPoint(event, canvas);
     const node = nearestTrailNode(point, canvas);
-    if (!node || !isTrailDragStartAllowed(node.label)) return;
+    if (!node) return;
     trailDragStart = node;
     trailDragPoint = point;
     canvas.setPointerCapture(event.pointerId);
@@ -1197,32 +1269,29 @@ function setupTrailCanvas() {
   else drawTrailCanvas(canvas);
 }
 
-function isTrailDragStartAllowed(label) {
-  const sequence = state.trail.sequence || [];
-  if (sequence.length === 0) return label === TRAIL_EXPECTED[0];
-  return label === sequence[sequence.length - 1] && sequence.length < TRAIL_EXPECTED.length;
-}
-
 function commitTrailDrag(startNode, endNode, canvas) {
-  const sequence = state.trail.sequence || [];
-  const expectedStart = sequence.length === 0 ? TRAIL_EXPECTED[0] : sequence[sequence.length - 1];
-  const expectedEnd = TRAIL_EXPECTED[sequence.length === 0 ? 1 : sequence.length];
-  if (!endNode || startNode.label !== expectedStart || endNode.label !== expectedEnd) {
-    state.trail.errors += 1;
-  } else {
-    if (sequence.length === 0) sequence.push(startNode.label);
-    sequence.push(endNode.label);
-  }
   const response = getResponse("trail");
-  response.behavior.sequence = [...sequence];
+  if (!endNode || startNode.label === endNode.label) {
+    response.behavior.missedDrops = (response.behavior.missedDrops || 0) + 1;
+    return;
+  }
+  state.trail.edges = state.trail.edges || [];
+  state.trail.edges.push({
+    from: startNode.label,
+    to: endNode.label,
+    at: new Date().toISOString()
+  });
+  rebuildTrailFromEdges();
+  response.behavior.sequence = [...state.trail.sequence];
+  response.behavior.edges = [...state.trail.edges];
   response.behavior.errors = state.trail.errors;
+  response.behavior.correctStep = state.trail.correctStep;
   response.behavior.mode = "drag-line";
   response.behavior.lastDrag = {
     from: startNode.label,
     to: endNode?.label || "",
     at: new Date().toISOString()
   };
-  state.trail.sequence = sequence;
   if (canvas) response.drawingImage = canvas.toDataURL("image/png");
 }
 
@@ -1267,19 +1336,25 @@ function drawTrailCanvas(canvas, tick = 0) {
       x: guide[0].x + (guide[1].x - guide[0].x) * progress,
       y: guide[0].y + (guide[1].y - guide[0].y) * progress
     };
-    drawFingerCue(activeCtx, moving.x, moving.y, tick);
+    const angle = Math.atan2(guide[1].y - guide[0].y, guide[1].x - guide[0].x);
+    drawFingerCue(activeCtx, moving.x, moving.y, tick, angle);
   }
 
-  activeCtx.strokeStyle = "#20a66b";
-  activeCtx.lineWidth = 5;
-  activeCtx.beginPath();
-  state.trail.sequence.forEach((label, index) => {
-    const node = nodes.find((entry) => entry.label === label);
-    if (!node) return;
-    if (index === 0) activeCtx.moveTo(node.x, node.y);
-    else activeCtx.lineTo(node.x, node.y);
+  const nodeMap = new Map(nodes.map((node) => [node.label, node]));
+  const edges = trailEdgesForDrawing();
+  edges.forEach((edge) => {
+    const from = nodeMap.get(edge.from);
+    const to = nodeMap.get(edge.to);
+    if (!from || !to) return;
+    activeCtx.strokeStyle = edge.correct ? "#20a66b" : "#ff7d63";
+    activeCtx.lineWidth = edge.correct ? 5 : 6;
+    activeCtx.setLineDash(edge.correct ? [] : [12, 9]);
+    activeCtx.beginPath();
+    activeCtx.moveTo(from.x, from.y);
+    activeCtx.lineTo(to.x, to.y);
+    activeCtx.stroke();
   });
-  activeCtx.stroke();
+  activeCtx.setLineDash([]);
 
   if (trailDragStart && trailDragPoint) {
     activeCtx.strokeStyle = "rgba(32, 166, 107, 0.72)";
@@ -1309,34 +1384,83 @@ function drawTrailCanvas(canvas, tick = 0) {
   });
 }
 
-function drawFingerCue(ctx, x, y, tick) {
-  const bob = Math.sin(tick / 12) * 2;
+function drawFingerCue(ctx, x, y, tick, angle = 0) {
+  const bob = Math.sin(tick / 14) * 2.2;
   ctx.save();
   ctx.translate(x, y + bob);
-  ctx.rotate(-0.12);
-  ctx.fillStyle = "#ffcfb6";
-  ctx.strokeStyle = "#9b4c3d";
+  ctx.rotate(angle - 0.02);
+  ctx.translate(-54, 10);
+  ctx.scale(1.08, 1.08);
   ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(170, 82, 52, 0.36)";
+  ctx.shadowColor = "rgba(127, 72, 43, 0.24)";
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 8;
+
+  const skin = ctx.createLinearGradient(-58, -42, 86, 58);
+  skin.addColorStop(0, "#ffd9bd");
+  skin.addColorStop(0.52, "#f3a877");
+  skin.addColorStop(1, "#ffd9bd");
+  const skinSoft = ctx.createLinearGradient(-36, -36, 46, 54);
+  skinSoft.addColorStop(0, "#ffe3cf");
+  skinSoft.addColorStop(1, "#ee9a69");
+
+  ctx.fillStyle = skin;
   ctx.beginPath();
-  roundedRectPath(ctx, -18, -2, 28, 28, 12);
+  roundedRectPath(ctx, -48, 28, 44, 40, 14);
   ctx.fill();
   ctx.stroke();
-  [["#ffcfb6", -13, -24, 10, 28], ["#ffcfb6", -2, -30, 10, 38], ["#ffcfb6", 9, -24, 10, 28]].forEach((finger) => {
-    ctx.fillStyle = finger[0];
+
+  ctx.fillStyle = skinSoft;
+  ctx.beginPath();
+  ctx.ellipse(-22, 12, 33, 31, -0.14, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  [
+    [-27, -25, 24, 48, -0.48],
+    [-7, -32, 24, 50, -0.18],
+    [12, -28, 23, 46, 0.16]
+  ].forEach(([cx, cy, width, height, rotate]) => {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rotate);
+    ctx.fillStyle = skin;
     ctx.beginPath();
-    roundedRectPath(ctx, finger[1], finger[2], finger[3], finger[4], 6);
+    roundedRectPath(ctx, -width / 2, -height / 2, width, height, 12);
     ctx.fill();
     ctx.stroke();
+    ctx.restore();
   });
+
+  ctx.save();
+  ctx.translate(-34, 4);
+  ctx.rotate(0.82);
+  ctx.fillStyle = skinSoft;
   ctx.beginPath();
-  roundedRectPath(ctx, 8, -12, 38, 13, 7);
+  roundedRectPath(ctx, -10, -12, 52, 25, 13);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = "#ffe6d6";
+  ctx.restore();
+
+  ctx.save();
+  ctx.rotate(-0.03);
+  ctx.fillStyle = skin;
   ctx.beginPath();
-  roundedRectPath(ctx, 42, -12, 10, 13, 5);
+  roundedRectPath(ctx, -6, -13, 93, 27, 15);
   ctx.fill();
   ctx.stroke();
+  ctx.fillStyle = "rgba(255, 238, 222, 0.78)";
+  ctx.beginPath();
+  ctx.ellipse(68, -4, 14, 7, -0.12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.shadowColor = "transparent";
+  ctx.fillStyle = "rgba(255, 238, 222, 0.55)";
+  ctx.beginPath();
+  ctx.ellipse(-26, 0, 15, 9, -0.35, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -1358,14 +1482,13 @@ function roundedRectPath(ctx, x, y, width, height, radius) {
 }
 
 function shouldShowTrailGuide() {
-  const sequence = state.trail.sequence || [];
-  return sequence.length === 0 || (sequence.length === 1 && sequence[0] === "1") || (sequence.length === 2 && sequence[0] === "1" && sequence[1] === "甲");
+  return Number(state.trail.correctStep || 0) < 2;
 }
 
 function trailGuideLabels() {
-  const sequence = state.trail.sequence || [];
-  if (sequence.length === 0 || (sequence.length === 1 && sequence[0] === "1")) return ["1", "甲"];
-  if (sequence.length === 2 && sequence[0] === "1" && sequence[1] === "甲") return ["甲", "2"];
+  const correctStep = Number(state.trail.correctStep || 0);
+  if (correctStep === 0) return ["1", "甲"];
+  if (correctStep === 1) return ["甲", "2"];
   return null;
 }
 
@@ -1407,10 +1530,10 @@ function captureCanvas(taskId) {
 
 function cubeReferenceSvg() {
   return `
-    <svg class="reference-svg" viewBox="0 0 240 190" role="img" aria-label="立方体参考图">
-      <path d="M58 64 L136 64 L176 32 L98 32 Z" fill="#f6fbff" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
-      <path d="M136 64 L176 32 L176 112 L136 150 Z" fill="#dbe7ef" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
-      <path d="M58 64 L136 64 L136 150 L58 150 Z" fill="#ffffff" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
+    <svg class="reference-svg" viewBox="0 0 180 160" role="img" aria-label="立方体参考图">
+      <path d="M28 56 L102 56 L148 18 L74 18 Z" fill="#f6fbff" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
+      <path d="M102 56 L148 18 L148 94 L102 132 Z" fill="#dbe7ef" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
+      <path d="M28 56 L102 56 L102 132 L28 132 Z" fill="#ffffff" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
     </svg>
   `;
 }
@@ -1483,6 +1606,7 @@ root.addEventListener("click", async (event) => {
     else state.activeTaskIndex = Math.max(0, state.activeTaskIndex - 1);
     render();
   }
+  if (action === "skipTask") await skipTask();
   if (action === "nextTask") await nextTask();
   if (action === "chooseNaming") {
     const response = getResponse(current.id);
@@ -1517,12 +1641,27 @@ root.addEventListener("click", async (event) => {
     render();
   }
   if (action === "undoTrail") {
-    state.trail.sequence.pop();
+    state.trail.edges = state.trail.edges || [];
+    state.trail.edges.pop();
     state.trail.undoCount += 1;
+    rebuildTrailFromEdges();
+    const response = getResponse("trail");
+    response.behavior.sequence = [...state.trail.sequence];
+    response.behavior.edges = [...state.trail.edges];
+    response.behavior.errors = state.trail.errors;
+    response.behavior.correctStep = state.trail.correctStep;
+    response.behavior.undoCount = state.trail.undoCount;
+    delete state.drawings.trail;
     render();
   }
   if (action === "clearTrail") {
-    state.trail = { sequence: [], errors: 0, undoCount: 0 };
+    state.trail = createTrailState({ undoCount: state.trail.undoCount || 0 });
+    const response = getResponse("trail");
+    response.behavior.sequence = [];
+    response.behavior.edges = [];
+    response.behavior.errors = 0;
+    response.behavior.correctStep = 0;
+    delete response.drawingImage;
     delete state.drawings.trail;
     render();
   }
@@ -1586,6 +1725,33 @@ async function nextTask() {
   } else {
     state.activeTaskIndex = nextIndex;
   }
+  render();
+}
+
+async function skipTask() {
+  const task = tasks[state.activeTaskIndex];
+  const response = getResponse(task.id);
+  response.answer.skipped = true;
+  response.behavior.skippedAt = new Date().toISOString();
+  if (recognizing || recordingAudio) stopVoiceInput();
+  if (task.type === "fluency" && response.answer.running) {
+    response.answer.running = false;
+    window.clearInterval(fluencyTimer);
+    stopVoiceInput();
+  }
+  if (task.type === "drawing" || task.type === "trail") response.drawingImage = captureCanvas(task.id);
+  finishTask(task.id);
+  response.ai = { mode: "skipped", taskId: task.id, scoreSuggestion: 0, confidence: 1, requiresHumanReview: false };
+  response.score = 0;
+  if (task.id === "memory1" && !state.memoryWaitStartedAt) state.memoryWaitStartedAt = Date.now();
+  const nextIndex = nextTaskIndexAfterSubmit(task);
+  if (nextIndex < 0) {
+    state.view = "results";
+    state.finishedAt = new Date().toISOString();
+  } else {
+    state.activeTaskIndex = nextIndex;
+  }
+  saveDraft();
   render();
 }
 
@@ -2361,19 +2527,28 @@ function aiScoreValue(task, response) {
 }
 
 function scoreTrail() {
-  const exact = state.trail.sequence.length === TRAIL_EXPECTED.length && state.trail.sequence.every((label, index) => label === TRAIL_EXPECTED[index]);
-  return { score: exact && !trailHasCrossing() ? 1 : 0 };
+  const edges = trailEdgesForDrawing();
+  const expectedEdges = TRAIL_EXPECTED.slice(0, -1).map((from, index) => ({ from, to: TRAIL_EXPECTED[index + 1] }));
+  const exact = edges.length === expectedEdges.length && edges.every((edge, index) => (
+    edge.from === expectedEdges[index].from && edge.to === expectedEdges[index].to
+  ));
+  return { score: exact && state.trail.errors === 0 && !trailHasCrossing() ? 1 : 0 };
 }
 
 function trailHasCrossing() {
-  if (state.trail.sequence.length < 4) return false;
+  const edges = trailEdgesForDrawing();
+  if (edges.length < 3) return false;
   const canvas = activeCanvas || document.querySelector("#taskCanvas");
   if (!canvas) return false;
   const nodes = trailNodes(canvas);
-  const points = state.trail.sequence.map((label) => nodes.find((node) => node.label === label)).filter(Boolean);
-  for (let i = 0; i < points.length - 1; i += 1) {
-    for (let j = i + 2; j < points.length - 1; j += 1) {
-      if (segmentsIntersect(points[i], points[i + 1], points[j], points[j + 1])) return true;
+  const nodeMap = new Map(nodes.map((node) => [node.label, node]));
+  const segments = edges
+    .map((edge) => [nodeMap.get(edge.from), nodeMap.get(edge.to)])
+    .filter(([from, to]) => from && to);
+  for (let i = 0; i < segments.length; i += 1) {
+    for (let j = i + 1; j < segments.length; j += 1) {
+      const sharedEndpoint = [segments[i][0].label, segments[i][1].label].some((label) => [segments[j][0].label, segments[j][1].label].includes(label));
+      if (!sharedEndpoint && segmentsIntersect(segments[i][0], segments[i][1], segments[j][0], segments[j][1])) return true;
     }
   }
   return false;
