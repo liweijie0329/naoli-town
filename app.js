@@ -846,7 +846,7 @@ function renderChoiceTask(task) {
         <div class="keypad digit-keypad">
           ${renderKeypadDigits("appendDigit")}
         </div>
-      ` : renderAudioButton("playCurrentAudio")}
+      ` : renderMemoryStartButton()}
     </div>
   `;
 }
@@ -1947,7 +1947,6 @@ async function submitActiveTask() {
 }
 
 function scheduleTaskInstruction(task) {
-  if (task.type === "choice") return;
   const step = getTaskStep(task);
   const key = `${task.id}:${step}`;
   if (state.playedInstructionKeys[key]) return;
@@ -1994,7 +1993,7 @@ function playCurrentAudio() {
     const response = getResponse(task.id);
     return playMemoryWords(response);
   }
-  if (task.type === "choice") return playChoiceAudio(task, step);
+  if (task.type === "choice") return playDigitStimulus(task);
   if (task.type === "vigilance") return startVigilance();
   if (task.type === "sentence") return speakText(task.sentences[step], { rate: 0.86, done: () => startVoiceInput() });
 }
@@ -2012,27 +2011,6 @@ function playMemoryWords(response) {
       render();
     }
   });
-}
-
-function playChoiceAudio(task, step) {
-  const response = getResponse(task.id);
-  response.answer.sequence = [];
-  response.answer.audioReady = false;
-  if (!response.answer.instructionPlayed) {
-    response.answer.instructionPlayed = true;
-    saveDraft();
-    return speakText(taskInstructionText(task, step), {
-      rate: 0.82,
-      pitch: 1.18,
-      done: () => {
-        window.setTimeout(() => {
-          if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
-          playDigitStimulus(task);
-        }, 220);
-      }
-    });
-  }
-  return playDigitStimulus(task);
 }
 
 function speakText(text, options = {}) {
