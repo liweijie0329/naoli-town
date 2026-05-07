@@ -17,9 +17,7 @@ const PLACE_SEARCH_TERMS = ["医院", "学校", "社区中心", "大学", "公�
 const MIN_PLACE_DISTRACTOR_KM = 10;
 const DRAWING_CONFIRM_NUDGE_MS = 10000;
 const SPEECH_VOLUME = 1;
-const REMOTE_TTS_ENDPOINT = "/api/tts";
-const REMOTE_TTS_TIMEOUT_MS = 12000;
-const REMOTE_TTS_CACHE_LIMIT = 24;
+const STATIC_TTS_MANIFEST_SRC = "./assets/audio/manifest.json";
 const SPEECH_RECOGNITION_RESTART_DELAY_MS = 260;
 const SPEECH_RECOGNITION_BLOCKING_ERRORS = ["not-allowed", "service-not-allowed", "audio-capture", "network"];
 const SPEECH_RECOGNITION_RECORDING_FALLBACK_ERRORS = ["service-not-allowed", "network"];
@@ -302,8 +300,9 @@ let speechPlaybackId = 0;
 let speechItemTimer = null;
 let speechTextFallbackTimer = null;
 let speechRecognitionRestartTimer = null;
-let remoteSpeechAudio = null;
-let remoteTtsCache = new Map();
+let activeSpeechAudio = null;
+let staticTtsManifest = null;
+let staticTtsManifestPromise = null;
 let instructionTimer = null;
 let speechPlaybackPurpose = null;
 let micPermissionReady = false;
@@ -922,7 +921,6 @@ function renderFluencyTask() {
       ${renderAudioWave()}
       <button class="timer-button ${running ? "running" : "pulse"}" data-action="startFluency">${running ? remaining : "开始"}</button>
       <strong>已识别 ${animals.length} 个</strong>
-      ${renderLiveTranscriptBox(live, "说出的动物名会实时显示在这里")}
       ${renderTranscriptEditor(live, "fluency")}
     </div>
   `;
@@ -968,7 +966,6 @@ function renderSpeechCard(live) {
     <div class="speech-page">
       ${renderAudioWave()}
       ${renderAudioButton("playCurrentAudio")}
-      ${renderLiveTranscriptBox(live, "复述内容会实时显示在这里")}
       ${renderTranscriptEditor(live, "sentence")}
     </div>
   `;
@@ -1013,7 +1010,7 @@ function renderLiveTranscriptBox(live, placeholder) {
 }
 
 function renderTranscriptEditor(live, kind) {
-  const value = live?.finalText || "";
+  const value = joinTranscriptText(live?.finalText, live?.interimText);
   const attr = kind === "fluency" ? "data-fluency-manual" : "data-voice-manual";
   return `<textarea class="transcript-input" ${attr} placeholder="语音识别结果会显示在这里，也可以手动修改。">${escapeHtml(value)}</textarea>`;
 }
@@ -2098,7 +2095,7 @@ function scheduleTaskInstruction(task) {
     instructionTimer = null;
     if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
     if (task.id === "memory1" && getResponse(task.id).answer.wordsPlaybackStarted) return;
-    speakText(text, { rate: 0.82, pitch: 1.18, purpose: "instruction" });
+    speakText(text, { rate: 0.82, pitch: 1.18, purpose: "instruction", audioKey: audioKeyForInstruction(task, step) });
   }, force ? 0 : 260);
 }
 
@@ -2132,6 +2129,10 @@ function taskInstructionText(task, step) {
   return task.instruction || task.prompt;
 }
 
+function audioKeyForInstruction(task, step = getTaskStep(task)) {
+  return task ? `instruction:${task.id}:${step}` : null;
+}
+
 function playCurrentAudio() {
   const task = tasks[state.activeTaskIndex];
   const step = getTaskStep(task);
@@ -2152,6 +2153,7 @@ function playMemoryWords(response) {
   response.answer.audioReady = false;
   response.answer.wordsPlaybackStarted = true;
   return speakItemsSlow(WORDS, {
+    audioKeyPrefix: "stimulus:memory1:word",
     gapMs: 1000,
     rate: 0.72,
     done: () => {
@@ -2176,11 +2178,12 @@ function prioritizeStartPlayback(task, step = getTaskStep(task)) {
   markCurrentInstructionHandled(task, step);
 }
 
-async function playSentenceForRepeat(task, step) {
+function playSentenceForRepeat(task, step) {
   const text = task.sentences[step];
-  await prepareSpeechInputBeforePlayback();
+  prepareSpeechInputBeforePlayback();
   if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
   return speakText(text, {
+    audioKey: `stimulus:sentence:${step}`,
     rate: 0.86,
     purpose: "sentence",
     fallbackMs: sentencePlaybackFallbackMs(text),
@@ -2205,8 +2208,12 @@ function sentencePlaybackFallbackMs(text) {
   return Math.max(3600, Math.min(10000, String(text || "").length * 360 + 1600));
 }
 
-async function speakText(text, options = {}) {
-  const { rate = 0.82, pitch = 1.18, done, onStart, fallbackMs = 0, purpose = "speech" } = options;
+function speakText(text, options = {}) {
+  const { rate = 0.82, pitch = 1.18, done, onStart, fallbackMs = 0, purpose = "speech", audioKey = null } = options;
+  if (!("speechSynthesis" in window)) {
+    if (done) done();
+    return;
+  }
   const playbackId = beginAudioPlayback();
   const speechParams = speechParamsFor(rate, pitch);
   startPlaybackUi(playbackId, purpose);
@@ -2222,18 +2229,6 @@ async function speakText(text, options = {}) {
     if (done) done();
   };
 
-  const remoteStarted = await playRemoteTtsAudio(text, {
-    playbackId,
-    speechParams,
-    onStart,
-    done: finish
-  });
-  if (remoteStarted) return;
-  if (playbackId !== speechPlaybackId || finished) return;
-  if (!("speechSynthesis" in window)) {
-    finish();
-    return;
-  }
   if (fallbackMs) speechTextFallbackTimer = window.setTimeout(finish, fallbackMs);
   speakTextWithBrowser(text, { playbackId, speechParams, onStart, finish });
 }
@@ -2274,12 +2269,16 @@ function pickNaturalVoice() {
 }
 
 function speakItemsSlow(items, options = {}) {
-  const { gapMs = 1000, rate = 0.72, done, onItemStart } = options;
+  const { gapMs = 1000, rate = 0.72, done, onItemStart, audioKeyPrefix = "", audioKeys = [] } = options;
+  if (!("speechSynthesis" in window)) {
+    if (done) done();
+    return;
+  }
   const playbackId = beginAudioPlayback();
   playState = "播放中...";
   render();
   let index = 0;
-  const speakNext = async () => {
+  const speakNext = () => {
     if (playbackId !== speechPlaybackId) return;
     if (index >= items.length) {
       playState = "开始";
@@ -2297,20 +2296,6 @@ function speakItemsSlow(items, options = {}) {
     const itemStart = () => {
       if (onItemStart) onItemStart(value, index);
     };
-    const remoteStarted = await playRemoteTtsAudio(value, {
-      playbackId,
-      speechParams,
-      onStart: itemStart,
-      done: queueNext
-    });
-    if (remoteStarted) return;
-    if (playbackId !== speechPlaybackId) return;
-    if (!("speechSynthesis" in window)) {
-      itemStart();
-      queueNext();
-      return;
-    }
-
     const utterance = new SpeechSynthesisUtterance(value);
     utterance.lang = "zh-CN";
     utterance.rate = speechParams.speedRatio;
@@ -2337,50 +2322,42 @@ function speechParamsFor(rate, pitch) {
   };
 }
 
-async function playRemoteTtsAudio(text, { playbackId, speechParams, onStart, done }) {
+async function playStaticTtsAudio(audioKey, { playbackId, onStart, done }) {
+  if (!audioKey) return false;
   try {
-    const url = await fetchRemoteTtsAudio(text, speechParams);
+    const url = await staticTtsAudioUrl(audioKey);
+    if (!url) return false;
     if (playbackId !== speechPlaybackId) return true;
-    return await playRemoteAudioUrl(url, playbackId, onStart, done);
+    return await playAudioUrl(url, playbackId, onStart, done);
   } catch {
     return false;
   }
 }
 
-async function fetchRemoteTtsAudio(text, speechParams) {
-  const cacheKey = remoteTtsCacheKey(text, speechParams);
-  const cached = remoteTtsCache.get(cacheKey);
-  if (cached) return cached.url;
-
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), REMOTE_TTS_TIMEOUT_MS);
-  try {
-    const response = await fetch(REMOTE_TTS_ENDPOINT, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        text,
-        profile: speechParams.profile,
-        speedRatio: speechParams.speedRatio,
-        pitchRatio: speechParams.pitchRatio,
-        volumeRatio: SPEECH_VOLUME,
-        format: "mp3"
-      }),
-      signal: controller.signal
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const blob = await response.blob();
-    if (!blob.size) throw new Error("Empty TTS audio");
-    const url = URL.createObjectURL(blob);
-    remoteTtsCache.set(cacheKey, { url });
-    trimRemoteTtsCache();
-    return url;
-  } finally {
-    window.clearTimeout(timer);
-  }
+async function staticTtsAudioUrl(audioKey) {
+  const manifest = await loadStaticTtsManifest();
+  const entry = manifest?.entries?.[audioKey];
+  const src = typeof entry === "string" ? entry : entry?.src;
+  if (!src) return "";
+  if (/^(https?:)?\/\//i.test(src) || src.startsWith("/") || src.startsWith("./")) return src;
+  return `./${src}`;
 }
 
-function playRemoteAudioUrl(url, playbackId, onStart, done) {
+async function loadStaticTtsManifest() {
+  if (staticTtsManifest) return staticTtsManifest;
+  if (!staticTtsManifestPromise) {
+    staticTtsManifestPromise = fetch(STATIC_TTS_MANIFEST_SRC, { cache: "no-cache" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((manifest) => {
+        staticTtsManifest = manifest && typeof manifest === "object" ? manifest : null;
+        return staticTtsManifest;
+      })
+      .catch(() => null);
+  }
+  return staticTtsManifestPromise;
+}
+
+function playAudioUrl(url, playbackId, onStart, done) {
   return new Promise((resolve) => {
     let resolved = false;
     const resolveOnce = (value) => {
@@ -2389,14 +2366,14 @@ function playRemoteAudioUrl(url, playbackId, onStart, done) {
       resolve(value);
     };
     const audio = new Audio(url);
-    remoteSpeechAudio = audio;
+    activeSpeechAudio = audio;
     audio.volume = SPEECH_VOLUME;
     audio.onended = () => {
-      if (remoteSpeechAudio === audio) remoteSpeechAudio = null;
+      if (activeSpeechAudio === audio) activeSpeechAudio = null;
       if (done) done();
     };
     audio.onerror = () => {
-      if (remoteSpeechAudio === audio) remoteSpeechAudio = null;
+      if (activeSpeechAudio === audio) activeSpeechAudio = null;
       if (resolved) {
         if (done) done();
       } else {
@@ -2406,7 +2383,7 @@ function playRemoteAudioUrl(url, playbackId, onStart, done) {
     audio.play()
       .then(() => {
         if (playbackId !== speechPlaybackId) {
-          stopRemoteSpeechAudio();
+          stopActiveSpeechAudio();
           resolveOnce(true);
           return;
         }
@@ -2414,46 +2391,27 @@ function playRemoteAudioUrl(url, playbackId, onStart, done) {
         resolveOnce(true);
       })
       .catch(() => {
-        if (remoteSpeechAudio === audio) remoteSpeechAudio = null;
+        if (activeSpeechAudio === audio) activeSpeechAudio = null;
         resolveOnce(false);
       });
   });
 }
 
-function remoteTtsCacheKey(text, speechParams) {
-  return JSON.stringify([
-    text,
-    speechParams.profile,
-    speechParams.speedRatio,
-    speechParams.pitchRatio,
-    SPEECH_VOLUME
-  ]);
-}
-
-function trimRemoteTtsCache() {
-  while (remoteTtsCache.size > REMOTE_TTS_CACHE_LIMIT) {
-    const firstKey = remoteTtsCache.keys().next().value;
-    const entry = remoteTtsCache.get(firstKey);
-    if (entry?.url) URL.revokeObjectURL(entry.url);
-    remoteTtsCache.delete(firstKey);
-  }
-}
-
-function stopRemoteSpeechAudio() {
-  if (!remoteSpeechAudio) return;
-  remoteSpeechAudio.onended = null;
-  remoteSpeechAudio.onerror = null;
-  remoteSpeechAudio.pause();
-  remoteSpeechAudio.removeAttribute("src");
-  remoteSpeechAudio.load();
-  remoteSpeechAudio = null;
+function stopActiveSpeechAudio() {
+  if (!activeSpeechAudio) return;
+  activeSpeechAudio.onended = null;
+  activeSpeechAudio.onerror = null;
+  activeSpeechAudio.pause();
+  activeSpeechAudio.removeAttribute("src");
+  activeSpeechAudio.load();
+  activeSpeechAudio = null;
 }
 
 function beginAudioPlayback() {
   speechPlaybackId += 1;
   clearInstructionTimer();
   clearSpeechTextFallbackTimer();
-  stopRemoteSpeechAudio();
+  stopActiveSpeechAudio();
   prepareAudioOutputMode();
   if (speechItemTimer) {
     window.clearTimeout(speechItemTimer);
@@ -2474,10 +2432,10 @@ function prepareAudioOutputMode() {
 
 function stopAudioPlayback() {
   clearInstructionTimer();
-  if (!("speechSynthesis" in window) && !remoteSpeechAudio && !speechItemTimer && playState !== "播放中...") return;
+  if (!("speechSynthesis" in window) && !activeSpeechAudio && !speechItemTimer && playState !== "播放中...") return;
   speechPlaybackId += 1;
   clearSpeechTextFallbackTimer();
-  stopRemoteSpeechAudio();
+  stopActiveSpeechAudio();
   if (speechItemTimer) {
     window.clearTimeout(speechItemTimer);
     speechItemTimer = null;
@@ -2513,6 +2471,7 @@ function playDigitStimulus(task) {
   response.answer.audioReady = false;
   response.behavior.digitPlayback = [];
   speakItemsSlow(task.stimulus.split(""), {
+    audioKeyPrefix: `stimulus:${task.id}:digit`,
     gapMs: 1000,
     rate: 0.66,
     onItemStart: (digit, index) => response.behavior.digitPlayback.push({ digit, index, at: Date.now() }),
@@ -2530,7 +2489,7 @@ function initSpeechRecognition() {
   const recognition = new Recognition();
   recognition.lang = "zh-CN";
   recognition.interimResults = true;
-  recognition.continuous = true;
+  recognition.continuous = false;
   recognition.maxAlternatives = 1;
   recognition.onstart = () => {
     speechRecognitionStartPending = false;
@@ -3230,6 +3189,7 @@ function startVigilance() {
   response.behavior.vigilanceDigits = [];
   window.clearInterval(vigilanceTimer);
   speakItemsSlow(VIGILANCE_DIGITS, {
+    audioKeyPrefix: "stimulus:vigilance:digit",
     gapMs: 1000,
     rate: 0.66,
     onItemStart: (digit, index) => response.behavior.vigilanceDigits.push({ digit, index, at: Date.now() }),
