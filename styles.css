@@ -617,16 +617,24 @@ h4 {
   bottom: 0;
   left: 0;
   width: min(360px, 86vw);
-  display: grid;
-  grid-template-rows: auto repeat(5, auto) auto auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 10px;
+  max-height: 100dvh;
   padding: 22px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border-right: 2px solid var(--soft-line);
   background: #fff;
   box-shadow: var(--shadow);
   transform: translateX(-104%);
   transition: transform 0.22s ease;
+  -webkit-overflow-scrolling: touch;
+}
+
+.drawer-panel > * {
+  flex-shrink: 0;
 }
 
 .hidden-drawer.open {
@@ -721,9 +729,8 @@ h4 {
   display: grid;
   align-content: start;
   gap: 8px;
-  min-height: 0;
-  overflow: auto;
-  padding-right: 2px;
+  overflow: visible;
+  padding: 0 2px 18px 0;
 }
 
 .drawer-task {
