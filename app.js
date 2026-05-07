@@ -19,7 +19,16 @@ const DRAWING_CONFIRM_NUDGE_MS = 10000;
 const SPEECH_VOLUME = 1;
 const STATIC_TTS_MANIFEST_SRC = "./assets/audio/manifest.json";
 const ASR_ENDPOINT = "/api/asr";
+const ASR_TIMEOUT_MS = 90000;
 const PREFER_CLOUDFLARE_ASR = true;
+const MAX_DRAFT_AUDIO_RECORDING_BYTES = 700 * 1024;
+const RECORDER_MIME_TYPES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/mp4;codecs=mp4a.40.2",
+  "audio/mp4",
+  "audio/aac"
+];
 const SPEECH_RECOGNITION_RESTART_DELAY_MS = 260;
 const SPEECH_RECOGNITION_BLOCKING_ERRORS = ["not-allowed", "service-not-allowed", "audio-capture", "network"];
 const SPEECH_RECOGNITION_RECORDING_FALLBACK_ERRORS = ["service-not-allowed", "network"];
@@ -292,6 +301,7 @@ let recognizing = false;
 let mediaRecorder = null;
 let micStream = null;
 let recordingAudio = false;
+let speechTranscribing = false;
 let speechRecognitionWanted = false;
 let speechRecognitionBlocked = false;
 let speechSessionBaseFinal = "";
@@ -310,6 +320,9 @@ let speechPlaybackPurpose = null;
 let micPermissionReady = false;
 let speechRecognitionStartPending = false;
 let speechRecognitionLastError = null;
+let releaseMicAfterRecordingStop = false;
+let recordingWillTranscribe = false;
+let activeTranscriptionId = 0;
 let vigilanceTimer = null;
 let vigilancePointerTapAt = 0;
 let fluencyTimer = null;
@@ -484,7 +497,23 @@ function migrateState() {
 }
 
 function saveDraft() {
-  localStorage.setItem("moca-game-draft", JSON.stringify(state));
+  try {
+    localStorage.setItem("moca-game-draft", JSON.stringify(state));
+  } catch {
+    try {
+      localStorage.setItem("moca-game-draft", JSON.stringify(compactStateForDraft(state)));
+    } catch {
+      // Mobile browsers can have very small localStorage quotas; the live test state remains in memory.
+    }
+  }
+}
+
+function compactStateForDraft(value) {
+  const copy = JSON.parse(JSON.stringify(value || {}));
+  Object.values(copy.responses || {}).forEach((response) => {
+    if (response?.answer?.audioRecordings) delete response.answer.audioRecordings;
+  });
+  return copy;
 }
 
 function resetState() {
@@ -496,6 +525,7 @@ function resetState() {
   menuOpen = false;
   playState = "开始";
   voiceState = "待说";
+  speechTranscribing = false;
 }
 
 function isParticipantComplete() {
@@ -713,10 +743,11 @@ function renderMainView(current) {
 
 function renderTask(task) {
   const step = getTaskStep(task);
+  const waitAttr = speechTranscribing ? "disabled" : "";
   return html`
     <section class="single-page task-page">
-      <button class="edge-arrow edge-arrow-left" data-action="previousTask" aria-label="上一题" ${state.activeTaskIndex === 0 && step === 0 ? "disabled" : ""}>‹</button>
-      <button class="edge-arrow edge-arrow-right" data-action="skipTask" aria-label="下一步">›</button>
+      <button class="edge-arrow edge-arrow-left" data-action="previousTask" aria-label="上一题" ${state.activeTaskIndex === 0 && step === 0 ? "disabled" : waitAttr}>‹</button>
+      <button class="edge-arrow edge-arrow-right" data-action="skipTask" aria-label="下一步" ${waitAttr}>›</button>
       <div class="task-workspace">${renderTaskWorkspace(task, step)}</div>
       ${renderTaskActions(task, step)}
     </section>
@@ -731,7 +762,7 @@ function renderTaskActions(task, step) {
   return html`
     <div class="task-actions">
       <div class="task-actions-left">${secondary || ""}</div>
-      ${showConfirm ? `<button class="${confirmClass}" data-action="nextTask">${confirmLabel(task, step)}</button>` : ""}
+      ${showConfirm ? `<button class="${confirmClass}" data-action="nextTask" ${speechTranscribing ? "disabled" : ""}>${confirmLabel(task, step)}</button>` : ""}
     </div>
   `;
 }
@@ -916,12 +947,13 @@ function renderFluencyTask() {
   const response = getResponse("fluency");
   const remaining = response.answer.remaining ?? 60;
   const running = Boolean(response.answer.running);
+  const waiting = speechTranscribing && tasks[state.activeTaskIndex]?.id === "fluency";
   const live = getLiveTranscript(tasks.find((task) => task.id === "fluency"), response, 0);
   const animals = uniqueWords(extractAnimalNames(`${live.finalText} ${live.interimText}`));
   return html`
     <div class="fluency-page">
       ${renderAudioWave()}
-      <button class="timer-button ${running ? "running" : "pulse"}" data-action="startFluency">${running ? remaining : "开始"}</button>
+      <button class="timer-button ${running ? "running" : waiting ? "" : "pulse"}" ${waiting ? "disabled" : `data-action="startFluency"`}>${waiting ? "请稍等" : running ? remaining : "开始"}</button>
       <strong>已识别 ${animals.length} 个</strong>
       ${renderTranscriptEditor(live, "fluency")}
     </div>
@@ -1018,9 +1050,17 @@ function renderTranscriptEditor(live, kind) {
 }
 
 function renderAudioWave() {
-  const active = playState === "播放中..." || recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending;
-  const label = playState === "播放中..." ? "播放中..." : voiceState && voiceState !== "待说" ? voiceState : recognizing || recordingAudio || speechRecognitionStartPending ? "请说" : "";
-  const showLabel = label && label !== "播放中...";
+  const active = playState === "播放中..." || recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending || speechTranscribing;
+  const label = speechTranscribing
+    ? "请稍等"
+    : playState === "播放中..."
+      ? "播放中..."
+      : voiceState && voiceState !== "待说"
+        ? voiceState
+        : recognizing || recordingAudio || speechRecognitionStartPending
+          ? "请说"
+          : "";
+  const showLabel = label && label !== "播放中..." && !speechTranscribing;
   return html`
     <div class="audio-wave ${active ? "active" : ""}" aria-label="${escapeHtml(label)}">
       <span></span><span></span><span></span><span></span><span></span>
@@ -1034,6 +1074,7 @@ function renderAudioButton(action) {
   if (playState === "播放中..." && !(action === "playCurrentAudio" && current?.type === "sentence" && speechPlaybackPurpose === "instruction")) {
     return `<button class="primary circle-button pulse sound-button" disabled>播放中</button>`;
   }
+  if (speechTranscribing) return `<button class="secondary circle-button sound-button" disabled>请稍等</button>`;
   if (recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">停止</button>`;
   return `<button class="primary circle-button pulse sound-button" data-action="${action}">开始</button>`;
 }
@@ -1873,6 +1914,7 @@ async function requestStartupPermissions() {
 }
 
 async function nextTask() {
+  if (speechTranscribing) return;
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
   const step = getTaskStep(task);
@@ -1900,6 +1942,7 @@ async function nextTask() {
 }
 
 async function goNextStepOrSkip() {
+  if (speechTranscribing) return;
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
   const step = getTaskStep(task);
@@ -1914,6 +1957,7 @@ async function goNextStepOrSkip() {
 }
 
 function goPreviousStep() {
+  if (speechTranscribing) return;
   const current = tasks[state.activeTaskIndex];
   const response = getResponse(current.id);
   const step = getTaskStep(current);
@@ -1938,6 +1982,7 @@ function goPreviousStep() {
 }
 
 async function skipTask() {
+  if (speechTranscribing) return;
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
   response.answer.skipped = true;
@@ -2555,11 +2600,13 @@ function initSpeechRecognition() {
 }
 
 function toggleVoiceInput() {
+  if (speechTranscribing) return;
   if (recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending) stopVoiceInput();
   else startVoiceInput();
 }
 
 async function startVoiceInput() {
+  if (speechTranscribing) return false;
   clearSpeechRecognitionRestartTimer();
   voiceState = voicePromptText();
   speechRecognitionLastError = null;
@@ -2655,6 +2702,7 @@ function stopVoiceInput(options = {}) {
   const { releaseMic = true, shouldRender = true } = options;
   clearSpeechRecognitionRestartTimer();
   const wasRecognitionPending = speechRecognitionStartPending;
+  const wasRecording = mediaRecorder && mediaRecorder.state === "recording";
   speechRecognitionWanted = false;
   speechRecognitionStartPending = false;
   speechRecognitionLastError = null;
@@ -2669,10 +2717,23 @@ function stopVoiceInput(options = {}) {
       speechRecognition.abort?.();
     }
   }
-  if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
-  if (releaseMic) releaseMicStream();
+  if (wasRecording) {
+    releaseMicAfterRecordingStop = releaseMic;
+    if (recordingWillTranscribe) {
+      speechTranscribing = true;
+      voiceState = "请稍等";
+    }
+    try {
+      mediaRecorder.requestData?.();
+    } catch {
+      // Some mobile browsers throw if requestData lands too close to stop().
+    }
+    mediaRecorder.stop();
+  } else if (releaseMic) {
+    releaseMicStream();
+  }
   recordingAudio = false;
-  voiceState = "待说";
+  if (!speechTranscribing) voiceState = "待说";
   if (shouldRender) render();
 }
 
@@ -2688,39 +2749,110 @@ async function startAudioRecording(options = {}) {
     micStream = await getReusableMicStream();
     micPermissionReady = true;
     audioChunks = [];
-    const options = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? { mimeType: "audio/webm;codecs=opus", audioBitsPerSecond: 32000 } : { audioBitsPerSecond: 32000 };
-    mediaRecorder = new MediaRecorder(micStream, options);
+    releaseMicAfterRecordingStop = false;
+    recordingWillTranscribe = transcribeOnStop;
+    const recorderOptions = mediaRecorderOptions();
+    const recorder = new MediaRecorder(micStream, recorderOptions);
+    mediaRecorder = recorder;
+    const recordingMimeType = recorder.mimeType || recorderOptions.mimeType || "";
     const task = tasks[state.activeTaskIndex];
     const step = getTaskStep(task);
     const response = getResponse(task.id);
     mediaRecorder.ondataavailable = (event) => {
       if (event.data?.size) audioChunks.push(event.data);
     };
+    mediaRecorder.onerror = (event) => {
+      recordSpeechRecognitionEvent("media-recorder-error", { message: event?.error?.message || "MediaRecorder error" });
+    };
     mediaRecorder.onstop = async () => {
-      const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || "audio/webm" });
-      response.behavior.audioRecordings = response.behavior.audioRecordings || [];
-      response.behavior.audioRecordings.push({ step, mimeType: blob.type, size: blob.size, endedAt: new Date().toISOString() });
-      const reader = new FileReader();
-      reader.onload = () => {
-        response.answer.audioRecordings = response.answer.audioRecordings || {};
-        response.answer.audioRecordings[step] = reader.result;
-        saveDraft();
-      };
-      if (blob.size) reader.readAsDataURL(blob);
-      if (transcribeOnStop && blob.size) {
-        await transcribeAudioBlob(blob, task.id, step);
+      const shouldReleaseMic = releaseMicAfterRecordingStop;
+      releaseMicAfterRecordingStop = false;
+      let micReleased = false;
+      try {
+        const blobType = recordingBlobType(recorder, audioChunks, recordingMimeType);
+        const blob = new Blob(audioChunks, { type: blobType });
+        response.behavior.audioRecordings = response.behavior.audioRecordings || [];
+        response.behavior.audioRecordings.push({
+          step,
+          mimeType: blob.type || "application/octet-stream",
+          size: blob.size,
+          chunks: audioChunks.length,
+          recorderMimeType: recordingMimeType,
+          endedAt: new Date().toISOString()
+        });
+        storeAudioRecordingDraft(response, step, blob);
+        if (shouldReleaseMic) {
+          releaseMicStream();
+          micReleased = true;
+        }
+        if (transcribeOnStop && blob.size) {
+          await transcribeAudioBlob(blob, task.id, step);
+        } else if (transcribeOnStop) {
+          speechTranscribing = false;
+          voiceState = "没有录到声音";
+          saveDraft();
+          render();
+        }
+      } finally {
+        recordingWillTranscribe = false;
+        if (mediaRecorder === recorder) mediaRecorder = null;
+        if (shouldReleaseMic && !micReleased) releaseMicStream();
       }
     };
-    mediaRecorder.start();
+    try {
+      mediaRecorder.start(1000);
+    } catch {
+      mediaRecorder.start();
+    }
     recordingAudio = true;
     voiceState = voicePromptText();
     render();
     return true;
   } catch {
     recordingAudio = false;
+    releaseMicAfterRecordingStop = false;
+    recordingWillTranscribe = false;
     voiceState = "请允许麦克风权限";
     render();
     return false;
+  }
+}
+
+function mediaRecorderOptions() {
+  const mimeType = RECORDER_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type));
+  return mimeType
+    ? { mimeType, audioBitsPerSecond: 32000 }
+    : { audioBitsPerSecond: 32000 };
+}
+
+function recordingBlobType(recorder, chunks, fallbackType) {
+  return recorder?.mimeType || chunks.find((chunk) => chunk.type)?.type || fallbackType || "application/octet-stream";
+}
+
+function storeAudioRecordingDraft(response, step, blob) {
+  if (!blob.size) {
+    saveDraft();
+    return;
+  }
+  if (blob.size > MAX_DRAFT_AUDIO_RECORDING_BYTES) {
+    response.answer.audioRecordings = response.answer.audioRecordings || {};
+    delete response.answer.audioRecordings[step];
+    saveDraft();
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    response.answer.audioRecordings = response.answer.audioRecordings || {};
+    response.answer.audioRecordings[step] = reader.result;
+    saveDraft();
+  };
+  reader.onerror = () => {
+    saveDraft();
+  };
+  try {
+    reader.readAsDataURL(blob);
+  } catch {
+    saveDraft();
   }
 }
 
@@ -2733,8 +2865,15 @@ async function getReusableMicStream() {
 
 async function transcribeAudioBlob(blob, taskId, step) {
   const task = tasks.find((entry) => entry.id === taskId);
-  if (!task || !["sentence", "fluency"].includes(task.type)) return;
+  if (!task || !["sentence", "fluency"].includes(task.type)) {
+    speechTranscribing = false;
+    render();
+    return;
+  }
   const response = getResponse(task.id);
+  const transcriptionId = activeTranscriptionId + 1;
+  activeTranscriptionId = transcriptionId;
+  speechTranscribing = true;
   response.behavior.speechRecognition = response.behavior.speechRecognition || [];
   response.behavior.speechRecognition.push({
     step,
@@ -2743,16 +2882,10 @@ async function transcribeAudioBlob(blob, taskId, step) {
     size: blob.size,
     at: new Date().toISOString()
   });
-  voiceState = "正在转文字";
+  voiceState = "请稍等";
   render();
   try {
-    const result = await requestJson(`${ASR_ENDPOINT}?taskId=${encodeURIComponent(task.id)}&step=${encodeURIComponent(step)}`, {
-      method: "POST",
-      headers: { "content-type": blob.type || "audio/webm" },
-      body: blob
-    }, (error) => {
-      throw error;
-    });
+    const result = await requestAsrJson(task, step, blob);
     const text = String(result?.text || result?.transcription || "").trim();
     response.behavior.speechRecognition.push({
       step,
@@ -2775,6 +2908,39 @@ async function transcribeAudioBlob(blob, taskId, step) {
     voiceState = "转文字失败，可手动输入";
     saveDraft();
     render();
+  } finally {
+    if (activeTranscriptionId === transcriptionId) {
+      speechTranscribing = false;
+      render();
+    }
+  }
+}
+
+async function requestAsrJson(task, step, blob) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), ASR_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${ASR_ENDPOINT}?taskId=${encodeURIComponent(task.id)}&step=${encodeURIComponent(step)}`, {
+      method: "POST",
+      headers: { "content-type": blob.type || "application/octet-stream" },
+      body: blob,
+      signal: controller.signal
+    });
+    let payload = {};
+    try {
+      payload = await response.json();
+    } catch {
+      payload = {};
+    }
+    if (!response.ok) {
+      throw new Error(payload?.message || payload?.error || `HTTP ${response.status}`);
+    }
+    return payload;
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("转文字超时，请检查网络后重试");
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
   }
 }
 
