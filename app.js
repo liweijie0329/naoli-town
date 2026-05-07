@@ -291,6 +291,7 @@ let audioChunks = [];
 let speechPlaybackId = 0;
 let speechItemTimer = null;
 let speechTextFallbackTimer = null;
+let instructionTimer = null;
 let speechPlaybackPurpose = null;
 let micPermissionReady = false;
 let vigilanceTimer = null;
@@ -2020,7 +2021,9 @@ function scheduleTaskInstruction(task) {
   if (!text) return;
   state.playedInstructionKeys[key] = true;
   saveDraft();
-  window.setTimeout(() => {
+  clearInstructionTimer();
+  instructionTimer = window.setTimeout(() => {
+    instructionTimer = null;
     if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
     if (task.id === "memory1" && getResponse(task.id).answer.wordsPlaybackStarted) return;
     speakText(text, { rate: 0.82, pitch: 1.18, purpose: "instruction" });
@@ -2062,11 +2065,11 @@ function playCurrentAudio() {
   const step = getTaskStep(task);
   if (task.type === "memory") {
     const response = getResponse(task.id);
-    markCurrentInstructionHandled(task, step);
+    prioritizeStartPlayback(task, step);
     return playMemoryWords(response);
   }
   if (task.type === "choice") {
-    markCurrentInstructionHandled(task, step);
+    prioritizeStartPlayback(task, step);
     return playDigitStimulus(task);
   }
   if (task.type === "vigilance") return startVigilance();
@@ -2093,6 +2096,12 @@ function markCurrentInstructionHandled(task, step = getTaskStep(task)) {
   state.playedInstructionKeys[`${task.id}:${step}`] = true;
   immediateInstructionPlayback = false;
   saveDraft();
+}
+
+function prioritizeStartPlayback(task, step = getTaskStep(task)) {
+  clearInstructionTimer();
+  stopAudioPlayback();
+  markCurrentInstructionHandled(task, step);
 }
 
 function playSentenceForRepeat(task, step) {
@@ -2203,6 +2212,7 @@ function speakItemsSlow(items, options = {}) {
 
 function beginAudioPlayback() {
   speechPlaybackId += 1;
+  clearInstructionTimer();
   clearSpeechTextFallbackTimer();
   if (speechItemTimer) {
     window.clearTimeout(speechItemTimer);
@@ -2214,6 +2224,7 @@ function beginAudioPlayback() {
 }
 
 function stopAudioPlayback() {
+  clearInstructionTimer();
   if (!("speechSynthesis" in window) && !speechItemTimer && playState !== "播放中...") return;
   speechPlaybackId += 1;
   clearSpeechTextFallbackTimer();
@@ -2224,6 +2235,12 @@ function stopAudioPlayback() {
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   if (playState === "播放中...") playState = "开始";
   speechPlaybackPurpose = null;
+}
+
+function clearInstructionTimer() {
+  if (!instructionTimer) return;
+  window.clearTimeout(instructionTimer);
+  instructionTimer = null;
 }
 
 function clearSpeechTextFallbackTimer() {
