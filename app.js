@@ -16,6 +16,7 @@ const DEFAULT_PLACE_OPTIONS = ["社区中心", "医院", "学校", "公园"];
 const PLACE_SEARCH_TERMS = ["医院", "学校", "社区中心", "大学", "公园", "图书馆", "体育中心", "博物馆"];
 const MIN_PLACE_DISTRACTOR_KM = 10;
 const DRAWING_CONFIRM_NUDGE_MS = 10000;
+const SPEECH_VOLUME = 1;
 const VOICE_PROFILES = {
   cartoon: { label: "卡通童声", hints: ["xiaoxiao", "xiaoyi", "xiaobei", "tingting", "美佳", "sin-ji"], rateScale: 0.96, pitchOffset: 0.1 },
   gentle: { label: "温柔女声", hints: ["xiaoxiao", "ting-ting", "tingting", "mei-jia", "meijia", "female", "美佳"], rateScale: 1, pitchOffset: -0.04 },
@@ -2188,6 +2189,7 @@ function speakText(text, options = {}) {
   utterance.lang = "zh-CN";
   utterance.rate = clampSpeech(rate * profile.rateScale, 0.55, 1.08);
   utterance.pitch = clampSpeech(pitch + profile.pitchOffset, 0.72, 1.55);
+  utterance.volume = SPEECH_VOLUME;
   const voice = pickNaturalVoice();
   if (voice) utterance.voice = voice;
   utterance.onstart = () => {
@@ -2248,6 +2250,7 @@ function speakItemsSlow(items, options = {}) {
     utterance.lang = "zh-CN";
     utterance.rate = clampSpeech(rate * profile.rateScale, 0.55, 1.08);
     utterance.pitch = clampSpeech(1.18 + profile.pitchOffset, 0.72, 1.55);
+    utterance.volume = SPEECH_VOLUME;
     const voice = pickNaturalVoice();
     if (voice) utterance.voice = voice;
     utterance.onend = () => {
@@ -2265,6 +2268,7 @@ function beginAudioPlayback() {
   speechPlaybackId += 1;
   clearInstructionTimer();
   clearSpeechTextFallbackTimer();
+  prepareAudioOutputMode();
   if (speechItemTimer) {
     window.clearTimeout(speechItemTimer);
     speechItemTimer = null;
@@ -2272,6 +2276,14 @@ function beginAudioPlayback() {
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   speechPlaybackPurpose = null;
   return speechPlaybackId;
+}
+
+function prepareAudioOutputMode() {
+  if (recordingAudio || recognizing) {
+    stopVoiceInput({ releaseMic: true, shouldRender: false });
+    return;
+  }
+  releaseMicStream();
 }
 
 function stopAudioPlayback() {
@@ -2399,7 +2411,7 @@ function startSpeechRecognitionSafe() {
 }
 
 function stopVoiceInput(options = {}) {
-  const { releaseMic = false, shouldRender = true } = options;
+  const { releaseMic = true, shouldRender = true } = options;
   speechRecognitionWanted = false;
   if (!recognizing) {
     promoteLiveInterimTranscript();
