@@ -193,8 +193,9 @@ const tasks = [
     instruction: "请您说说两个词在什么方面相类似，或者说它们有什么共性。",
     scoring: "交通/运输工具 1 分；测量仪器/测量用的 1 分。",
     items: [
-      { key: "trainBike", pair: "火车 - 自行车", answer: "交通工具", options: ["交通工具", "都有轮子", "都很快", "都很重"] },
-      { key: "watchRuler", pair: "手表 - 尺子", answer: "测量工具", options: ["测量工具", "都有数字", "都能戴在手上", "都是文具"] }
+      { key: "orangeBanana", words: ["桔子", "香蕉"], emojis: ["🍊", "🍌"], answer: "水果", options: ["水果", "电脑", "学校", "无聊"], practice: true },
+      { key: "trainBike", words: ["火车", "自行车"], emojis: ["🚆", "🚲"], answer: "交通工具", options: ["交通工具", "电脑", "学校", "无聊"] },
+      { key: "watchRuler", words: ["手表", "尺子"], emojis: ["⌚", "📏"], answer: "测量仪器", options: ["测量仪器", "电脑", "学校", "无聊"] }
     ]
   },
   {
@@ -556,10 +557,43 @@ function renderTask(task) {
     <section class="single-page task-page">
       <button class="edge-arrow edge-arrow-left" data-action="previousTask" aria-label="上一题" ${state.activeTaskIndex === 0 && step === 0 ? "disabled" : ""}>‹</button>
       <div class="task-workspace">${renderTaskWorkspace(task, step)}</div>
-      <button class="edge-arrow edge-arrow-right" data-action="nextTask" aria-label="确定">›</button>
-      <button class="primary confirm-task-button" data-action="nextTask">${confirmLabel(task, step)}</button>
+      ${renderTaskActions(task, step)}
     </section>
   `;
+}
+
+function renderTaskActions(task, step) {
+  const secondary = taskActionSecondaryButtons(task);
+  const showConfirm = shouldShowConfirmButton(task);
+  if (!secondary && !showConfirm) return `<div class="task-actions spacer"></div>`;
+  return html`
+    <div class="task-actions">
+      <div class="task-actions-left">${secondary || ""}</div>
+      ${showConfirm ? `<button class="confirm-button" data-action="nextTask">${confirmLabel(task, step)}</button>` : ""}
+    </div>
+  `;
+}
+
+function taskActionSecondaryButtons(task) {
+  if (task.type === "trail") return `
+    <button class="utility-button" data-action="undoTrail">撤销</button>
+    <button class="utility-button" data-action="clearTrail">重画</button>
+  `;
+  if (task.type === "drawing") return `<button class="utility-button" data-action="clearDrawing">重画</button>`;
+  if (task.type === "choice" && getResponse(task.id).answer.audioReady) return `<button class="utility-button" data-action="backspaceDigit">删除</button>`;
+  if (task.type === "serial7") return `<button class="utility-button" data-action="backspaceSerial">删除</button>`;
+  if (task.type === "memory" && getResponse(task.id).answer.audioReady) return `<button class="utility-button" data-action="playCurrentAudio">重听</button>`;
+  return "";
+}
+
+function shouldShowConfirmButton(task) {
+  if (task.type === "memory") return task.trial === 2 || Boolean(getResponse(task.id).answer.audioReady);
+  if (task.type === "choice") return Boolean(getResponse(task.id).answer.audioReady);
+  if (task.type === "vigilance") {
+    const answer = getResponse(task.id).answer || {};
+    return Boolean(answer.startedAt) && !answer.running;
+  }
+  return true;
 }
 
 function getTaskStep(task) {
@@ -600,10 +634,6 @@ function renderTrailTask() {
   return html`
     <div class="trail-page">
       <canvas id="taskCanvas" class="task-canvas" aria-label="交替连线画图区域"></canvas>
-      <div class="control-row">
-        <button class="ghost" data-action="undoTrail">撤销一步</button>
-        <button class="ghost" data-action="clearTrail">重画</button>
-      </div>
     </div>
   `;
 }
@@ -615,7 +645,6 @@ function renderDrawingTask(task) {
       <div class="canvas-wrap">
         ${task.drawingKind === "clock" ? `<div class="clock-label">11:10</div>` : ""}
         <canvas id="taskCanvas" class="task-canvas" aria-label="${escapeHtml(task.title)}画图区域"></canvas>
-        <button class="ghost redraw-button" data-action="clearDrawing">重画</button>
       </div>
     </div>
   `;
@@ -641,21 +670,24 @@ function renderMemoryTask(task) {
   const response = getResponse(task.id);
   const selected = response.answer.selectedWords || [];
   const complete = selected.length === WORDS.length;
+  const ready = task.trial === 2 || Boolean(response.answer.audioReady);
   return html`
-    <div class="memory-page">
+    <div class="memory-page ${ready ? "ready" : ""}">
       <div class="memory-audio">
         ${renderAudioWave()}
-        ${task.trial === 1 ? renderAudioButton("playCurrentAudio") : ""}
+        ${task.trial === 1 && !ready ? renderAudioButton("playCurrentAudio") : ""}
       </div>
-      <div class="memory-choice-panel">
-        <strong>请选择 5 个词</strong>
-        <span>${selected.length}/5</span>
-      </div>
-      <div class="option-grid memory-options">
-        ${task.options.map((word) => `<button class="option ${selected.includes(word) ? "picked" : ""}" data-action="toggleMemoryWord" data-word="${escapeHtml(word)}">${escapeHtml(word)}</button>`).join("")}
-      </div>
-      ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
-      ${task.trial === 1 && complete ? `<p class="task-ok">选对后再继续。</p>` : ""}
+      ${ready ? `
+        <div class="memory-choice-panel">
+          <strong>请选择 5 个词</strong>
+          <span>${selected.length}/5</span>
+        </div>
+        <div class="option-grid memory-options">
+          ${task.options.map((word) => `<button class="option ${selected.includes(word) ? "picked" : ""}" data-action="toggleMemoryWord" data-word="${escapeHtml(word)}">${escapeHtml(word)}</button>`).join("")}
+        </div>
+        ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
+        ${task.trial === 1 && complete ? `<p class="task-ok">选对后再继续。</p>` : ""}
+      ` : `<p class="memory-wait-copy">请先点击开始，听完 5 个词后再选择。</p>`}
     </div>
   `;
 }
@@ -670,10 +702,7 @@ function renderChoiceTask(task) {
       ${ready ? `
         <div class="digit-answer">${sequence.map((digit) => `<span>${digit}</span>`).join("")}</div>
         <div class="keypad digit-keypad">
-          ${DIGIT_PAD.slice(0, 9).map((digit) => `<button data-action="appendDigit" data-digit="${digit}">${digit}</button>`).join("")}
-          <button class="key-action" data-action="backspaceDigit">删除</button>
-          <button data-action="appendDigit" data-digit="0">0</button>
-          <button class="key-action" data-action="confirmDigit" ${sequence.length === 0 ? "disabled" : ""}>确定</button>
+          ${renderKeypadDigits("appendDigit")}
         </div>
       ` : renderAudioButton("playCurrentAudio")}
     </div>
@@ -683,12 +712,13 @@ function renderChoiceTask(task) {
 function renderVigilanceTask() {
   const response = getResponse("vigilance");
   const started = Boolean(response.answer.startedAt);
+  const running = Boolean(response.answer.running);
   const taps = response.answer.taps || [];
   return html`
     <div class="vigilance-page">
       <strong class="tap-instruction">听到 1 敲一下</strong>
-      ${renderAudioWave()}
-      ${started ? `<button class="tap-button pulse" data-action="tapVigilance">敲一下</button><span class="tap-count">已敲 ${taps.length} 次</span>` : `<button class="primary circle-button pulse" data-action="playCurrentAudio">开始</button>`}
+      ${started ? renderAudioWave() : ""}
+      ${!started ? `<button class="primary circle-button pulse" data-action="playCurrentAudio">开始</button>` : running ? `<button class="tap-button pulse" data-action="tapVigilance">敲一下</button><span class="tap-count">已敲 ${taps.length} 次</span>` : `<p class="task-ok">听力反应完成，请点确定。</p>`}
     </div>
   `;
 }
@@ -702,8 +732,7 @@ function renderSerial7Task(step) {
       <div class="math-question">${previous} - 7 = ?</div>
       <div class="serial-display">${escapeHtml(values[step] || " ")}</div>
       <div class="keypad serial-keypad">
-        ${DIGIT_PAD.map((digit) => `<button data-action="inputSerialDigit" data-digit="${digit}">${digit}</button>`).join("")}
-        <button class="key-action" data-action="backspaceSerial">删除</button>
+        ${renderKeypadDigits("inputSerialDigit")}
       </div>
     </div>
   `;
@@ -736,10 +765,13 @@ function renderAbstractionTask(task, step) {
   const value = response.answer[item.key] || "";
   return html`
     <div class="abstraction-page">
-      <div class="pair-title">${escapeHtml(item.pair)}</div>
-      <div class="option-grid">
-        ${item.options.map((option) => `<button class="option ${value === option ? "picked" : ""}" data-action="chooseAbstraction" data-key="${item.key}" data-value="${escapeHtml(option)}">${escapeHtml(option)}</button>`).join("")}
+      <div class="word-pair">
+        ${item.words.map((word, index) => `<div class="word-card"><span>${item.emojis[index]}</span><strong>${escapeHtml(word)}</strong></div>`).join("")}
       </div>
+      <div class="option-grid abstraction-options">
+        ${item.options.map((option) => `<button class="option ${value === option ? "picked" : ""} ${item.practice && option === item.answer ? "guided-option" : ""}" data-action="chooseAbstraction" data-key="${item.key}" data-value="${escapeHtml(option)}">${escapeHtml(option)}${item.practice && option === item.answer ? `<span class="hand-cue">👉</span>` : ""}</button>`).join("")}
+      </div>
+      ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
     </div>
   `;
 }
@@ -752,7 +784,6 @@ function renderOrientationTask(step) {
   return html`
     <div class="orientation-page">
       <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
-      ${prompt.key === "city" || prompt.key === "place" ? `<p class="location-text">${escapeHtml(locationStatus())}</p>` : ""}
       <div class="option-grid orientation-options">
         ${options.map((option) => `<button class="option ${picked === option.value ? "picked" : ""}" data-action="chooseOrientation" data-key="${prompt.key}" data-value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</button>`).join("")}
       </div>
@@ -795,6 +826,14 @@ function renderAudioButton(action) {
   return `<button class="primary circle-button pulse sound-button" data-action="${action}">开始</button>`;
 }
 
+function renderKeypadDigits(action) {
+  return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""]
+    .map((digit) => digit
+      ? `<button data-action="${action}" data-digit="${digit}">${digit}</button>`
+      : `<span class="keypad-spacer"></span>`)
+    .join("");
+}
+
 function renderResults() {
   const totals = computeTotals();
   const success = totals.totalScore >= 26;
@@ -807,6 +846,7 @@ function renderResults() {
         <span>${success ? "闯关完成" : "闯关结束"}</span>
         <strong>${totals.totalScore}<em>/30</em></strong>
         <p>${success ? "表现很棒，继续保持。" : "这次有点吃力，建议再做一次专业评估。"}</p>
+        ${renderRadarChart(totals.domainScores)}
         <div class="result-medals">
           <b>专注</b><b>记忆</b><b>反应</b>
         </div>
@@ -817,6 +857,51 @@ function renderResults() {
       </div>
     </section>
   `;
+}
+
+function renderRadarChart(domainScores) {
+  const domains = Object.entries(domainScores || {}).filter(([, value]) => value.max > 0);
+  if (!domains.length) return "";
+  const center = 130;
+  const radius = 78;
+  const labelRadius = 108;
+  const axis = domains.map(([name], index) => radarPoint(index, domains.length, labelRadius, center));
+  const valuePoints = domains.map(([, value], index) => {
+    const ratio = value.max ? Math.max(0, Math.min(1, value.score / value.max)) : 0;
+    return radarPoint(index, domains.length, radius * ratio, center);
+  });
+  const rings = [0.25, 0.5, 0.75, 1].map((ratio) => domains.map((entry, index) => radarPoint(index, domains.length, radius * ratio, center)));
+  return html`
+    <div class="radar-card">
+      <div class="radar-pulse"></div>
+      <svg class="radar-chart" viewBox="0 0 260 260" role="img" aria-label="各分项得分雷达图">
+        ${rings.map((ring) => `<polygon class="radar-ring" points="${pointsAttr(ring)}" />`).join("")}
+        ${axis.map((point) => `<line class="radar-axis" x1="${center}" y1="${center}" x2="${point.x}" y2="${point.y}" />`).join("")}
+        <polygon class="radar-area" points="${pointsAttr(valuePoints)}" />
+        ${valuePoints.map((point) => `<circle class="radar-dot" cx="${point.x}" cy="${point.y}" r="4" />`).join("")}
+        ${domains.map(([name, value], index) => {
+          const point = axis[index];
+          return `<text class="radar-label" x="${point.x}" y="${point.y}" text-anchor="middle">${escapeHtml(shortDomainName(name))} ${value.score}/${value.max}</text>`;
+        }).join("")}
+      </svg>
+    </div>
+  `;
+}
+
+function radarPoint(index, total, radius, center) {
+  const angle = -Math.PI / 2 + (Math.PI * 2 * index) / total;
+  return {
+    x: Number((center + Math.cos(angle) * radius).toFixed(1)),
+    y: Number((center + Math.sin(angle) * radius).toFixed(1))
+  };
+}
+
+function pointsAttr(points) {
+  return points.map((point) => `${point.x},${point.y}`).join(" ");
+}
+
+function shortDomainName(name) {
+  return String(name || "").replace("视空间与执行功能", "视空间").replace("延迟回忆", "回忆").replace("语言", "语言").replace("注意", "注意");
 }
 
 function renderAdmin() {
@@ -1150,7 +1235,7 @@ function drawTrailCanvas(canvas, tick = 0) {
       else activeCtx.lineTo(node.x, node.y);
     });
     activeCtx.stroke();
-    const progress = (tick % 60) / 60;
+    const progress = (tick % 120) / 120;
     const moving = {
       x: guide[0].x + (guide[1].x - guide[0].x) * progress,
       y: guide[0].y + (guide[1].y - guide[0].y) * progress
@@ -1198,21 +1283,33 @@ function drawTrailCanvas(canvas, tick = 0) {
 }
 
 function drawFingerCue(ctx, x, y, tick) {
-  const bob = Math.sin(tick / 8) * 2;
+  const bob = Math.sin(tick / 12) * 2;
   ctx.save();
   ctx.translate(x, y + bob);
-  ctx.rotate(-0.25);
+  ctx.rotate(-0.12);
   ctx.fillStyle = "#ffcfb6";
   ctx.strokeStyle = "#9b4c3d";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  roundedRectPath(ctx, -8, -18, 16, 34, 8);
+  roundedRectPath(ctx, -18, -2, 28, 28, 12);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = "#fff7ef";
+  [["#ffcfb6", -13, -24, 10, 28], ["#ffcfb6", -2, -30, 10, 38], ["#ffcfb6", 9, -24, 10, 28]].forEach((finger) => {
+    ctx.fillStyle = finger[0];
+    ctx.beginPath();
+    roundedRectPath(ctx, finger[1], finger[2], finger[3], finger[4], 6);
+    ctx.fill();
+    ctx.stroke();
+  });
   ctx.beginPath();
-  ctx.arc(0, -16, 7, Math.PI, Math.PI * 2);
+  roundedRectPath(ctx, 8, -12, 38, 13, 7);
   ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#ffe6d6";
+  ctx.beginPath();
+  roundedRectPath(ctx, 42, -12, 10, 13, 5);
+  ctx.fill();
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -1371,6 +1468,7 @@ root.addEventListener("click", async (event) => {
   if (action === "chooseAbstraction") {
     const response = getResponse("abstraction");
     response.answer[target.dataset.key] = target.dataset.value;
+    delete response.behavior.selectionWarning;
     saveDraft();
     render();
   }
@@ -1378,7 +1476,6 @@ root.addEventListener("click", async (event) => {
   if (action === "toggleVoiceInput") toggleVoiceInput();
   if (action === "appendDigit") await appendDigit(target.dataset.digit);
   if (action === "backspaceDigit") backspaceDigit();
-  if (action === "confirmDigit") await confirmDigit();
   if (action === "inputSerialDigit") inputSerialDigit(target.dataset.digit);
   if (action === "backspaceSerial") backspaceSerial();
   if (action === "chooseOrientation") {
@@ -1468,6 +1565,10 @@ async function nextTask() {
 function canConfirmTask(task, response) {
   if (task.type === "memory") {
     const selected = response.answer.selectedWords || [];
+    if (task.trial === 1 && !response.answer.audioReady) {
+      response.behavior.selectionWarning = "请先听完词语";
+      return false;
+    }
     if (selected.length !== WORDS.length) {
       response.behavior.selectionWarning = "请先选满 5 个词";
       return false;
@@ -1478,6 +1579,28 @@ function canConfirmTask(task, response) {
       return false;
     }
     delete response.behavior.selectionWarning;
+  }
+  if (task.type === "serial7") {
+    const values = response.answer.values || [];
+    if (!String(values[getTaskStep(task)] || "").trim()) return false;
+  }
+  if (task.type === "choice" && !(response.answer.sequence || []).length) return false;
+  if (task.type === "naming") {
+    const item = task.items[getTaskStep(task)];
+    if (!response.answer[item.key]) return false;
+  }
+  if (task.type === "abstractionChoice") {
+    const item = task.items[getTaskStep(task)];
+    if (!response.answer[item.key]) return false;
+    if (item.practice && response.answer[item.key] !== item.answer) {
+      response.behavior.selectionWarning = "例题请选择“水果”";
+      return false;
+    }
+    delete response.behavior.selectionWarning;
+  }
+  if (task.type === "orientation") {
+    const prompt = orientationPrompts[getTaskStep(task)];
+    if (!response.answer.orientationChoices?.[prompt.key]) return false;
   }
   return true;
 }
@@ -1568,7 +1691,15 @@ function taskInstructionText(task, step) {
       ? "现在我要对您说一句话，我说完后请您把我说的话尽可能原原本本地重复出来。"
       : "现在我再说另一句话，我说完后请您也把它尽可能原原本本地重复出来。";
   }
-  if (task.type === "abstractionChoice") return `请您说说${task.items[step].pair}在什么方面相类似？`;
+  if (task.type === "serial7") {
+    return step === 0 ? task.instruction : "再减 7，等于多少？";
+  }
+  if (task.type === "abstractionChoice") {
+    const item = task.items[step];
+    return item.practice
+      ? "先看一个例子。桔子和香蕉在什么方面相类似？请选择水果。"
+      : `请您说说${item.words.join("和")}在什么方面相类似？`;
+  }
   if (task.type === "orientation") return orientationPrompts[step].label;
   return task.instruction || task.prompt;
 }
@@ -1576,7 +1707,20 @@ function taskInstructionText(task, step) {
 function playCurrentAudio() {
   const task = tasks[state.activeTaskIndex];
   const step = getTaskStep(task);
-  if (task.type === "memory") return speakItemsSlow(WORDS, { gapMs: 1000, rate: 0.72 });
+  if (task.type === "memory") {
+    const response = getResponse(task.id);
+    response.answer.audioReady = false;
+    return speakItemsSlow(WORDS, {
+      gapMs: 1000,
+      rate: 0.72,
+      done: () => {
+        response.answer.audioReady = true;
+        delete response.behavior.selectionWarning;
+        saveDraft();
+        render();
+      }
+    });
+  }
   if (task.type === "choice") return playDigitStimulus(task);
   if (task.type === "vigilance") return startVigilance();
   if (task.type === "sentence") return speakText(task.sentences[step], { rate: 0.86, done: () => startVoiceInput() });
@@ -1854,21 +1998,50 @@ function orientationOptions(prompt) {
     return optionObjects([today.weekday, weekdays[(index + 1) % 7], weekdays[(index + 6) % 7], weekdays[(index + 2) % 7]], today.weekday);
   }
   if (prompt.key === "city") {
-    const expected = getResponse("orientation").answer.expectedCity || getResponse("orientation").behavior.location?.city || "南京市";
+    const expected = cleanCityName(getResponse("orientation").answer.expectedCity || getResponse("orientation").behavior.location?.city || "南京市");
     return optionObjects([expected, "上海市", "北京市", "杭州市", "苏州市"], expected).slice(0, 4);
   }
   const expectedPlace = currentPlaceName();
-  return optionObjects([expectedPlace, "社区卫生服务中心", "综合医院门诊", "学校教室", "家里客厅"], expectedPlace).slice(0, 4);
+  return optionObjects([expectedPlace, "城北医院", "南湖学校", "东山社区中心"], expectedPlace).slice(0, 4);
 }
 
 function currentPlaceName() {
   const response = getResponse("orientation");
   const location = response.behavior.location || {};
-  return response.answer.expectedPlace || location.place || firstLocationPart(location.address) || "社区测评室";
+  return response.answer.expectedPlace || location.place || generalizePlaceName(firstLocationPart(location.address)) || "社区中心";
 }
 
 function firstLocationPart(address) {
   return String(address || "").split(/[，,]/).map((part) => part.trim()).filter(Boolean)[0] || "";
+}
+
+function cleanCityName(value) {
+  const text = String(value || "");
+  const cityMatch = text.match(/[^省市自治区县区,，\s]{2,12}市/);
+  if (cityMatch) return cityMatch[0];
+  const countyMatch = text.match(/[^省市自治区县区,，\s]{2,12}(县|区)/);
+  if (countyMatch) return countyMatch[0];
+  return text.split(/[，,\s]/).find(Boolean) || "南京市";
+}
+
+function generalizePlaceName(value) {
+  const text = String(value || "");
+  if (/医院|门诊|卫生院|卫生服务/.test(text)) return shortNamedPlace(text, "医院");
+  if (/学校|大学|学院|中学|小学/.test(text)) return shortNamedPlace(text, "学校");
+  if (/社区|街道|居委|服务中心/.test(text)) return shortNamedPlace(text, "社区中心");
+  return "社区中心";
+}
+
+function shortNamedPlace(text, fallbackSuffix) {
+  const compact = String(text || "").replace(/\s/g, "");
+  const pattern = fallbackSuffix === "医院" ? /医院|门诊|卫生院|卫生服务/ : fallbackSuffix === "学校" ? /学校|大学|学院|中学|小学/ : /社区|街道|居委|服务中心/;
+  const match = compact.match(pattern);
+  if (!match) return fallbackSuffix;
+  const start = Math.max(0, match.index - 6);
+  const end = Math.min(compact.length, match.index + match[0].length);
+  const name = compact.slice(start, end);
+  if (name.length >= 2) return name.replace(/卫生服务$/, "社区中心").replace(/服务中心$/, "社区中心");
+  return fallbackSuffix;
 }
 
 function optionObjects(values, correct) {
@@ -1927,12 +2100,6 @@ function backspaceDigit() {
   response.answer.sequence = response.answer.sequence || [];
   response.answer.sequence.pop();
   render();
-}
-
-async function confirmDigit() {
-  const response = getResponse(tasks[state.activeTaskIndex].id);
-  response.answer.sequence = response.answer.sequence || [];
-  await nextTask();
 }
 
 function inputSerialDigit(digit) {
@@ -2036,8 +2203,8 @@ async function reverseGeocodeLocation(response) {
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${loc.latitude}&lon=${loc.longitude}&accept-language=zh-CN`;
     const data = await fetch(url).then((entry) => entry.json());
     loc.address = data.display_name || "";
-    loc.city = data.address?.city || data.address?.town || data.address?.county || "";
-    loc.place = data.name || data.address?.building || data.address?.road || loc.address;
+    loc.city = cleanCityName(data.address?.city || data.address?.town || data.address?.county || loc.address || "");
+    loc.place = generalizePlaceName(data.name || data.address?.building || data.address?.amenity || data.address?.road || loc.address);
     getResponse("orientation").answer.expectedCity = loc.city || "";
     getResponse("orientation").answer.expectedPlace = loc.place || "";
   } catch {
@@ -2049,7 +2216,7 @@ function locationStatus() {
   const location = getResponse("orientation").behavior.location;
   if (!location) return "定位未获取";
   if (location.error) return location.error;
-  if (location.city || location.place) return `已获取：${location.city || ""} ${location.place || ""}`;
+  if (location.city || location.place) return "定位完成";
   return "已记录定位信息";
 }
 
@@ -2221,7 +2388,7 @@ function scoreSentenceTranscript(task, response) {
 }
 
 function scoreAbstractionChoice(task, response) {
-  return task.items.reduce((sum, item) => sum + (response.answer?.[item.key] === item.answer ? 1 : 0), 0);
+  return task.items.reduce((sum, item) => sum + (!item.practice && response.answer?.[item.key] === item.answer ? 1 : 0), 0);
 }
 
 function scoreMemoryChoices(response) {

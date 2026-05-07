@@ -24,7 +24,8 @@ html,
 body,
 #app {
   width: 100%;
-  height: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
 }
 
 body {
@@ -281,6 +282,8 @@ h4 {
 
 .primary,
 .secondary,
+.confirm-button,
+.utility-button,
 .ghost,
 .option,
 .keypad button,
@@ -299,6 +302,7 @@ h4 {
 
 .primary,
 .secondary,
+.confirm-button,
 .tap-button {
   padding: 12px 20px;
   color: #fff;
@@ -313,6 +317,28 @@ h4 {
 .secondary {
   background: var(--sky);
   box-shadow: 0 5px 0 #2167bf;
+}
+
+.confirm-button {
+  min-width: clamp(138px, 18vw, 190px);
+  min-height: clamp(58px, 8dvh, 72px);
+  border-radius: 999px;
+  background: var(--coral);
+  box-shadow: 0 5px 0 #bf533e;
+  font-size: clamp(22px, 2.5vw, 28px);
+}
+
+.utility-button {
+  min-width: clamp(108px, 14vw, 150px);
+  min-height: clamp(52px, 7dvh, 66px);
+  padding: 10px 18px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ink);
+  font-size: clamp(20px, 2.1vw, 24px);
+  font-weight: 950;
+  box-shadow: 0 4px 0 #cddbd2;
 }
 
 .ghost {
@@ -331,6 +357,8 @@ h4 {
 
 .primary:hover,
 .secondary:hover,
+.confirm-button:hover,
+.utility-button:hover,
 .ghost:hover,
 .option:hover,
 .keypad button:hover,
@@ -342,6 +370,7 @@ h4 {
 
 .primary:active,
 .secondary:active,
+.confirm-button:active,
 .tap-button:active {
   transform: translateY(3px);
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.22);
@@ -388,7 +417,7 @@ h4 {
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-rows: 124px minmax(0, 1fr);
+  grid-template-rows: clamp(82px, 13dvh, 118px) minmax(0, 1fr);
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -397,7 +426,7 @@ h4 {
 .page-header {
   justify-content: space-between;
   gap: 18px;
-  padding: 14px 24px;
+  padding: clamp(8px, 1.8dvh, 14px) clamp(16px, 2.5vw, 24px);
   border-bottom: 1px solid rgba(36, 52, 71, 0.08);
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(10px);
@@ -429,10 +458,10 @@ h4 {
 .header-prompt {
   display: -webkit-box;
   max-width: 920px;
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   overflow: hidden;
   color: #3e4d5e;
-  font-size: 22px;
+  font-size: clamp(16px, 2.1vw, 22px);
   font-weight: 820;
   line-height: 1.34;
   -webkit-box-orient: vertical;
@@ -617,8 +646,9 @@ h4 {
 .task-page {
   position: relative;
   display: grid;
-  grid-template-rows: minmax(0, 1fr);
-  padding: 18px 92px 24px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: clamp(8px, 1.5dvh, 14px);
+  padding: clamp(10px, 2dvh, 18px) clamp(68px, 8vw, 92px) max(10px, env(safe-area-inset-bottom));
 }
 
 .task-copy {
@@ -703,14 +733,14 @@ h4 {
   top: 50%;
   z-index: 4;
   display: grid;
-  width: 62px;
-  height: 118px;
+  width: clamp(46px, 6vw, 62px);
+  height: clamp(86px, 15dvh, 118px);
   place-items: center;
   border: 2px solid #d7e4dc;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.94);
   color: var(--leaf-dark);
-  font-size: 72px;
+  font-size: clamp(48px, 7vw, 72px);
   font-weight: 950;
   line-height: 1;
   box-shadow: 0 8px 20px rgba(36, 52, 71, 0.12);
@@ -718,23 +748,36 @@ h4 {
 }
 
 .edge-arrow-left {
-  left: 18px;
+  left: clamp(8px, 1.8vw, 18px);
 }
 
 .edge-arrow-right {
   right: 18px;
+  display: none;
 }
 
-.confirm-task-button {
-  position: absolute;
-  left: 50%;
-  bottom: 34px;
-  z-index: 5;
-  min-width: 180px;
-  min-height: 72px;
-  border-radius: 999px;
-  font-size: 28px;
-  transform: translateX(-50%);
+.task-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: clamp(58px, 9dvh, 78px);
+  padding: 0 clamp(4px, 1vw, 10px);
+}
+
+.task-actions.spacer {
+  min-height: 0;
+}
+
+.task-actions-left {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.task-actions-left:empty {
+  display: block;
 }
 
 .trail-page,
@@ -761,7 +804,7 @@ h4 {
 
 .trail-page {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 58px;
+  grid-template-rows: minmax(0, 1fr);
   gap: 10px;
   padding: 14px;
 }
@@ -776,6 +819,7 @@ h4 {
   grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);
   gap: 18px;
   padding: 14px;
+  align-items: stretch;
 }
 
 .drawing-page.clock-page {
@@ -786,7 +830,7 @@ h4 {
   display: grid;
   place-items: center;
   min-width: 0;
-  min-height: 0;
+  min-height: 100%;
   border: 2px dashed #c9d9d0;
   border-radius: 8px;
   background: #f8fbf8;
@@ -803,6 +847,7 @@ h4 {
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
+  height: 100%;
 }
 
 .clock-label {
@@ -894,7 +939,11 @@ h4 {
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   align-content: center;
   gap: 16px;
-  padding: 26px 34px 98px;
+  padding: clamp(16px, 2.6dvh, 26px) clamp(20px, 3vw, 34px);
+}
+
+.memory-page:not(.ready) {
+  grid-template-rows: auto auto;
 }
 
 .memory-audio {
@@ -928,6 +977,14 @@ h4 {
   justify-self: center;
 }
 
+.memory-wait-copy {
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(22px, 2.6vw, 30px);
+  font-weight: 950;
+  text-align: center;
+}
+
 .task-warning,
 .task-ok {
   justify-self: center;
@@ -956,7 +1013,7 @@ h4 {
   place-items: center;
   align-content: center;
   gap: 18px;
-  padding: 22px;
+  padding: clamp(14px, 2.4dvh, 22px);
 }
 
 .audio-visual {
@@ -1128,28 +1185,32 @@ h4 {
 
 .keypad {
   display: grid;
-  grid-template-columns: repeat(5, 68px);
+  grid-template-columns: repeat(3, clamp(64px, 8.4vw, 86px));
   gap: 12px;
   justify-content: center;
 }
 
 .digit-keypad {
-  grid-template-columns: repeat(3, 82px);
+  grid-template-columns: repeat(3, clamp(64px, 8.4vw, 86px));
 }
 
 .serial-keypad {
-  grid-template-columns: repeat(3, 86px);
+  grid-template-columns: repeat(3, clamp(64px, 8.4vw, 86px));
 }
 
 .keypad button {
   min-width: 0;
-  min-height: 58px;
+  min-height: clamp(48px, 7dvh, 62px);
   border: 2px solid #d7e4dc;
   background: #fff;
   color: var(--ink);
   font-size: 24px;
   font-weight: 950;
   box-shadow: 0 4px 0 #cddbd2;
+}
+
+.keypad-spacer {
+  min-height: clamp(48px, 7dvh, 62px);
 }
 
 .keypad .key-wide {
@@ -1237,11 +1298,53 @@ h4 {
 
 .abstraction-page {
   gap: 26px;
-  padding: 42px 54px 98px;
+  padding: clamp(18px, 3dvh, 42px) clamp(24px, 4vw, 54px);
 }
 
-.abstraction-page .pair-title {
-  font-size: 52px;
+.word-pair {
+  display: flex;
+  gap: clamp(18px, 3vw, 34px);
+  justify-content: center;
+  align-items: center;
+}
+
+.word-card {
+  display: grid;
+  min-width: clamp(150px, 22vw, 220px);
+  min-height: clamp(118px, 20dvh, 170px);
+  place-items: center;
+  padding: 14px;
+  border: 2px solid #f6e8ba;
+  border-radius: 8px;
+  background: #fff7dc;
+}
+
+.word-card span {
+  font-size: clamp(42px, 7vw, 68px);
+  line-height: 1;
+}
+
+.word-card strong {
+  font-size: clamp(30px, 4.8vw, 48px);
+  font-weight: 1000;
+}
+
+.abstraction-options {
+  width: min(760px, 100%);
+}
+
+.guided-option {
+  position: relative;
+  overflow: visible;
+}
+
+.hand-cue {
+  position: absolute;
+  right: -18px;
+  bottom: -14px;
+  font-size: 42px;
+  filter: drop-shadow(0 6px 8px rgba(36, 52, 71, 0.22));
+  animation: handPoint 1.2s ease-in-out infinite;
 }
 
 .fluency-page .timer-button {
@@ -1313,8 +1416,8 @@ h4 {
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 12px;
-  padding: 28px;
+  gap: clamp(8px, 1.4dvh, 12px);
+  padding: clamp(14px, 2.4dvh, 28px);
 }
 
 .result-hero.celebrate {
@@ -1326,8 +1429,8 @@ h4 {
 }
 
 .result-logo {
-  width: 150px;
-  height: 150px;
+  width: clamp(96px, 14dvh, 150px);
+  height: clamp(96px, 14dvh, 150px);
   object-fit: contain;
 }
 
@@ -1448,7 +1551,7 @@ h4 {
 
 .result-hero strong {
   color: var(--leaf-dark);
-  font-size: 94px;
+  font-size: clamp(58px, 11dvh, 94px);
   line-height: 0.9;
 }
 
@@ -1464,6 +1567,62 @@ h4 {
   margin-bottom: 0;
   color: var(--ink);
   font-size: 24px;
+  font-weight: 900;
+}
+
+.radar-card {
+  position: relative;
+  display: grid;
+  width: min(320px, 46dvh);
+  aspect-ratio: 1;
+  place-items: center;
+}
+
+.radar-pulse {
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(34, 169, 107, 0.20), rgba(34, 169, 107, 0));
+  animation: radarPulse 1.9s ease-out infinite;
+}
+
+.radar-chart {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.radar-ring {
+  fill: none;
+  stroke: rgba(36, 52, 71, 0.18);
+  stroke-width: 1.5;
+}
+
+.radar-axis {
+  stroke: rgba(36, 52, 71, 0.14);
+  stroke-width: 1.5;
+}
+
+.radar-area {
+  fill: rgba(34, 169, 107, 0.28);
+  stroke: var(--leaf);
+  stroke-width: 4;
+  stroke-linejoin: round;
+  animation: radarGrow 0.72s ease-out both;
+  transform-origin: center;
+}
+
+.radar-dot {
+  fill: var(--coral);
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.radar-label {
+  fill: #3d4e5f;
+  font-size: 11px;
   font-weight: 900;
 }
 
@@ -1946,6 +2105,38 @@ h4 {
   }
 }
 
+@keyframes radarPulse {
+  from {
+    transform: scale(0.3);
+    opacity: 0.78;
+  }
+  to {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+@keyframes radarGrow {
+  from {
+    transform: scale(0.08);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes handPoint {
+  0%,
+  100% {
+    transform: translateX(0) rotate(-8deg);
+  }
+  50% {
+    transform: translateX(-10px) rotate(-8deg);
+  }
+}
+
 @media (max-width: 960px) {
   .task-page {
     padding: 14px 72px 18px;
@@ -1960,9 +2151,47 @@ h4 {
   }
 }
 
+@media (orientation: portrait) {
+  .setup-panel {
+    width: min(720px, 94vw);
+    padding: 28px;
+  }
+
+  .page-shell {
+    grid-template-rows: clamp(92px, 10dvh, 116px) minmax(0, 1fr);
+  }
+
+  .task-page {
+    padding-inline: 58px;
+  }
+
+  .drawing-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(180px, 0.42fr) minmax(0, 1fr);
+  }
+
+  .reference-svg {
+    width: min(320px, 86%);
+  }
+
+  .rubric-layout,
+  .admin-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .result-logo {
+    width: 104px;
+    height: 104px;
+  }
+
+  .radar-card {
+    width: min(300px, 36dvh);
+  }
+}
+
 @media (max-height: 720px) {
   .page-shell {
-    grid-template-rows: 92px minmax(0, 1fr);
+    grid-template-rows: 84px minmax(0, 1fr);
   }
 
   .page-header {
@@ -1997,8 +2226,9 @@ h4 {
   }
 
   .task-page {
-    padding-top: 12px;
-    padding-bottom: 12px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    gap: 8px;
   }
 
   .task-copy {
@@ -2006,7 +2236,8 @@ h4 {
   }
 
   .option {
-    min-height: 58px;
+    min-height: 52px;
+    font-size: 22px;
   }
 
   .math-question {
@@ -2016,10 +2247,20 @@ h4 {
   .circle-button,
   .timer-button,
   .sound-button {
-    width: 132px;
-    height: 132px;
-    min-width: 132px;
-    min-height: 132px;
+    width: 116px;
+    height: 116px;
+    min-width: 116px;
+    min-height: 116px;
+  }
+
+  .task-actions {
+    min-height: 56px;
+  }
+
+  .confirm-button,
+  .utility-button {
+    min-height: 50px;
+    font-size: 20px;
   }
 
   .tap-button {
