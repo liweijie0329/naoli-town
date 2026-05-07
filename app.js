@@ -283,6 +283,7 @@ let recordingAudio = false;
 let audioChunks = [];
 let speechPlaybackId = 0;
 let speechItemTimer = null;
+let micPermissionReady = false;
 let vigilanceTimer = null;
 let fluencyTimer = null;
 let trailGuideFrame = null;
@@ -919,26 +920,28 @@ function renderOrientationTask(step) {
 }
 
 function renderSpeechCard(transcript) {
+  const value = transcript === "等待语音识别..." ? "" : transcript;
   return html`
     <div class="speech-page">
       ${renderAudioWave()}
       ${renderAudioButton("playCurrentAudio")}
-      <textarea class="transcript-input" data-voice-manual>${escapeHtml(transcript)}</textarea>
+      <textarea class="transcript-input" data-voice-manual placeholder="语音识别结果会显示在这里，也可以手动修改。">${escapeHtml(value)}</textarea>
     </div>
   `;
 }
 
 function renderSpeechControls(transcript) {
+  const value = transcript === "等待语音识别..." ? "" : transcript;
   return html`
     ${renderAudioWave()}
     ${renderAudioButton("playCurrentAudio")}
-    <textarea class="transcript-input" data-voice-manual>${escapeHtml(transcript)}</textarea>
+    <textarea class="transcript-input" data-voice-manual placeholder="语音识别结果会显示在这里，也可以手动修改。">${escapeHtml(value)}</textarea>
   `;
 }
 
 function renderAudioWave() {
   const active = playState === "播放中..." || recognizing || recordingAudio;
-  const label = playState === "播放中..." ? "播放中..." : recognizing || recordingAudio ? "请说" : "";
+  const label = playState === "播放中..." ? "播放中..." : voiceState && voiceState !== "待说" ? voiceState : recognizing || recordingAudio ? "请说" : "";
   return html`
     <div class="audio-wave ${active ? "active" : ""}" aria-label="${escapeHtml(label)}">
       <span></span><span></span><span></span><span></span><span></span>
@@ -949,7 +952,7 @@ function renderAudioWave() {
 
 function renderAudioButton(action) {
   if (playState === "播放中...") return `<button class="primary circle-button pulse sound-button" disabled>播放中</button>`;
-  if (recognizing || recordingAudio) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">请说</button>`;
+  if (recognizing || recordingAudio) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">停止</button>`;
   return `<button class="primary circle-button pulse sound-button" data-action="${action}">开始</button>`;
 }
 
@@ -1516,6 +1519,7 @@ root.addEventListener("click", async (event) => {
     state.startedAt = new Date().toISOString();
     state.activeTaskIndex = 0;
     state.view = "test";
+    primeMicrophonePermission();
     render();
   }
   if (action === "openMenu") {
@@ -2064,15 +2068,17 @@ function initSpeechRecognition() {
     let text = "";
     for (let i = 0; i < event.results.length; i += 1) text += event.results[i][0].transcript;
     applyVoiceText(text);
+    voiceState = "正在识别";
+    render();
   };
   recognition.onend = () => {
     recognizing = false;
-    voiceState = "待说";
+    voiceState = recordingAudio ? "已录音，识别已暂停" : "待说";
     render();
   };
-  recognition.onerror = () => {
+  recognition.onerror = (event) => {
     recognizing = false;
-    voiceState = "识别未完成";
+    voiceState = speechRecognitionErrorText(event?.error);
     render();
   };
   return recognition;
@@ -2085,17 +2091,18 @@ function toggleVoiceInput() {
 
 async function startVoiceInput() {
   voiceState = "请说";
-  await startAudioRecording();
+  const recordingStarted = await startAudioRecording();
   speechRecognition = speechRecognition || initSpeechRecognition();
   if (!speechRecognition) {
-    voiceState = recordingAudio ? "请说" : "当前浏览器不支持语音识别";
+    voiceState = recordingStarted ? "已录音，但此浏览器不支持自动转文字" : "当前浏览器不能录音或识别";
     render();
     return;
   }
   try {
     speechRecognition.start();
   } catch {
-    // Already started.
+    voiceState = recordingAudio ? "已录音，识别启动失败" : "识别启动失败";
+    render();
   }
 }
 
@@ -2107,17 +2114,20 @@ function stopVoiceInput() {
     micStream = null;
   }
   recordingAudio = false;
+  voiceState = "待说";
   render();
 }
 
 async function startAudioRecording() {
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
     voiceState = "当前浏览器不能录音";
-    return;
+    render();
+    return false;
   }
-  if (mediaRecorder && mediaRecorder.state === "recording") return;
+  if (mediaRecorder && mediaRecorder.state === "recording") return true;
   try {
     micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    micPermissionReady = true;
     audioChunks = [];
     const options = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? { mimeType: "audio/webm;codecs=opus", audioBitsPerSecond: 32000 } : { audioBitsPerSecond: 32000 };
     mediaRecorder = new MediaRecorder(micStream, options);
@@ -2143,11 +2153,32 @@ async function startAudioRecording() {
     recordingAudio = true;
     voiceState = "请说";
     render();
+    return true;
   } catch {
     recordingAudio = false;
     voiceState = "请允许麦克风权限";
     render();
+    return false;
   }
+}
+
+async function primeMicrophonePermission() {
+  if (micPermissionReady || !navigator.mediaDevices?.getUserMedia) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach((track) => track.stop());
+    micPermissionReady = true;
+  } catch {
+    micPermissionReady = false;
+  }
+}
+
+function speechRecognitionErrorText(error) {
+  if (error === "not-allowed" || error === "service-not-allowed") return "请允许麦克风和语音识别权限";
+  if (error === "no-speech") return "没有听到声音，请靠近麦克风再试";
+  if (error === "audio-capture") return "没有检测到麦克风";
+  if (error === "network") return "语音识别网络不可用";
+  return "识别未完成，请再试一次";
 }
 
 function applyVoiceText(text) {
