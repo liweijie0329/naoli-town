@@ -17,6 +17,7 @@
   --app-height: 100dvh;
   --app-width: 100vw;
   --bottom-safe: max(22px, env(safe-area-inset-bottom));
+  --setup-control-height: 68px;
 }
 
 * {
@@ -209,6 +210,7 @@ h4 {
 .setup-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(0, auto);
   gap: 15px;
 }
 
@@ -280,7 +282,8 @@ h4 {
 
 .field input,
 .field select {
-  min-height: 68px;
+  height: var(--setup-control-height);
+  min-height: var(--setup-control-height);
   padding: 0 18px;
   font-size: 24px;
   font-weight: 900;
@@ -305,10 +308,12 @@ h4 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  height: var(--setup-control-height);
 }
 
 .segment-option {
-  min-height: 68px;
+  height: 100%;
+  min-height: 0;
   border: 2px solid var(--line);
   border-radius: 8px;
   background: #fff;
@@ -899,9 +904,14 @@ h4 {
 .drawing-page {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 18px;
   padding: 14px;
   align-items: stretch;
+}
+
+.drawing-page.cube-page {
+  grid-template-columns: minmax(300px, 1fr) minmax(0, 1.35fr);
 }
 
 .drawing-page.clock-page {
@@ -912,7 +922,8 @@ h4 {
   display: grid;
   place-items: center;
   min-width: 0;
-  min-height: 100%;
+  min-height: 0;
+  height: 100%;
   border: 2px dashed #c9d9d0;
   border-radius: 8px;
   background: #f8fbf8;
@@ -930,6 +941,10 @@ h4 {
   min-width: 0;
   min-height: 0;
   height: 100%;
+}
+
+.cube-page .canvas-wrap {
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .clock-label {
@@ -2253,6 +2268,11 @@ h4 {
     grid-template-rows: minmax(180px, 0.42fr) minmax(0, 1fr);
   }
 
+  .drawing-page.cube-page {
+    grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.05fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
   .reference-svg {
     width: min(380px, 92%);
   }
@@ -2286,9 +2306,18 @@ h4 {
     width: min(210px, 48vw);
     height: min(210px, 48vw);
   }
+
+  .drawing-page.cube-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(170px, 0.42fr) minmax(0, 1fr);
+  }
 }
 
 @media (max-height: 820px) {
+  :root {
+    --setup-control-height: 56px;
+  }
+
   .setup-screen {
     padding: 14px;
   }
@@ -2324,7 +2353,6 @@ h4 {
   .field input,
   .field select,
   .segment-option {
-    min-height: 56px;
     font-size: 21px;
   }
 

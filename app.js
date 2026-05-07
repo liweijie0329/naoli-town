@@ -739,7 +739,7 @@ function renderTrailTask() {
 
 function renderDrawingTask(task) {
   return html`
-    <div class="drawing-page ${task.drawingKind === "clock" ? "clock-page" : ""}">
+    <div class="drawing-page ${task.drawingKind === "clock" ? "clock-page" : ""} ${task.drawingKind === "cube" ? "cube-page" : ""}">
       ${task.drawingKind === "cube" ? `<div class="reference-panel">${cubeReferenceSvg()}</div>` : ""}
       <div class="canvas-wrap">
         ${task.drawingKind === "clock" ? `<div class="clock-label">11:10</div>` : ""}
@@ -1347,9 +1347,9 @@ function drawTrailCanvas(canvas, tick = 0) {
     const from = nodeMap.get(edge.from);
     const to = nodeMap.get(edge.to);
     if (!from || !to) return;
-    activeCtx.strokeStyle = edge.correct ? "#20a66b" : "#ff7d63";
-    activeCtx.lineWidth = edge.correct ? 5 : 6;
-    activeCtx.setLineDash(edge.correct ? [] : [12, 9]);
+    activeCtx.strokeStyle = "#20a66b";
+    activeCtx.lineWidth = 5;
+    activeCtx.setLineDash([]);
     activeCtx.beginPath();
     activeCtx.moveTo(from.x, from.y);
     activeCtx.lineTo(to.x, to.y);
@@ -1458,10 +1458,10 @@ function captureCanvas(taskId) {
 
 function cubeReferenceSvg() {
   return `
-    <svg class="reference-svg" viewBox="0 0 180 160" role="img" aria-label="立方体参考图">
-      <path d="M28 56 L102 56 L148 18 L74 18 Z" fill="#f6fbff" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
-      <path d="M102 56 L148 18 L148 132 L102 132 Z" fill="#dbe7ef" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
-      <path d="M28 56 L102 56 L102 132 L28 132 Z" fill="#ffffff" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
+    <svg class="reference-svg" viewBox="0 0 140 112" role="img" aria-label="立方体参考图">
+      <path d="M34 38 H88 V90 H34 Z" fill="#ffffff" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
+      <path d="M34 38 L50 22 H104 L88 38 Z" fill="#ffffff" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
+      <path d="M88 38 L104 22 V74 L88 90 Z" fill="#ffffff" stroke="#243447" stroke-width="4" stroke-linejoin="round" />
     </svg>
   `;
 }
