@@ -299,6 +299,7 @@ let voiceState = "待说";
 let speechRecognition = null;
 let recognizing = false;
 let mediaRecorder = null;
+let pcmRecorder = null;
 let micStream = null;
 let recordingAudio = false;
 let speechTranscribing = false;
@@ -317,6 +318,9 @@ let staticTtsManifest = null;
 let staticTtsManifestPromise = null;
 let instructionTimer = null;
 let speechPlaybackPurpose = null;
+let speechAudioContext = null;
+let activeSpeechBufferSources = [];
+let speechItemTimers = [];
 let micPermissionReady = false;
 let speechRecognitionStartPending = false;
 let speechRecognitionLastError = null;
@@ -890,6 +894,9 @@ function renderMemoryTask(task) {
 }
 
 function renderMemoryStartButton() {
+  if (playState === "播放中...") {
+    return `<button class="primary circle-button sound-button" disabled>请听题</button>`;
+  }
   return `<button class="primary circle-button pulse sound-button" data-action="playCurrentAudio">开始</button>`;
 }
 
@@ -1073,7 +1080,7 @@ function renderAudioWave() {
 function renderAudioButton(action) {
   const current = tasks[state.activeTaskIndex];
   if (playState === "播放中..." && !(action === "playCurrentAudio" && current?.type === "sentence" && speechPlaybackPurpose === "instruction")) {
-    return `<button class="primary circle-button pulse sound-button" disabled>播放中</button>`;
+    return `<button class="primary circle-button sound-button" disabled>请听题</button>`;
   }
   if (speechTranscribing) return `<button class="secondary circle-button sound-button" disabled>请稍等</button>`;
   if (recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">停止</button>`;
@@ -2328,6 +2335,14 @@ function speakItemsSlow(items, options = {}) {
   const playbackId = beginAudioPlayback();
   playState = "播放中...";
   render();
+  playStaticItemSequence(items, { audioKeyPrefix, audioKeys, gapMs, playbackId, onItemStart, done })
+    .catch(() => false)
+    .then((started) => {
+      if (!started) speakItemsWithBrowser(items, { gapMs, rate, done, onItemStart, audioKeyPrefix, audioKeys, playbackId });
+    });
+}
+
+function speakItemsWithBrowser(items, { gapMs, rate, done, onItemStart, audioKeyPrefix, audioKeys, playbackId }) {
   let index = 0;
   const speakNext = async () => {
     if (playbackId !== speechPlaybackId) return;
@@ -2348,11 +2363,14 @@ function speakItemsSlow(items, options = {}) {
       if (onItemStart) onItemStart(value, index);
     };
     const audioKey = audioKeys[index] || (audioKeyPrefix ? `${audioKeyPrefix}:${index}` : null);
-    const staticAudioStarted = await playStaticTtsAudio(audioKey, {
-      playbackId,
-      onStart: itemStart,
-      done: queueNext
-    });
+    const useStaticAudio = !audioKeyPrefix.includes(":digit");
+    const staticAudioStarted = useStaticAudio
+      ? await playStaticTtsAudio(audioKey, {
+        playbackId,
+        onStart: itemStart,
+        done: queueNext
+      })
+      : false;
     if (staticAudioStarted) return;
     if (playbackId !== speechPlaybackId) return;
     if (!("speechSynthesis" in window)) {
@@ -2421,6 +2439,100 @@ async function loadStaticTtsManifest() {
   return staticTtsManifestPromise;
 }
 
+async function playStaticItemSequence(items, { audioKeyPrefix, audioKeys, gapMs, playbackId, onItemStart, done }) {
+  const keys = items.map((_, index) => audioKeys[index] || (audioKeyPrefix ? `${audioKeyPrefix}:${index}` : null));
+  if (!keys.every(Boolean)) return false;
+  const context = await resumeSpeechAudioContext();
+  if (!context) return false;
+  const urls = await Promise.all(keys.map((key) => staticTtsAudioUrl(key)));
+  if (playbackId !== speechPlaybackId) return true;
+  if (!urls.every(Boolean)) return false;
+  let buffers;
+  try {
+    buffers = await Promise.all(urls.map((url) => loadSpeechAudioBuffer(url, context)));
+  } catch {
+    return false;
+  }
+  if (playbackId !== speechPlaybackId) return true;
+
+  stopStaticSpeechSources();
+  let cursor = context.currentTime + 0.08;
+  const gapSeconds = gapMs / 1000;
+  buffers.forEach((buffer, index) => {
+    const source = context.createBufferSource();
+    source.buffer = buffer;
+    source.connect(context.destination);
+    activeSpeechBufferSources.push(source);
+    const delayMs = Math.max(0, (cursor - context.currentTime) * 1000);
+    const timer = window.setTimeout(() => {
+      if (playbackId !== speechPlaybackId) return;
+      if (onItemStart) onItemStart(items[index], index);
+    }, delayMs);
+    speechItemTimers.push(timer);
+    source.start(cursor);
+    cursor += buffer.duration + gapSeconds;
+    if (index === buffers.length - 1) {
+      source.onended = () => finishStaticItemSequence(playbackId, done);
+    }
+  });
+  return true;
+}
+
+async function resumeSpeechAudioContext() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+  speechAudioContext = speechAudioContext || new AudioContextClass();
+  if (speechAudioContext.state === "suspended") {
+    try {
+      await speechAudioContext.resume();
+    } catch {
+      return null;
+    }
+  }
+  return speechAudioContext;
+}
+
+async function loadSpeechAudioBuffer(url, context) {
+  const response = await fetch(url, { cache: "force-cache" });
+  if (!response.ok) throw new Error("Audio fetch failed");
+  const arrayBuffer = await response.arrayBuffer();
+  return decodeAudioDataCompat(context, arrayBuffer.slice(0));
+}
+
+function decodeAudioDataCompat(context, arrayBuffer) {
+  return new Promise((resolve, reject) => {
+    const result = context.decodeAudioData(arrayBuffer, resolve, reject);
+    if (result?.then) result.then(resolve, reject);
+  });
+}
+
+function finishStaticItemSequence(playbackId, done) {
+  if (playbackId !== speechPlaybackId) return;
+  activeSpeechBufferSources = [];
+  clearSpeechItemTimers();
+  playState = "开始";
+  render();
+  if (done) done();
+}
+
+function stopStaticSpeechSources() {
+  activeSpeechBufferSources.forEach((source) => {
+    source.onended = null;
+    try {
+      source.stop();
+    } catch {
+      // Already stopped.
+    }
+  });
+  activeSpeechBufferSources = [];
+  clearSpeechItemTimers();
+}
+
+function clearSpeechItemTimers() {
+  speechItemTimers.forEach((timer) => window.clearTimeout(timer));
+  speechItemTimers = [];
+}
+
 function playAudioUrl(url, playbackId, onStart, done) {
   return new Promise((resolve) => {
     let resolved = false;
@@ -2476,6 +2588,7 @@ function beginAudioPlayback() {
   clearInstructionTimer();
   clearSpeechTextFallbackTimer();
   stopActiveSpeechAudio();
+  stopStaticSpeechSources();
   prepareAudioOutputMode();
   if (speechItemTimer) {
     window.clearTimeout(speechItemTimer);
@@ -2500,6 +2613,7 @@ function stopAudioPlayback() {
   speechPlaybackId += 1;
   clearSpeechTextFallbackTimer();
   stopActiveSpeechAudio();
+  stopStaticSpeechSources();
   if (speechItemTimer) {
     window.clearTimeout(speechItemTimer);
     speechItemTimer = null;
@@ -2720,6 +2834,7 @@ function stopVoiceInput(options = {}) {
   clearSpeechRecognitionRestartTimer();
   const wasRecognitionPending = speechRecognitionStartPending;
   const wasRecording = mediaRecorder && mediaRecorder.state === "recording";
+  const wasPcmRecording = Boolean(pcmRecorder);
   speechRecognitionWanted = false;
   speechRecognitionStartPending = false;
   speechRecognitionLastError = null;
@@ -2734,7 +2849,15 @@ function stopVoiceInput(options = {}) {
       speechRecognition.abort?.();
     }
   }
-  if (wasRecording) {
+  if (wasPcmRecording) {
+    releaseMicAfterRecordingStop = releaseMic;
+    if (recordingWillTranscribe) {
+      speechTranscribing = true;
+      voiceState = "请稍等";
+    }
+    finishPcmAudioRecording(pcmRecorder);
+    pcmRecorder = null;
+  } else if (wasRecording) {
     releaseMicAfterRecordingStop = releaseMic;
     if (recordingWillTranscribe) {
       speechTranscribing = true;
@@ -2756,6 +2879,10 @@ function stopVoiceInput(options = {}) {
 
 async function startAudioRecording(options = {}) {
   const { transcribeOnStop = false } = options;
+  if (transcribeOnStop) {
+    const pcmStarted = await startPcmAudioRecording({ transcribeOnStop });
+    if (pcmStarted !== null) return pcmStarted;
+  }
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
     voiceState = "当前浏览器不能录音";
     render();
@@ -2832,6 +2959,182 @@ async function startAudioRecording(options = {}) {
     voiceState = "请允许麦克风权限";
     render();
     return false;
+  }
+}
+
+async function startPcmAudioRecording(options = {}) {
+  const { transcribeOnStop = false } = options;
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!navigator.mediaDevices?.getUserMedia || !AudioContextClass) return null;
+  if (!AudioContextClass.prototype?.createScriptProcessor) return null;
+  if (pcmRecorder) return true;
+  try {
+    micStream = await getReusableMicStream();
+    micPermissionReady = true;
+    const context = new AudioContextClass();
+    await context.resume?.().catch(() => {});
+    const source = context.createMediaStreamSource(micStream);
+    const processor = context.createScriptProcessor(4096, 1, 1);
+    const chunks = [];
+    const task = tasks[state.activeTaskIndex];
+    const step = getTaskStep(task);
+    const response = getResponse(task.id);
+    processor.onaudioprocess = (event) => {
+      const input = event.inputBuffer.getChannelData(0);
+      chunks.push(new Float32Array(input));
+      const output = event.outputBuffer.getChannelData(0);
+      output.fill(0);
+    };
+    source.connect(processor);
+    processor.connect(context.destination);
+    pcmRecorder = {
+      chunks,
+      context,
+      processor,
+      response,
+      sampleRate: context.sampleRate,
+      source,
+      step,
+      taskId: task.id,
+      transcribeOnStop
+    };
+    releaseMicAfterRecordingStop = false;
+    recordingWillTranscribe = transcribeOnStop;
+    recordingAudio = true;
+    voiceState = voicePromptText();
+    render();
+    return true;
+  } catch (error) {
+    cleanupPcmRecorder(pcmRecorder);
+    pcmRecorder = null;
+    recordingAudio = false;
+    recordingWillTranscribe = false;
+    if (["NotAllowedError", "PermissionDeniedError", "NotFoundError", "NotReadableError"].includes(error?.name)) {
+      voiceState = error?.name === "NotFoundError" ? "没有找到麦克风" : "请允许麦克风权限";
+      render();
+      return false;
+    }
+    return null;
+  }
+}
+
+async function finishPcmAudioRecording(recorder) {
+  if (!recorder) return;
+  const shouldReleaseMic = releaseMicAfterRecordingStop;
+  releaseMicAfterRecordingStop = false;
+  let micReleased = false;
+  try {
+    cleanupPcmRecorder(recorder);
+    const task = tasks.find((entry) => entry.id === recorder.taskId);
+    const response = getResponse(recorder.taskId);
+    const blob = wavBlobFromFloat32Chunks(recorder.chunks, recorder.sampleRate);
+    response.behavior.audioRecordings = response.behavior.audioRecordings || [];
+    response.behavior.audioRecordings.push({
+      step: recorder.step,
+      mimeType: blob.type,
+      size: blob.size,
+      chunks: recorder.chunks.length,
+      recorderMimeType: "audio/wav;codec=pcm",
+      inputSampleRate: recorder.sampleRate,
+      endedAt: new Date().toISOString()
+    });
+    storeAudioRecordingDraft(response, recorder.step, blob);
+    if (shouldReleaseMic) {
+      releaseMicStream();
+      micReleased = true;
+    }
+    if (recorder.transcribeOnStop && blob.size && task) {
+      await transcribeAudioBlob(blob, recorder.taskId, recorder.step);
+    } else if (recorder.transcribeOnStop) {
+      speechTranscribing = false;
+      voiceState = "没有录到声音";
+      saveDraft();
+      render();
+    }
+  } catch (error) {
+    speechTranscribing = false;
+    voiceState = "录音处理失败，请重试";
+    saveDraft();
+    render();
+  } finally {
+    recordingWillTranscribe = false;
+    if (shouldReleaseMic && !micReleased) releaseMicStream();
+  }
+}
+
+function cleanupPcmRecorder(recorder) {
+  if (!recorder) return;
+  recorder.processor.onaudioprocess = null;
+  try {
+    recorder.processor.disconnect();
+  } catch {}
+  try {
+    recorder.source.disconnect();
+  } catch {}
+  recorder.context.close?.().catch(() => {});
+}
+
+function wavBlobFromFloat32Chunks(chunks, inputSampleRate) {
+  const merged = mergeFloat32Chunks(chunks);
+  const outputSampleRate = Math.min(16000, Math.max(8000, Math.round(inputSampleRate || 16000)));
+  const samples = downsampleFloat32(merged, inputSampleRate || outputSampleRate, outputSampleRate);
+  const bytesPerSample = 2;
+  const headerBytes = 44;
+  const buffer = new ArrayBuffer(headerBytes + samples.length * bytesPerSample);
+  const view = new DataView(buffer);
+  writeAscii(view, 0, "RIFF");
+  view.setUint32(4, 36 + samples.length * bytesPerSample, true);
+  writeAscii(view, 8, "WAVE");
+  writeAscii(view, 12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, outputSampleRate, true);
+  view.setUint32(28, outputSampleRate * bytesPerSample, true);
+  view.setUint16(32, bytesPerSample, true);
+  view.setUint16(34, 8 * bytesPerSample, true);
+  writeAscii(view, 36, "data");
+  view.setUint32(40, samples.length * bytesPerSample, true);
+  floatTo16BitPcm(view, 44, samples);
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
+function mergeFloat32Chunks(chunks) {
+  const length = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const merged = new Float32Array(length);
+  let offset = 0;
+  chunks.forEach((chunk) => {
+    merged.set(chunk, offset);
+    offset += chunk.length;
+  });
+  return merged;
+}
+
+function downsampleFloat32(samples, inputSampleRate, outputSampleRate) {
+  if (outputSampleRate >= inputSampleRate) return samples;
+  const ratio = inputSampleRate / outputSampleRate;
+  const length = Math.max(1, Math.round(samples.length / ratio));
+  const result = new Float32Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const start = Math.floor(index * ratio);
+    const end = Math.min(samples.length, Math.floor((index + 1) * ratio));
+    let sum = 0;
+    for (let source = start; source < end; source += 1) sum += samples[source];
+    result[index] = sum / Math.max(1, end - start);
+  }
+  return result;
+}
+
+function writeAscii(view, offset, text) {
+  for (let index = 0; index < text.length; index += 1) {
+    view.setUint8(offset + index, text.charCodeAt(index));
+  }
+}
+
+function floatTo16BitPcm(view, offset, samples) {
+  for (let index = 0; index < samples.length; index += 1, offset += 2) {
+    const sample = Math.max(-1, Math.min(1, samples[index]));
+    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
   }
 }
 
