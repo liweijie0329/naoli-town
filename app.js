@@ -281,6 +281,8 @@ let mediaRecorder = null;
 let micStream = null;
 let recordingAudio = false;
 let audioChunks = [];
+let speechPlaybackId = 0;
+let speechItemTimer = null;
 let vigilanceTimer = null;
 let fluencyTimer = null;
 let trailGuideFrame = null;
@@ -455,6 +457,7 @@ function saveDraft() {
 
 function resetState() {
   stopTimers();
+  stopAudioPlayback();
   localStorage.removeItem("moca-game-draft");
   state = createInitialState();
   menuOpen = false;
@@ -1496,6 +1499,7 @@ root.addEventListener("click", async (event) => {
   if (!target) return;
   const action = target.dataset.action;
   const current = tasks[state.activeTaskIndex];
+  if (action !== "tapVigilance") stopAudioPlayback();
 
   if (action === "startSession") {
     if (!isParticipantComplete()) {
@@ -1727,6 +1731,7 @@ async function skipTask() {
     window.clearInterval(fluencyTimer);
     stopVoiceInput();
   }
+  if (task.type === "vigilance" && response.answer.running) response.answer.running = false;
   if (task.type === "drawing" || task.type === "trail") response.drawingImage = captureCanvas(task.id);
   finishTask(task.id);
   response.ai = { mode: "skipped", taskId: task.id, scoreSuggestion: 0, confidence: 1, requiresHumanReview: false };
@@ -1921,6 +1926,7 @@ function speakText(text, options = {}) {
     if (done) done();
     return;
   }
+  const playbackId = beginAudioPlayback();
   const profile = currentVoiceProfile();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "zh-CN";
@@ -1929,21 +1935,23 @@ function speakText(text, options = {}) {
   const voice = pickNaturalVoice();
   if (voice) utterance.voice = voice;
   utterance.onstart = () => {
+    if (playbackId !== speechPlaybackId) return;
     playState = "播放中...";
     if (onStart) onStart();
     render();
   };
   utterance.onend = () => {
+    if (playbackId !== speechPlaybackId) return;
     playState = "开始";
     render();
     if (done) done();
   };
   utterance.onerror = () => {
+    if (playbackId !== speechPlaybackId) return;
     playState = "开始";
     render();
     if (done) done();
   };
-  window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
 }
 
@@ -1962,11 +1970,12 @@ function speakItemsSlow(items, options = {}) {
     if (done) done();
     return;
   }
-  window.speechSynthesis.cancel();
+  const playbackId = beginAudioPlayback();
   playState = "播放中...";
   render();
   let index = 0;
   const speakNext = () => {
+    if (playbackId !== speechPlaybackId) return;
     if (index >= items.length) {
       playState = "开始";
       render();
@@ -1983,13 +1992,35 @@ function speakItemsSlow(items, options = {}) {
     const voice = pickNaturalVoice();
     if (voice) utterance.voice = voice;
     utterance.onend = () => {
+      if (playbackId !== speechPlaybackId) return;
       index += 1;
-      window.setTimeout(speakNext, gapMs);
+      speechItemTimer = window.setTimeout(speakNext, gapMs);
     };
     utterance.onerror = utterance.onend;
     window.speechSynthesis.speak(utterance);
   };
   speakNext();
+}
+
+function beginAudioPlayback() {
+  speechPlaybackId += 1;
+  if (speechItemTimer) {
+    window.clearTimeout(speechItemTimer);
+    speechItemTimer = null;
+  }
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  return speechPlaybackId;
+}
+
+function stopAudioPlayback() {
+  if (!("speechSynthesis" in window) && !speechItemTimer && playState !== "播放中...") return;
+  speechPlaybackId += 1;
+  if (speechItemTimer) {
+    window.clearTimeout(speechItemTimer);
+    speechItemTimer = null;
+  }
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  if (playState === "播放中...") playState = "开始";
 }
 
 function currentVoiceProfile() {
