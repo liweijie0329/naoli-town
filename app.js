@@ -11,6 +11,8 @@ const MEMORY_OPTIONS_A = ["面孔", "学校", "红色", "天鹅绒", "苹果", "
 const MEMORY_OPTIONS_B = ["菊花", "鼻子", "天鹅绒", "绿色", "面孔", "医院", "红色", "自行车", "教堂", "手掌"];
 const ABSTRACTION_DISTRACTORS = ["电脑", "学校", "无聊", "天气", "杯子", "音乐", "铅笔", "花园", "电视", "袜子", "面包", "椅子", "彩虹", "玩具", "月亮", "云朵"];
 const CITY_DISTRACTORS = ["北京市", "上海市", "杭州市", "苏州市", "广州市", "深圳市", "成都市", "武汉市", "西安市", "青岛市", "厦门市", "天津市"];
+const DEFAULT_CITY_OPTIONS = ["杭州市", "上海市", "南京市", "西安市"];
+const DEFAULT_PLACE_OPTIONS = ["社区中心", "医院", "学校", "公园"];
 const PLACE_SEARCH_TERMS = ["医院", "学校", "社区中心", "大学", "公园", "图书馆", "体育中心", "博物馆"];
 const MIN_PLACE_DISTRACTOR_KM = 10;
 const DRAWING_CONFIRM_NUDGE_MS = 10000;
@@ -938,7 +940,7 @@ function renderOrientationTask(step) {
         <div class="option-grid orientation-options">
           ${options.map((option) => `<button class="option ${picked === option.value ? "picked" : ""}" data-action="chooseOrientation" data-key="${prompt.key}" data-value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</button>`).join("")}
         </div>
-      ` : `<p class="task-warning">${escapeHtml(locationStatus())}，正在根据真实定位生成选项。</p>`}
+      ` : ""}
     </div>
   `;
 }
@@ -2511,12 +2513,20 @@ function orientationOptions(prompt) {
   }
   if (prompt.key === "city") {
     const expected = cleanCityName(response.answer.expectedCity || response.behavior.location?.city || "");
-    if (!expected) return [];
+    if (!expected) {
+      response.answer.expectedCity = "南京市";
+      saveDraft();
+      return optionObjects(DEFAULT_CITY_OPTIONS, "南京市");
+    }
     return optionObjects(stableOptionValues(response, `orientation:city:${expected}`, expected, CITY_DISTRACTORS), expected);
   }
   const expectedPlace = currentPlaceName();
   const location = response.behavior.location || {};
-  if (!expectedPlace) return [];
+  if (!expectedPlace) {
+    response.answer.expectedPlace = "社区中心";
+    saveDraft();
+    return optionObjects(DEFAULT_PLACE_OPTIONS, "社区中心");
+  }
   const sameCityDistractors = Array.isArray(location.placeDistractors) ? location.placeDistractors.map((entry) => entry.name) : [];
   return optionObjects(stableOptionValues(response, `orientation:place:${expectedPlace}`, expectedPlace, sameCityDistractors), expectedPlace);
 }
