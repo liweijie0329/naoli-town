@@ -338,6 +338,7 @@ updateViewportMetrics();
 bindViewportMetrics();
 migrateState();
 render();
+void loadStaticTtsManifest();
 
 window.addEventListener("pageshow", (event) => {
   if (!event.persisted) return;
@@ -2255,12 +2256,8 @@ function sentencePlaybackFallbackMs(text) {
   return Math.max(3600, Math.min(10000, String(text || "").length * 360 + 1600));
 }
 
-function speakText(text, options = {}) {
+async function speakText(text, options = {}) {
   const { rate = 0.82, pitch = 1.18, done, onStart, fallbackMs = 0, purpose = "speech", audioKey = null } = options;
-  if (!("speechSynthesis" in window)) {
-    if (done) done();
-    return;
-  }
   const playbackId = beginAudioPlayback();
   const speechParams = speechParamsFor(rate, pitch);
   startPlaybackUi(playbackId, purpose);
@@ -2276,6 +2273,17 @@ function speakText(text, options = {}) {
     if (done) done();
   };
 
+  const staticAudioStarted = await playStaticTtsAudio(audioKey, {
+    playbackId,
+    onStart,
+    done: finish
+  });
+  if (staticAudioStarted) return;
+  if (playbackId !== speechPlaybackId || finished) return;
+  if (!("speechSynthesis" in window)) {
+    finish();
+    return;
+  }
   if (fallbackMs) speechTextFallbackTimer = window.setTimeout(finish, fallbackMs);
   speakTextWithBrowser(text, { playbackId, speechParams, onStart, finish });
 }
@@ -2317,15 +2325,11 @@ function pickNaturalVoice() {
 
 function speakItemsSlow(items, options = {}) {
   const { gapMs = 1000, rate = 0.72, done, onItemStart, audioKeyPrefix = "", audioKeys = [] } = options;
-  if (!("speechSynthesis" in window)) {
-    if (done) done();
-    return;
-  }
   const playbackId = beginAudioPlayback();
   playState = "播放中...";
   render();
   let index = 0;
-  const speakNext = () => {
+  const speakNext = async () => {
     if (playbackId !== speechPlaybackId) return;
     if (index >= items.length) {
       playState = "开始";
@@ -2343,6 +2347,19 @@ function speakItemsSlow(items, options = {}) {
     const itemStart = () => {
       if (onItemStart) onItemStart(value, index);
     };
+    const audioKey = audioKeys[index] || (audioKeyPrefix ? `${audioKeyPrefix}:${index}` : null);
+    const staticAudioStarted = await playStaticTtsAudio(audioKey, {
+      playbackId,
+      onStart: itemStart,
+      done: queueNext
+    });
+    if (staticAudioStarted) return;
+    if (playbackId !== speechPlaybackId) return;
+    if (!("speechSynthesis" in window)) {
+      itemStart();
+      queueNext();
+      return;
+    }
     const utterance = new SpeechSynthesisUtterance(value);
     utterance.lang = "zh-CN";
     utterance.rate = speechParams.speedRatio;

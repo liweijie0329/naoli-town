@@ -235,7 +235,8 @@ async function serveStatic(req, res, url) {
     await stat(requested);
     const ext = extname(requested);
     res.writeHead(200, {
-      "content-type": contentTypes[ext] || "application/octet-stream"
+      "content-type": contentTypes[ext] || "application/octet-stream",
+      "cache-control": ["html", "js", "json"].includes(ext.slice(1)) ? "no-store" : "public, max-age=31536000, immutable"
     });
     createReadStream(requested).pipe(res);
   } catch {

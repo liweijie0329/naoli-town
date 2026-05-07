@@ -1,0 +1,440 @@
+{
+  "version": 1,
+  "generatedAt": "2026-05-07T17:16:13.230Z",
+  "provider": "doubao",
+  "source": "data/tts-texts.json",
+  "entries": {
+    "instruction:trail:0": {
+      "src": "assets/audio/instruction-trail-0.mp3",
+      "text": "请按数字和汉字交替上升的规则，把所有圆圈用一条线连起来。每次从当前圆圈拖到下一个圆圈。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:cube:0": {
+      "src": "assets/audio/instruction-cube-0.mp3",
+      "text": "请您照着这幅图在下面的空白处再画一遍，并尽可能精确。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:clock:0": {
+      "src": "assets/audio/instruction-clock-0.mp3",
+      "text": "请您在此处画一个钟表，填上所有的数字并指示出 11 点 10 分。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:naming:0": {
+      "src": "assets/audio/instruction-naming-0.mp3",
+      "text": "请您告诉我这个动物的名字。这是什么动物？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:naming:1": {
+      "src": "assets/audio/instruction-naming-1.mp3",
+      "text": "请您告诉我这个动物的名字。这是什么动物？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:naming:2": {
+      "src": "assets/audio/instruction-naming-2.mp3",
+      "text": "请您告诉我这个动物的名字。这是什么动物？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:memory1:0": {
+      "src": "assets/audio/instruction-memory1-0.mp3",
+      "text": "这是一个记忆力测验。我会给您读几个词，您要注意听，一定要记住。当我读完后，请选出您记住的词。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:memory2:0": {
+      "src": "assets/audio/instruction-memory2-0.mp3",
+      "text": "刚才我给您读了几个词让您记住，请您再尽量回忆一下，选出这些词都有什么。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:digitForward:0": {
+      "src": "assets/audio/instruction-digitforward-0.mp3",
+      "text": "下面我说一些数字，您仔细听。说完后，请按原来的顺序选择出来。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:digitBackward:0": {
+      "src": "assets/audio/instruction-digitbackward-0.mp3",
+      "text": "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:vigilance:0": {
+      "src": "assets/audio/instruction-vigilance-0.mp3",
+      "text": "下面我要读出一系列数字，请注意听。每当我读到 1 的时候，您就敲一下按钮。当我读其他的数字时不要敲。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serial7:0": {
+      "src": "assets/audio/instruction-serial7-0.mp3",
+      "text": "100 减 7 等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serial7:1": {
+      "src": "assets/audio/instruction-serial7-1.mp3",
+      "text": "再减 7，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serial7:2": {
+      "src": "assets/audio/instruction-serial7-2.mp3",
+      "text": "再减 7，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serial7:3": {
+      "src": "assets/audio/instruction-serial7-3.mp3",
+      "text": "再减 7，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serial7:4": {
+      "src": "assets/audio/instruction-serial7-4.mp3",
+      "text": "再减 7，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:sentence:0": {
+      "src": "assets/audio/instruction-sentence-0.mp3",
+      "text": "现在我要对您说一句话，我说完后请您把我说的话尽可能原原本本地重复出来。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:sentence:1": {
+      "src": "assets/audio/instruction-sentence-1.mp3",
+      "text": "现在我再说另一句话，我说完后请您也把它尽可能原原本本地重复出来。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:fluency:0": {
+      "src": "assets/audio/instruction-fluency-0.mp3",
+      "text": "请您尽可能快、尽可能多地说出您所知道的动物的名称。时间是 1 分钟。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:abstraction:0": {
+      "src": "assets/audio/instruction-abstraction-0.mp3",
+      "text": "先看一个例子。桔子和香蕉在什么方面相类似？请选择水果。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:abstraction:1": {
+      "src": "assets/audio/instruction-abstraction-1.mp3",
+      "text": "请您说说火车和自行车在什么方面相类似？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:abstraction:2": {
+      "src": "assets/audio/instruction-abstraction-2.mp3",
+      "text": "请您说说手表和尺子在什么方面相类似？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:orientation:0": {
+      "src": "assets/audio/instruction-orientation-0.mp3",
+      "text": "今年是哪一年？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:orientation:1": {
+      "src": "assets/audio/instruction-orientation-1.mp3",
+      "text": "今天是几月几号？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:orientation:2": {
+      "src": "assets/audio/instruction-orientation-2.mp3",
+      "text": "今天星期几？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:orientation:3": {
+      "src": "assets/audio/instruction-orientation-3.mp3",
+      "text": "你现在在哪个城市？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:orientation:4": {
+      "src": "assets/audio/instruction-orientation-4.mp3",
+      "text": "这里是什么地方？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:memory1:word:0": {
+      "src": "assets/audio/stimulus-memory1-word-0.mp3",
+      "text": "面孔",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:memory1:word:1": {
+      "src": "assets/audio/stimulus-memory1-word-1.mp3",
+      "text": "天鹅绒",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:memory1:word:2": {
+      "src": "assets/audio/stimulus-memory1-word-2.mp3",
+      "text": "教堂",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:memory1:word:3": {
+      "src": "assets/audio/stimulus-memory1-word-3.mp3",
+      "text": "菊花",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:memory1:word:4": {
+      "src": "assets/audio/stimulus-memory1-word-4.mp3",
+      "text": "红色",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:digit:0": {
+      "src": "assets/audio/stimulus-digitforward-digit-0.mp3",
+      "text": "2",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:digit:1": {
+      "src": "assets/audio/stimulus-digitforward-digit-1.mp3",
+      "text": "1",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:digit:2": {
+      "src": "assets/audio/stimulus-digitforward-digit-2.mp3",
+      "text": "8",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:digit:3": {
+      "src": "assets/audio/stimulus-digitforward-digit-3.mp3",
+      "text": "5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:digit:4": {
+      "src": "assets/audio/stimulus-digitforward-digit-4.mp3",
+      "text": "4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:digit:0": {
+      "src": "assets/audio/stimulus-digitbackward-digit-0.mp3",
+      "text": "7",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:digit:1": {
+      "src": "assets/audio/stimulus-digitbackward-digit-1.mp3",
+      "text": "4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:digit:2": {
+      "src": "assets/audio/stimulus-digitbackward-digit-2.mp3",
+      "text": "2",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:vigilance:digit:0": {
+      "src": "assets/audio/stimulus-vigilance-digit-0.mp3",
+      "text": "1",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:vigilance:digit:1": {
+      "src": "assets/audio/stimulus-vigilance-digit-1.mp3",
+      "text": "5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:vigilance:digit:2": {
+      "src": "assets/audio/stimulus-vigilance-digit-2.mp3",
+      "text": "2",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:vigilance:digit:3": {
+      "src": "assets/audio/stimulus-vigilance-digit-3.mp3",
+      "text": "9",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:vigilance:digit:4": {
+      "src": "assets/audio/stimulus-vigilance-digit-4.mp3",
+      "text": "4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:vigilance:digit:5": {
+      "src": "assets/audio/stimulus-vigilance-digit-5.mp3",
+      "text": "5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:sentence:0": {
+      "src": "assets/audio/stimulus-sentence-0.mp3",
+      "text": "我只知道今天张亮是帮过忙的人",
+      "profile": "gentle",
+      "speedRatio": 0.86,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:sentence:1": {
+      "src": "assets/audio/stimulus-sentence-1.mp3",
+      "text": "当狗在房间里的时候，猫总是藏在沙发下",
+      "profile": "gentle",
+      "speedRatio": 0.86,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    }
+  }
+}

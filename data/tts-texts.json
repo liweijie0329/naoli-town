@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "defaultProfile": "gentle",
+  "defaultFormat": "mp3",
+  "entries": [
+    {
+      "key": "instruction:trail:0",
+      "text": "请按数字和汉字交替上升的规则，把所有圆圈用一条线连起来。每次从当前圆圈拖到下一个圆圈。"
+    },
+    {
+      "key": "instruction:cube:0",
+      "text": "请您照着这幅图在下面的空白处再画一遍，并尽可能精确。"
+    },
+    {
+      "key": "instruction:clock:0",
+      "text": "请您在此处画一个钟表，填上所有的数字并指示出 11 点 10 分。"
+    },
+    {
+      "key": "instruction:naming:0",
+      "text": "请您告诉我这个动物的名字。这是什么动物？"
+    },
+    {
+      "key": "instruction:naming:1",
+      "text": "请您告诉我这个动物的名字。这是什么动物？"
+    },
+    {
+      "key": "instruction:naming:2",
+      "text": "请您告诉我这个动物的名字。这是什么动物？"
+    },
+    {
+      "key": "instruction:memory1:0",
+      "text": "这是一个记忆力测验。我会给您读几个词，您要注意听，一定要记住。当我读完后，请选出您记住的词。"
+    },
+    {
+      "key": "instruction:memory2:0",
+      "text": "刚才我给您读了几个词让您记住，请您再尽量回忆一下，选出这些词都有什么。"
+    },
+    {
+      "key": "instruction:digitForward:0",
+      "text": "下面我说一些数字，您仔细听。说完后，请按原来的顺序选择出来。"
+    },
+    {
+      "key": "instruction:digitBackward:0",
+      "text": "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。"
+    },
+    {
+      "key": "instruction:vigilance:0",
+      "text": "下面我要读出一系列数字，请注意听。每当我读到 1 的时候，您就敲一下按钮。当我读其他的数字时不要敲。"
+    },
+    {
+      "key": "instruction:serial7:0",
+      "text": "100 减 7 等于多少？"
+    },
+    {
+      "key": "instruction:serial7:1",
+      "text": "再减 7，等于多少？"
+    },
+    {
+      "key": "instruction:serial7:2",
+      "text": "再减 7，等于多少？"
+    },
+    {
+      "key": "instruction:serial7:3",
+      "text": "再减 7，等于多少？"
+    },
+    {
+      "key": "instruction:serial7:4",
+      "text": "再减 7，等于多少？"
+    },
+    {
+      "key": "instruction:sentence:0",
+      "text": "现在我要对您说一句话，我说完后请您把我说的话尽可能原原本本地重复出来。"
+    },
+    {
+      "key": "instruction:sentence:1",
+      "text": "现在我再说另一句话，我说完后请您也把它尽可能原原本本地重复出来。"
+    },
+    {
+      "key": "instruction:fluency:0",
+      "text": "请您尽可能快、尽可能多地说出您所知道的动物的名称。时间是 1 分钟。"
+    },
+    {
+      "key": "instruction:abstraction:0",
+      "text": "先看一个例子。桔子和香蕉在什么方面相类似？请选择水果。"
+    },
+    {
+      "key": "instruction:abstraction:1",
+      "text": "请您说说火车和自行车在什么方面相类似？"
+    },
+    {
+      "key": "instruction:abstraction:2",
+      "text": "请您说说手表和尺子在什么方面相类似？"
+    },
+    {
+      "key": "instruction:orientation:0",
+      "text": "今年是哪一年？"
+    },
+    {
+      "key": "instruction:orientation:1",
+      "text": "今天是几月几号？"
+    },
+    {
+      "key": "instruction:orientation:2",
+      "text": "今天星期几？"
+    },
+    {
+      "key": "instruction:orientation:3",
+      "text": "你现在在哪个城市？"
+    },
+    {
+      "key": "instruction:orientation:4",
+      "text": "这里是什么地方？"
+    },
+    {
+      "key": "stimulus:memory1:word:0",
+      "text": "面孔",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "stimulus:memory1:word:1",
+      "text": "天鹅绒",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "stimulus:memory1:word:2",
+      "text": "教堂",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "stimulus:memory1:word:3",
+      "text": "菊花",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "stimulus:memory1:word:4",
+      "text": "红色",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "stimulus:digitForward:digit:0",
+      "text": "2",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:digit:1",
+      "text": "1",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:digit:2",
+      "text": "8",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:digit:3",
+      "text": "5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:digit:4",
+      "text": "4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:digit:0",
+      "text": "7",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:digit:1",
+      "text": "4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:digit:2",
+      "text": "2",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:vigilance:digit:0",
+      "text": "1",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:vigilance:digit:1",
+      "text": "5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:vigilance:digit:2",
+      "text": "2",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:vigilance:digit:3",
+      "text": "9",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:vigilance:digit:4",
+      "text": "4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:vigilance:digit:5",
+      "text": "5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:sentence:0",
+      "text": "我只知道今天张亮是帮过忙的人",
+      "speedRatio": 0.86
+    },
+    {
+      "key": "stimulus:sentence:1",
+      "text": "当狗在房间里的时候，猫总是藏在沙发下",
+      "speedRatio": 0.86
+    }
+  ]
+}
