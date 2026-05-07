@@ -294,6 +294,7 @@ let trailDragStart = null;
 let trailDragPoint = null;
 let viewportRenderTimer = null;
 let drawingIdleTimers = [];
+let immediateInstructionPlayback = false;
 
 updateViewportMetrics();
 bindViewportMetrics();
@@ -1771,6 +1772,7 @@ async function goNextStepOrSkip() {
   const step = getTaskStep(task);
   if (step < getTaskStepCount(task) - 1) {
     response.answer.step = step + 1;
+    requestImmediateInstructionPlayback(task, response.answer.step);
     saveDraft();
     render();
     return;
@@ -1825,6 +1827,7 @@ async function skipTask() {
     state.finishedAt = new Date().toISOString();
   } else {
     state.activeTaskIndex = nextIndex;
+    requestImmediateInstructionPlayback(tasks[nextIndex]);
   }
   saveDraft();
   render();
@@ -1949,7 +1952,9 @@ async function submitActiveTask() {
 function scheduleTaskInstruction(task) {
   const step = getTaskStep(task);
   const key = `${task.id}:${step}`;
-  if (state.playedInstructionKeys[key]) return;
+  const force = immediateInstructionPlayback;
+  immediateInstructionPlayback = false;
+  if (state.playedInstructionKeys[key] && !force) return;
   const text = taskInstructionText(task, step);
   if (!text) return;
   state.playedInstructionKeys[key] = true;
@@ -1958,12 +1963,17 @@ function scheduleTaskInstruction(task) {
     if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
     if (task.id === "memory1" && getResponse(task.id).answer.wordsPlaybackStarted) return;
     speakText(text, { rate: 0.82, pitch: 1.18 });
-  }, 260);
+  }, force ? 0 : 260);
 }
 
 function resetInstructionPlayback(task, step = getTaskStep(task)) {
   if (!task) return;
   delete state.playedInstructionKeys[`${task.id}:${step}`];
+}
+
+function requestImmediateInstructionPlayback(task, step = getTaskStep(task)) {
+  resetInstructionPlayback(task, step);
+  immediateInstructionPlayback = true;
 }
 
 function taskInstructionText(task, step) {
