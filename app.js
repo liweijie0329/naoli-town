@@ -11,7 +11,8 @@ const MEMORY_OPTIONS_A = ["面孔", "学校", "红色", "天鹅绒", "苹果", "
 const MEMORY_OPTIONS_B = ["菊花", "鼻子", "天鹅绒", "绿色", "面孔", "医院", "红色", "自行车", "教堂", "手掌"];
 const ABSTRACTION_DISTRACTORS = ["电脑", "学校", "无聊", "天气", "杯子", "音乐", "铅笔", "花园", "电视", "袜子", "面包", "椅子", "彩虹", "玩具", "月亮", "云朵"];
 const CITY_DISTRACTORS = ["北京市", "上海市", "杭州市", "苏州市", "广州市", "深圳市", "成都市", "武汉市", "西安市", "青岛市", "厦门市", "天津市"];
-const PLACE_DISTRACTORS = ["北京大学", "上海瑞金医院", "杭州西湖社区中心", "苏州人民医院", "广州越秀学校", "深圳南山社区中心", "成都华西医院", "武汉光谷学校", "西安碑林社区中心", "青岛市立医院"];
+const PLACE_SEARCH_TERMS = ["医院", "学校", "社区中心", "大学", "公园", "图书馆", "体育中心", "博物馆"];
+const MIN_PLACE_DISTRACTOR_KM = 10;
 const VOICE_PROFILES = {
   cartoon: { label: "卡通童声", hints: ["xiaoxiao", "xiaoyi", "xiaobei", "tingting", "美佳", "sin-ji"], rateScale: 0.96, pitchOffset: 0.1 },
   gentle: { label: "温柔女声", hints: ["xiaoxiao", "ting-ting", "tingting", "mei-jia", "meijia", "female", "美佳"], rateScale: 1, pitchOffset: -0.04 },
@@ -341,6 +342,7 @@ function createInitialState() {
     memoryWaitStartedAt: null,
     resumeAfterMemory2Index: null,
     playedInstructionKeys: {},
+    permissions: { microphone: "unknown", location: "unknown" },
     voiceProfile: "cartoon",
     setupAttempted: false,
     adminSessions: [],
@@ -447,6 +449,7 @@ function migrateState() {
   state.drawings = state.drawings || {};
   state.trail = normalizeTrailState(state.trail);
   state.playedInstructionKeys = state.playedInstructionKeys || {};
+  state.permissions = state.permissions || { microphone: "unknown", location: "unknown" };
   state.voiceProfile = VOICE_PROFILES[state.voiceProfile] ? state.voiceProfile : "cartoon";
   state.setupAttempted = Boolean(state.setupAttempted);
   state.resumeAfterMemory2Index = Number.isInteger(state.resumeAfterMemory2Index) ? state.resumeAfterMemory2Index : null;
@@ -563,6 +566,7 @@ function renderSetup() {
             <small>游戏</small>
           </button>
         </div>
+        <button class="skip-login-button" data-action="skipLogin">跳过登录</button>
       </section>
     </div>
   `;
@@ -1511,16 +1515,15 @@ root.addEventListener("click", async (event) => {
       render();
       return;
     }
-    const participant = { ...state.participant };
-    const adminSessions = state.adminSessions || [];
-    state = createInitialState();
-    state.participant = participant;
-    state.adminSessions = adminSessions;
-    state.startedAt = new Date().toISOString();
-    state.activeTaskIndex = 0;
-    state.view = "test";
-    primeMicrophonePermission();
-    render();
+    await startNewSession({ ...state.participant });
+  }
+  if (action === "skipLogin") {
+    await startNewSession({
+      name: `访客${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+      birthYear: "",
+      sex: "",
+      educationLevel: ""
+    });
   }
   if (action === "openMenu") {
     menuOpen = true;
@@ -1664,6 +1667,25 @@ root.addEventListener("change", (event) => {
     saveDraft();
   }
 });
+
+async function startNewSession(participant) {
+  const adminSessions = state.adminSessions || [];
+  state = createInitialState();
+  state.participant = participant;
+  state.adminSessions = adminSessions;
+  state.startedAt = new Date().toISOString();
+  state.activeTaskIndex = 0;
+  state.view = "test";
+  await requestStartupPermissions();
+  render();
+}
+
+async function requestStartupPermissions() {
+  await Promise.allSettled([
+    primeMicrophonePermission(),
+    primeLocationPermission()
+  ]);
+}
 
 async function nextTask() {
   const task = tasks[state.activeTaskIndex];
@@ -2163,13 +2185,21 @@ async function startAudioRecording() {
 }
 
 async function primeMicrophonePermission() {
-  if (micPermissionReady || !navigator.mediaDevices?.getUserMedia) return;
+  if (micPermissionReady) return true;
+  if (!navigator.mediaDevices?.getUserMedia) {
+    state.permissions.microphone = "unsupported";
+    return false;
+  }
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     stream.getTracks().forEach((track) => track.stop());
     micPermissionReady = true;
+    state.permissions.microphone = "granted";
+    return true;
   } catch {
     micPermissionReady = false;
+    state.permissions.microphone = "denied";
+    return false;
   }
 }
 
@@ -2269,10 +2299,14 @@ function orientationOptions(prompt) {
   }
   if (prompt.key === "city") {
     const expected = cleanCityName(response.answer.expectedCity || response.behavior.location?.city || "南京市");
-    return optionObjects(stableOptionValues(response, "orientation:city", expected, CITY_DISTRACTORS), expected);
+    return optionObjects(stableOptionValues(response, `orientation:city:${expected}`, expected, CITY_DISTRACTORS), expected);
   }
   const expectedPlace = currentPlaceName();
-  return optionObjects(stableOptionValues(response, "orientation:place", expectedPlace, PLACE_DISTRACTORS), expectedPlace);
+  const location = response.behavior.location || {};
+  const sameCityDistractors = Array.isArray(location.placeDistractors) && location.placeDistractors.length
+    ? location.placeDistractors.map((entry) => entry.name)
+    : fallbackSameCityPlaceDistractors(expectedPlace, cleanCityName(response.answer.expectedCity || location.city || "本市"));
+  return optionObjects(stableOptionValues(response, `orientation:place:${expectedPlace}`, expectedPlace, sameCityDistractors), expectedPlace);
 }
 
 function currentPlaceName() {
@@ -2281,8 +2315,88 @@ function currentPlaceName() {
   return response.answer.expectedPlace || location.place || generalizePlaceName(firstLocationPart(location.address)) || "社区中心";
 }
 
+function placeNameFromReverse(data, loc) {
+  const address = data.address || {};
+  const raw = data.name || data.namedetails?.name || address.building || address.amenity || address.road || firstLocationPart(data.display_name);
+  const place = specificPlaceName(raw, loc.city);
+  if (place) return place;
+  return generalizePlaceName(data.display_name || loc.address || "");
+}
+
+async function sameCityPlaceDistractors(loc) {
+  if (!loc?.city || !Number.isFinite(Number(loc.latitude)) || !Number.isFinite(Number(loc.longitude))) return [];
+  const collected = [];
+  for (const term of PLACE_SEARCH_TERMS) {
+    if (collected.length >= 8) break;
+    try {
+      const query = encodeURIComponent(`${loc.city} ${term}`);
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=30&accept-language=zh-CN&q=${query}`;
+      const entries = await fetch(url).then((entry) => entry.json());
+      if (!Array.isArray(entries)) continue;
+      entries.forEach((entry) => {
+        const lat = Number(entry.lat);
+        const lon = Number(entry.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+        const distanceKm = distanceKmBetween(loc.latitude, loc.longitude, lat, lon);
+        if (distanceKm < MIN_PLACE_DISTRACTOR_KM) return;
+        if (!isSameCityPlace(entry, loc.city)) return;
+        const name = specificPlaceName(entry.name || firstLocationPart(entry.display_name), loc.city);
+        if (!name || name === loc.place || collected.some((item) => item.name === name)) return;
+        collected.push({ name, distanceKm: Number(distanceKm.toFixed(1)), latitude: lat, longitude: lon, source: "nominatim" });
+      });
+    } catch {
+      // Keep trying other search terms.
+    }
+  }
+  if (collected.length >= 3) return shuffle(collected).slice(0, 6);
+  return fallbackSameCityPlaceDistractors(loc.place, loc.city).map((name, index) => ({
+    name,
+    distanceKm: MIN_PLACE_DISTRACTOR_KM + 2 + index * 3,
+    synthetic: true,
+    source: "same-city-fallback"
+  }));
+}
+
+function isSameCityPlace(entry, city) {
+  const address = entry.address || {};
+  const text = [address.city, address.town, address.county, address.state, entry.display_name].filter(Boolean).join(" ");
+  const clean = cleanCityName(city);
+  return !clean || text.includes(clean) || clean.includes(cleanCityName(text));
+}
+
+function fallbackSameCityPlaceDistractors(expectedPlace, city) {
+  const prefix = cleanCityName(city).replace(/市$/, "") || "本市";
+  return [`${prefix}人民医院`, `${prefix}实验学校`, `${prefix}社区中心`, `${prefix}体育中心`, `${prefix}图书馆`, `${prefix}文化公园`]
+    .filter((name) => name && name !== expectedPlace);
+}
+
+function distanceKmBetween(lat1, lon1, lat2, lon2) {
+  const radius = 6371;
+  const toRad = (value) => Number(value) * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function firstLocationPart(address) {
   return String(address || "").split(/[，,]/).map((part) => part.trim()).filter(Boolean)[0] || "";
+}
+
+function specificPlaceName(value, city = "") {
+  const raw = firstLocationPart(value).replace(/\s/g, "");
+  if (!raw) return "";
+  const cityText = cleanCityName(city).replace(/市$/, "");
+  const compact = raw
+    .replace(/^中国/, "")
+    .replace(new RegExp(`^${escapeRegExp(cityText)}市?`), "")
+    .replace(/^(江苏省|浙江省|广东省|四川省|湖北省|陕西省|山东省|福建省|北京市|上海市|天津市|重庆市)/, "");
+  if (/医院|门诊|卫生院|卫生服务/.test(compact)) return shortNamedPlace(compact, "医院");
+  if (/学校|大学|学院|中学|小学/.test(compact)) return shortNamedPlace(compact, "学校");
+  if (/社区|街道|居委|服务中心/.test(compact)) return shortNamedPlace(compact, "社区中心");
+  if (/公园|图书馆|体育中心|博物馆|文化馆/.test(compact)) return compact.slice(0, 14);
+  if (compact.length >= 2 && compact.length <= 14 && !/^\d+$/.test(compact)) return compact;
+  return "";
 }
 
 function cleanCityName(value) {
@@ -2312,6 +2426,10 @@ function shortNamedPlace(text, fallbackSuffix) {
   const name = compact.slice(start, end);
   if (name.length >= 2) return name.replace(/卫生服务$/, "社区中心").replace(/服务中心$/, "社区中心");
   return fallbackSuffix;
+}
+
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function optionObjects(values, correct) {
@@ -2461,37 +2579,60 @@ function memoryWaitRemaining() {
 
 function prepareLocationAnswer() {
   const response = getResponse("orientation");
-  if (response.behavior.location || !navigator.geolocation) return;
-  navigator.geolocation.getCurrentPosition(
-    async (position) => {
-      response.behavior.location = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-        at: new Date().toISOString()
-      };
-      await reverseGeocodeLocation(response);
-      saveDraft();
-      render();
-    },
-    () => {
-      response.behavior.location = { error: "定位未授权或不可用", at: new Date().toISOString() };
-      saveDraft();
-      render();
-    },
-    { enableHighAccuracy: true, timeout: 10000 }
-  );
+  if (response.behavior.location) return;
+  primeLocationPermission({ rerender: true });
+}
+
+async function primeLocationPermission(options = {}) {
+  const { rerender = false } = options;
+  const response = getResponse("orientation");
+  if (!navigator.geolocation) {
+    state.permissions.location = "unsupported";
+    response.behavior.location = { error: "当前设备不支持定位", at: new Date().toISOString() };
+    if (rerender) render();
+    return false;
+  }
+  try {
+    const position = await getCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+    state.permissions.location = "granted";
+    response.behavior.location = {
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      accuracy: position.coords.accuracy,
+      at: new Date().toISOString()
+    };
+    await reverseGeocodeLocation(response);
+    saveDraft();
+    if (rerender) render();
+    return true;
+  } catch {
+    state.permissions.location = "denied";
+    response.behavior.location = { error: "定位未授权或不可用", at: new Date().toISOString() };
+    saveDraft();
+    if (rerender) render();
+    return false;
+  }
+}
+
+function getCurrentPosition(options) {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, options);
+  });
 }
 
 async function reverseGeocodeLocation(response) {
   const loc = response.behavior.location;
   if (!loc || loc.error) return;
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${loc.latitude}&lon=${loc.longitude}&accept-language=zh-CN`;
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&namedetails=1&zoom=18&lat=${loc.latitude}&lon=${loc.longitude}&accept-language=zh-CN`;
     const data = await fetch(url).then((entry) => entry.json());
     loc.address = data.display_name || "";
     loc.city = cleanCityName(data.address?.city || data.address?.town || data.address?.county || loc.address || "");
-    loc.place = generalizePlaceName(data.name || data.address?.building || data.address?.amenity || data.address?.road || loc.address);
+    loc.place = placeNameFromReverse(data, loc);
+    loc.placeDistractors = await sameCityPlaceDistractors(loc);
+    Object.keys(response.behavior.optionOrders || {}).forEach((key) => {
+      if (key.startsWith("orientation:city") || key.startsWith("orientation:place")) delete response.behavior.optionOrders[key];
+    });
     getResponse("orientation").answer.expectedCity = loc.city || "";
     getResponse("orientation").answer.expectedPlace = loc.place || "";
   } catch {
