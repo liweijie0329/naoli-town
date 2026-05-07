@@ -1077,7 +1077,18 @@ function renderAudioButton(action) {
   }
   if (speechTranscribing) return `<button class="secondary circle-button sound-button" disabled>请稍等</button>`;
   if (recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">停止</button>`;
+  if (current?.type === "sentence" && sentenceStepHasSpeechAttempt(current, getTaskStep(current))) {
+    return `<button class="primary circle-button sound-button" data-action="${action}">重播</button>`;
+  }
   return `<button class="primary circle-button pulse sound-button" data-action="${action}">开始</button>`;
+}
+
+function sentenceStepHasSpeechAttempt(task, step) {
+  const response = getResponse(task.id);
+  if (String(response.answer?.transcript?.[step] || "").trim()) return true;
+  return (response.behavior?.speechRecognition || []).some((event) => (
+    Number(event.step) === Number(step) && event.eventType === "cloudflare-asr-result"
+  ));
 }
 
 function renderKeypadDigits(action) {
