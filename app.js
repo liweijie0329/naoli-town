@@ -1952,8 +1952,20 @@ function scheduleTaskInstruction(task) {
   saveDraft();
   window.setTimeout(() => {
     if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
-    speakText(text, { rate: 0.82, pitch: 1.18 });
+    speakText(text, { rate: 0.82, pitch: 1.18, done: taskInstructionDone(task, step) });
   }, 260);
+}
+
+function taskInstructionDone(task, step) {
+  if (task.id !== "memory1" || step !== 0) return null;
+  return () => {
+    window.setTimeout(() => {
+      if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
+      const response = getResponse(task.id);
+      if (response.answer.audioReady || (response.answer.selectedWords || []).length) return;
+      playCurrentAudio();
+    }, 220);
+  };
 }
 
 function resetInstructionPlayback(task, step = getTaskStep(task)) {
