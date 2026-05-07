@@ -1075,10 +1075,11 @@ function renderAdmin() {
         <button class="secondary" data-action="exportCsv">导出 CSV</button>
       </div>
       <div class="admin-table">
-        <div class="admin-head"><span>参加者</span><span>总分</span><span>原始分</span><span>教育加分</span><span>保存时间</span></div>
+        <div class="admin-head"><span>参加者</span><span>年龄</span><span>总分</span><span>原始分</span><span>教育加分</span><span>保存时间</span></div>
         ${(state.adminSessions || []).map((session) => `
           <div class="admin-row">
             <span>${escapeHtml(session.participant?.name || session.id.slice(0, 8))}</span>
+            <span>${formatParticipantAge(session.participant)}</span>
             <strong>${session.totalScore ?? "-"}/30</strong>
             <span>${session.rawScore ?? "-"}</span>
             <span>${session.educationBonus ?? 0}</span>
@@ -1088,6 +1089,14 @@ function renderAdmin() {
       </div>
     </section>
   `;
+}
+
+function formatParticipantAge(participant = {}) {
+  const birthYear = Number.parseInt(participant.birthYear, 10);
+  if (!Number.isFinite(birthYear)) return "-";
+  const currentYear = new Date().getFullYear();
+  if (birthYear < 1900 || birthYear > currentYear) return "-";
+  return String(currentYear - birthYear);
 }
 
 function formatSavedTime(session) {
@@ -3259,6 +3268,7 @@ function csvRowsForSession(session) {
   return itemResponses.map((item) => ({
     session_id: session.id || "",
     participant_name: participant.name || "",
+    participant_age: formatParticipantAge(participant),
     birth_year: participant.birthYear || "",
     gender: participant.sex || participant.gender || "",
     education_level: participant.educationLevel || "",

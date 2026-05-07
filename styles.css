@@ -1878,10 +1878,10 @@ h4 {
 .admin-head,
 .admin-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) minmax(110px, 0.7fr) minmax(110px, 0.7fr) minmax(120px, 0.7fr) minmax(220px, 1.5fr);
+  grid-template-columns: minmax(180px, 1.35fr) minmax(76px, 0.45fr) minmax(110px, 0.65fr) minmax(110px, 0.65fr) minmax(120px, 0.7fr) minmax(220px, 1.45fr);
   gap: 12px;
   align-items: center;
-  min-width: 860px;
+  min-width: 940px;
 }
 
 .admin-head {
@@ -3181,9 +3181,9 @@ h4 {
 
   .admin-head,
   .admin-row {
-    grid-template-columns: minmax(128px, 1.2fr) minmax(78px, 0.6fr) minmax(78px, 0.6fr) minmax(88px, 0.6fr) minmax(160px, 1.3fr);
+    grid-template-columns: minmax(128px, 1.2fr) minmax(56px, 0.45fr) minmax(78px, 0.6fr) minmax(78px, 0.6fr) minmax(88px, 0.6fr) minmax(160px, 1.3fr);
     gap: 6px;
-    min-width: 610px;
+    min-width: 672px;
     padding-inline: 8px;
     font-size: 12px;
   }
