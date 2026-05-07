@@ -813,7 +813,7 @@ function renderMemoryTask(task) {
     <div class="memory-page ${ready ? "ready" : ""}">
       <div class="memory-audio">
         ${renderAudioWave()}
-        ${task.trial === 1 && !ready ? renderAudioButton("playCurrentAudio") : ""}
+        ${task.trial === 1 && !ready ? renderMemoryStartButton() : ""}
       </div>
       ${ready ? `
         <div class="memory-choice-panel">
@@ -828,6 +828,10 @@ function renderMemoryTask(task) {
       ` : `<p class="memory-wait-copy">请先点击开始，听完 5 个词后再选择。</p>`}
     </div>
   `;
+}
+
+function renderMemoryStartButton() {
+  return `<button class="primary circle-button pulse sound-button" data-action="playCurrentAudio">开始</button>`;
 }
 
 function renderChoiceTask(task) {
@@ -1943,7 +1947,7 @@ async function submitActiveTask() {
 }
 
 function scheduleTaskInstruction(task) {
-  if (task.id === "memory1" || task.type === "choice") return;
+  if (task.type === "choice") return;
   const step = getTaskStep(task);
   const key = `${task.id}:${step}`;
   if (state.playedInstructionKeys[key]) return;
@@ -1953,6 +1957,7 @@ function scheduleTaskInstruction(task) {
   saveDraft();
   window.setTimeout(() => {
     if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
+    if (task.id === "memory1" && getResponse(task.id).answer.wordsPlaybackStarted) return;
     speakText(text, { rate: 0.82, pitch: 1.18 });
   }, 260);
 }
@@ -1987,21 +1992,6 @@ function playCurrentAudio() {
   const step = getTaskStep(task);
   if (task.type === "memory") {
     const response = getResponse(task.id);
-    response.answer.audioReady = false;
-    if (task.id === "memory1" && !response.answer.instructionPlayed && !(response.answer.selectedWords || []).length) {
-      response.answer.instructionPlayed = true;
-      saveDraft();
-      return speakText(taskInstructionText(task, step), {
-        rate: 0.82,
-        pitch: 1.18,
-        done: () => {
-          window.setTimeout(() => {
-            if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
-            playMemoryWords(response);
-          }, 220);
-        }
-      });
-    }
     return playMemoryWords(response);
   }
   if (task.type === "choice") return playChoiceAudio(task, step);
@@ -2011,6 +2001,7 @@ function playCurrentAudio() {
 
 function playMemoryWords(response) {
   response.answer.audioReady = false;
+  response.answer.wordsPlaybackStarted = true;
   return speakItemsSlow(WORDS, {
     gapMs: 1000,
     rate: 0.72,
