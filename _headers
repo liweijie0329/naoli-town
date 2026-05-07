@@ -1,0 +1,6 @@
+/*
+  Permissions-Policy: microphone=(self), geolocation=(self)
+  X-Content-Type-Options: nosniff
+
+/api/*
+  Cache-Control: no-store

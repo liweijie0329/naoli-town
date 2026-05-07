@@ -2,7 +2,10 @@
 node_modules/
 .codex_tmp/
 data/sessions.json
+dist/
 *.log
 
 /cognition-hearing-game/
+cloudflare-pages-upload/
+cognition-hearing-game-cloudflare-pages.zip
 wechat-miniprogram/project.private.config.json

@@ -18,8 +18,13 @@ npm start
 - `render.yaml`: Render 自动部署和持久化磁盘配置
 - `/api/health`: 健康检查接口
 - `DATA_DIR`: 云端数据目录环境变量
+- `functions/`: Cloudflare Pages Functions 后端接口
+- `schema.sql`: Cloudflare D1 数据库建表脚本
+- `npm run build`: 生成 Cloudflare Pages 静态目录 `dist/`
 
 详细步骤见 [docs/deploy-online.md](./docs/deploy-online.md)。
+
+Cloudflare Pages + D1 的部署步骤见 [docs/cloudflare-d1.md](./docs/cloudflare-d1.md)。
 
 如果云平台要求绑定付费信息，可以先走免费路线：
 
@@ -34,7 +39,7 @@ npm start
 - 交替连线、复制立方体、画钟表使用画布，并上传画布图片到 AI 评分接口。
 - 选择题为主，句子复述、动物流畅性、延迟回忆、定向和画图题提交后由 AI 直接评分。
 - 自动记录总分、教育水平加分、每题得分、每题用时、总用时、连线序列、敲击反应、画图图片、AI 评分结果。
-- 后台数据库为本地 JSON 文件：`data/sessions.json`。
+- 本地开发的后台数据库为 JSON 文件：`data/sessions.json`；Cloudflare 部署后使用 D1 数据库。
 - 纯静态免费网页或小程序免费模式下，后台记录会退化为当前设备本地缓存。
 
 ## AI 评分接入

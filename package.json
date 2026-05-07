@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "node scripts/build-pages.mjs",
+    "build:pages": "node scripts/build-pages.mjs",
     "start": "node server.mjs",
     "dev": "HOST=127.0.0.1 PORT=5177 node server.mjs"
   },
