@@ -285,6 +285,7 @@ let recordingAudio = false;
 let audioChunks = [];
 let speechPlaybackId = 0;
 let speechItemTimer = null;
+let speechTextFallbackTimer = null;
 let micPermissionReady = false;
 let vigilanceTimer = null;
 let fluencyTimer = null;
@@ -2005,7 +2006,7 @@ function playCurrentAudio() {
   }
   if (task.type === "choice") return playDigitStimulus(task);
   if (task.type === "vigilance") return startVigilance();
-  if (task.type === "sentence") return speakText(task.sentences[step], { rate: 0.86, done: () => startVoiceInput() });
+  if (task.type === "sentence") return playSentenceForRepeat(task, step);
 }
 
 function playMemoryWords(response) {
@@ -2023,8 +2024,28 @@ function playMemoryWords(response) {
   });
 }
 
+function playSentenceForRepeat(task, step) {
+  const text = task.sentences[step];
+  return speakText(text, {
+    rate: 0.86,
+    fallbackMs: sentencePlaybackFallbackMs(text),
+    done: () => startSentenceRepeat(task, step)
+  });
+}
+
+async function startSentenceRepeat(task, step) {
+  if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
+  voiceState = "请复述";
+  render();
+  await startVoiceInput();
+}
+
+function sentencePlaybackFallbackMs(text) {
+  return Math.max(3600, Math.min(10000, String(text || "").length * 360 + 1600));
+}
+
 function speakText(text, options = {}) {
-  const { rate = 0.82, pitch = 1.18, done, onStart } = options;
+  const { rate = 0.82, pitch = 1.18, done, onStart, fallbackMs = 0 } = options;
   if (!("speechSynthesis" in window)) {
     if (done) done();
     return;
@@ -2043,18 +2064,19 @@ function speakText(text, options = {}) {
     if (onStart) onStart();
     render();
   };
-  utterance.onend = () => {
+  let finished = false;
+  const finish = () => {
     if (playbackId !== speechPlaybackId) return;
+    if (finished) return;
+    finished = true;
+    clearSpeechTextFallbackTimer();
     playState = "开始";
     render();
     if (done) done();
   };
-  utterance.onerror = () => {
-    if (playbackId !== speechPlaybackId) return;
-    playState = "开始";
-    render();
-    if (done) done();
-  };
+  utterance.onend = finish;
+  utterance.onerror = finish;
+  if (fallbackMs) speechTextFallbackTimer = window.setTimeout(finish, fallbackMs);
   window.speechSynthesis.speak(utterance);
 }
 
@@ -2107,6 +2129,7 @@ function speakItemsSlow(items, options = {}) {
 
 function beginAudioPlayback() {
   speechPlaybackId += 1;
+  clearSpeechTextFallbackTimer();
   if (speechItemTimer) {
     window.clearTimeout(speechItemTimer);
     speechItemTimer = null;
@@ -2118,12 +2141,19 @@ function beginAudioPlayback() {
 function stopAudioPlayback() {
   if (!("speechSynthesis" in window) && !speechItemTimer && playState !== "播放中...") return;
   speechPlaybackId += 1;
+  clearSpeechTextFallbackTimer();
   if (speechItemTimer) {
     window.clearTimeout(speechItemTimer);
     speechItemTimer = null;
   }
   if ("speechSynthesis" in window) window.speechSynthesis.cancel();
   if (playState === "播放中...") playState = "开始";
+}
+
+function clearSpeechTextFallbackTimer() {
+  if (!speechTextFallbackTimer) return;
+  window.clearTimeout(speechTextFallbackTimer);
+  speechTextFallbackTimer = null;
 }
 
 function currentVoiceProfile() {
@@ -2160,7 +2190,7 @@ function initSpeechRecognition() {
   recognition.continuous = true;
   recognition.onstart = () => {
     recognizing = true;
-    voiceState = "请说";
+    voiceState = voicePromptText();
     render();
   };
   recognition.onresult = (event) => {
@@ -2189,7 +2219,7 @@ function toggleVoiceInput() {
 }
 
 async function startVoiceInput() {
-  voiceState = "请说";
+  voiceState = voicePromptText();
   const recordingStarted = await startAudioRecording();
   speechRecognition = speechRecognition || initSpeechRecognition();
   if (!speechRecognition) {
@@ -2250,7 +2280,7 @@ async function startAudioRecording() {
     };
     mediaRecorder.start();
     recordingAudio = true;
-    voiceState = "请说";
+    voiceState = voicePromptText();
     render();
     return true;
   } catch {
@@ -2259,6 +2289,10 @@ async function startAudioRecording() {
     render();
     return false;
   }
+}
+
+function voicePromptText() {
+  return tasks[state.activeTaskIndex]?.type === "sentence" ? "请复述" : "请说";
 }
 
 async function primeMicrophonePermission() {
