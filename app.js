@@ -9,6 +9,9 @@ const MOCA_SHEET_IMAGE = "./assets/moca/moca-page.png";
 const NATURAL_VOICE_HINTS = ["xiaoxiao", "xiaoyi", "xiaobei", "ting-ting", "tingting", "mei-jia", "meijia", "google 普通话", "google 國語", "mandarin", "普通话", "美佳", "sin-ji"];
 const MEMORY_OPTIONS_A = ["面孔", "学校", "红色", "天鹅绒", "苹果", "教堂", "火车", "菊花", "尺子", "蓝色"];
 const MEMORY_OPTIONS_B = ["菊花", "鼻子", "天鹅绒", "绿色", "面孔", "医院", "红色", "自行车", "教堂", "手掌"];
+const ABSTRACTION_DISTRACTORS = ["电脑", "学校", "无聊", "天气", "杯子", "音乐", "铅笔", "花园", "电视", "袜子", "面包", "椅子", "彩虹", "玩具", "月亮", "云朵"];
+const CITY_DISTRACTORS = ["北京市", "上海市", "杭州市", "苏州市", "广州市", "深圳市", "成都市", "武汉市", "西安市", "青岛市", "厦门市", "天津市"];
+const PLACE_DISTRACTORS = ["北京大学", "上海瑞金医院", "杭州西湖社区中心", "苏州人民医院", "广州越秀学校", "深圳南山社区中心", "成都华西医院", "武汉光谷学校", "西安碑林社区中心", "青岛市立医院"];
 
 const animalEmojis = {
   lion: "🦁",
@@ -654,7 +657,7 @@ function renderTask(task) {
   return html`
     <section class="single-page task-page">
       <button class="edge-arrow edge-arrow-left" data-action="previousTask" aria-label="上一题" ${state.activeTaskIndex === 0 && step === 0 ? "disabled" : ""}>‹</button>
-      <button class="edge-arrow edge-arrow-right" data-action="skipTask" aria-label="跳过本题">›</button>
+      <button class="edge-arrow edge-arrow-right" data-action="skipTask" aria-label="下一步">›</button>
       <div class="task-workspace">${renderTaskWorkspace(task, step)}</div>
       ${renderTaskActions(task, step)}
     </section>
@@ -754,7 +757,7 @@ function renderNamingTask(task, step) {
   const item = task.items[step];
   return html`
     <div class="naming-page">
-      <div class="animal-emoji pop-in" role="img" aria-label="${escapeHtml(item.answer)}">${animalEmojis[item.key]}</div>
+      <div class="animal-emoji" role="img" aria-label="${escapeHtml(item.answer)}">${animalEmojis[item.key]}</div>
       <div class="animal-side">
         <h4>这是什么动物？</h4>
         <div class="option-grid">
@@ -862,13 +865,14 @@ function renderAbstractionTask(task, step) {
   const response = getResponse(task.id);
   const item = task.items[step];
   const value = response.answer[item.key] || "";
+  const options = abstractionOptions(response, item);
   return html`
     <div class="abstraction-page">
       <div class="word-pair">
         ${item.words.map((word, index) => `<div class="word-card"><span>${item.emojis[index]}</span><strong>${escapeHtml(word)}</strong></div>`).join("")}
       </div>
       <div class="option-grid abstraction-options">
-        ${item.options.map((option) => `<button class="option ${value === option ? "picked" : ""} ${item.practice && option === item.answer ? "guided-option" : ""}" data-action="chooseAbstraction" data-key="${item.key}" data-value="${escapeHtml(option)}">${escapeHtml(option)}${item.practice && option === item.answer ? `<span class="hand-cue">👉</span>` : ""}</button>`).join("")}
+        ${options.map((option) => `<button class="option ${value === option ? "picked" : ""} ${item.practice && option === item.answer ? "guided-option" : ""}" data-action="chooseAbstraction" data-key="${item.key}" data-value="${escapeHtml(option)}">${escapeHtml(option)}${item.practice && option === item.answer ? `<span class="hand-cue">👉</span>` : ""}</button>`).join("")}
       </div>
       ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
     </div>
@@ -1528,13 +1532,9 @@ root.addEventListener("click", async (event) => {
     render();
   }
   if (action === "previousTask") {
-    const response = getResponse(current.id);
-    const step = getTaskStep(current);
-    if (step > 0) response.answer.step = step - 1;
-    else state.activeTaskIndex = Math.max(0, state.activeTaskIndex - 1);
-    render();
+    goPreviousStep();
   }
-  if (action === "skipTask") await skipTask();
+  if (action === "skipTask") await goNextStepOrSkip();
   if (action === "nextTask") await nextTask();
   if (action === "chooseNaming") {
     const response = getResponse(current.id);
@@ -1656,6 +1656,40 @@ async function nextTask() {
   render();
 }
 
+async function goNextStepOrSkip() {
+  const task = tasks[state.activeTaskIndex];
+  const response = getResponse(task.id);
+  const step = getTaskStep(task);
+  if (step < getTaskStepCount(task) - 1) {
+    response.answer.step = step + 1;
+    saveDraft();
+    render();
+    return;
+  }
+  await skipTask();
+}
+
+function goPreviousStep() {
+  const current = tasks[state.activeTaskIndex];
+  const response = getResponse(current.id);
+  const step = getTaskStep(current);
+  if (step > 0) {
+    response.answer.step = step - 1;
+    saveDraft();
+    render();
+    return;
+  }
+
+  const previousIndex = previousSequentialIndex(state.activeTaskIndex);
+  if (previousIndex >= 0) {
+    const previous = tasks[previousIndex];
+    state.activeTaskIndex = previousIndex;
+    getResponse(previous.id).answer.step = Math.max(0, getTaskStepCount(previous) - 1);
+    saveDraft();
+  }
+  render();
+}
+
 async function skipTask() {
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
@@ -1741,6 +1775,14 @@ function nextTaskIndexAfterSubmit(task) {
 
 function nextSequentialIndex(fromIndex) {
   for (let index = fromIndex + 1; index < tasks.length; index += 1) {
+    if (tasks[index].id === "memory2" && !isMemory2Available()) continue;
+    return index;
+  }
+  return -1;
+}
+
+function previousSequentialIndex(fromIndex) {
+  for (let index = fromIndex - 1; index >= 0; index -= 1) {
     if (tasks[index].id === "memory2" && !isMemory2Available()) continue;
     return index;
   }
@@ -2102,28 +2144,35 @@ function applyOrientationChoice(key, value) {
   saveDraft();
 }
 
+function abstractionOptions(response, item) {
+  return stableOptionValues(response, `abstraction:${item.key}`, item.answer, ABSTRACTION_DISTRACTORS);
+}
+
 function orientationOptions(prompt) {
+  const response = getResponse("orientation");
   const today = todayParts();
   if (prompt.key === "year") {
     const year = Number(today.year);
-    return optionObjects([year, year - 1, year + 1, year - 2].map(String), today.year);
+    const distractors = [year - 1, year + 1, year - 2, year + 2, year - 3, year + 3].map(String);
+    return optionObjects(stableOptionValues(response, "orientation:year", today.year, distractors), today.year);
   }
   if (prompt.key === "date") {
-    const offsets = [0, -1, 1, 7];
-    const values = offsets.map((offset) => dateOptionValue(offset));
-    return optionObjects(values, values[0]).map((option) => ({ ...option, label: dateOptionLabel(option.value) }));
+    const correct = dateOptionValue(0);
+    const distractors = [-1, 1, -2, 2, -7, 7, -14, 14].map((offset) => dateOptionValue(offset));
+    return optionObjects(stableOptionValues(response, "orientation:date", correct, distractors), correct).map((option) => ({ ...option, label: dateOptionLabel(option.value) }));
   }
   if (prompt.key === "weekday") {
     const weekdays = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
     const index = weekdays.indexOf(today.weekday);
-    return optionObjects([today.weekday, weekdays[(index + 1) % 7], weekdays[(index + 6) % 7], weekdays[(index + 2) % 7]], today.weekday);
+    const distractors = [1, 2, 3, 4, 5, 6].map((offset) => weekdays[(index + offset) % 7]);
+    return optionObjects(stableOptionValues(response, "orientation:weekday", today.weekday, distractors), today.weekday);
   }
   if (prompt.key === "city") {
-    const expected = cleanCityName(getResponse("orientation").answer.expectedCity || getResponse("orientation").behavior.location?.city || "南京市");
-    return optionObjects([expected, "上海市", "北京市", "杭州市", "苏州市"], expected).slice(0, 4);
+    const expected = cleanCityName(response.answer.expectedCity || response.behavior.location?.city || "南京市");
+    return optionObjects(stableOptionValues(response, "orientation:city", expected, CITY_DISTRACTORS), expected);
   }
   const expectedPlace = currentPlaceName();
-  return optionObjects([expectedPlace, "城北医院", "南湖学校", "东山社区中心"], expectedPlace).slice(0, 4);
+  return optionObjects(stableOptionValues(response, "orientation:place", expectedPlace, PLACE_DISTRACTORS), expectedPlace);
 }
 
 function currentPlaceName() {
@@ -2167,11 +2216,28 @@ function shortNamedPlace(text, fallbackSuffix) {
 
 function optionObjects(values, correct) {
   const unique = [...new Set(values.filter(Boolean))];
-  if (unique.length > 2) {
-    const first = unique.shift();
-    unique.splice(2, 0, first);
-  }
   return unique.map((value) => ({ value, label: value, correct: value === correct }));
+}
+
+function stableOptionValues(response, key, correct, distractors, count = 4) {
+  response.behavior.optionOrders = response.behavior.optionOrders || {};
+  const saved = response.behavior.optionOrders[key];
+  if (Array.isArray(saved) && saved.includes(correct) && saved.length >= count) return saved;
+  const uniqueDistractors = [...new Set(distractors.filter((value) => value && value !== correct))];
+  const selected = shuffle(uniqueDistractors).slice(0, Math.max(0, count - 1));
+  const values = shuffle([correct, ...selected]).slice(0, count);
+  response.behavior.optionOrders[key] = values;
+  saveDraft();
+  return values;
+}
+
+function shuffle(values) {
+  const result = [...values];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
 }
 
 function dateOptionValue(offsetDays) {

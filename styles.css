@@ -1033,8 +1033,8 @@ h4 {
 
 .memory-page {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  align-content: center;
+  grid-template-rows: auto auto minmax(0, 1fr) minmax(0, auto);
+  align-content: stretch;
   gap: 16px;
   padding: clamp(16px, 2.6dvh, 26px) clamp(20px, 3vw, 34px);
 }
@@ -1072,6 +1072,13 @@ h4 {
 .memory-options {
   width: min(860px, 100%);
   justify-self: center;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-content: center;
+}
+
+.memory-options .option {
+  min-height: clamp(62px, 9dvh, 76px);
+  font-size: clamp(22px, 2.5vw, 26px);
 }
 
 .memory-wait-copy {
@@ -1437,11 +1444,12 @@ h4 {
 
 .hand-cue {
   position: absolute;
-  right: -18px;
-  bottom: -14px;
+  left: 12px;
+  top: 50%;
   font-size: 42px;
   filter: drop-shadow(0 6px 8px rgba(36, 52, 71, 0.22));
   animation: handPoint 1.2s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .fluency-page .timer-button {
@@ -1526,6 +1534,8 @@ h4 {
 }
 
 .result-logo {
+  position: relative;
+  z-index: 1;
   width: clamp(96px, 14dvh, 150px);
   height: clamp(96px, 14dvh, 150px);
   object-fit: contain;
@@ -1534,6 +1544,7 @@ h4 {
 .confetti {
   position: absolute;
   inset: 0;
+  z-index: 0;
   pointer-events: none;
 }
 
@@ -1603,6 +1614,7 @@ h4 {
 .result-sparkles {
   position: absolute;
   inset: 0;
+  z-index: 0;
   pointer-events: none;
 }
 
@@ -1642,11 +1654,15 @@ h4 {
 }
 
 .result-hero span {
+  position: relative;
+  z-index: 1;
   color: var(--muted);
   font-weight: 900;
 }
 
 .result-hero strong {
+  position: relative;
+  z-index: 1;
   color: var(--leaf-dark);
   font-size: clamp(58px, 11dvh, 94px);
   line-height: 0.9;
@@ -1661,6 +1677,8 @@ h4 {
 }
 
 .result-hero p {
+  position: relative;
+  z-index: 1;
   margin-bottom: 0;
   color: var(--ink);
   font-size: 24px;
@@ -1669,6 +1687,7 @@ h4 {
 
 .radar-card {
   position: relative;
+  z-index: 1;
   display: grid;
   width: min(320px, 46dvh);
   aspect-ratio: 1;
@@ -1724,6 +1743,8 @@ h4 {
 }
 
 .result-medals {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -2227,10 +2248,10 @@ h4 {
 @keyframes handPoint {
   0%,
   100% {
-    transform: translateX(0) rotate(-8deg);
+    transform: translate(-74%, -50%) rotate(-6deg);
   }
   50% {
-    transform: translateX(-10px) rotate(-8deg);
+    transform: translate(-54%, -50%) rotate(-6deg);
   }
 }
 
