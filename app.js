@@ -38,7 +38,6 @@ const VOICE_PROFILES = {
   clear: { label: "清晰慢速", hints: ["google 普通话", "google 國語", "mandarin", "普通话", "中文"], rateScale: 0.82, pitchOffset: -0.16 },
   system: { label: "系统默认", hints: [], rateScale: 1.04, pitchOffset: -0.26 }
 };
-const VOICE_PROFILE_ORDER = ["cartoon", "gentle", "clear", "system"];
 
 const animalEmojis = {
   lion: "🦁",
@@ -691,12 +690,6 @@ function renderShell(current) {
           <button class="drawer-item" data-action="navView" data-view="design">评分标准</button>
           <button class="drawer-item" data-action="navView" data-view="admin">后台</button>
           <button class="drawer-item" data-action="goHome">返回首页</button>
-          <label class="drawer-voice">
-            <span>语音风格</span>
-            <select data-voice-profile>
-              ${VOICE_PROFILE_ORDER.map((key) => `<option value="${key}" ${state.voiceProfile === key ? "selected" : ""}>${VOICE_PROFILES[key].label}</option>`).join("")}
-            </select>
-          </label>
           <div class="drawer-score"><span>${state.view === "test" ? `${state.activeTaskIndex + 1}/${tasks.length}` : `${totals.totalScore}/30`}</span></div>
           <nav class="drawer-task-list">
             ${tasks.map((task, index) => renderTaskNav(task, index)).join("")}
@@ -1890,11 +1883,6 @@ root.addEventListener("input", (event) => {
 
 root.addEventListener("change", (event) => {
   const target = event.target;
-  if (target.dataset.voiceProfile !== undefined) {
-    state.voiceProfile = VOICE_PROFILES[target.value] ? target.value : "cartoon";
-    saveDraft();
-    return;
-  }
   if (target.dataset.bind) {
     const [, key] = target.dataset.bind.split(".");
     state.participant[key] = target.value;
