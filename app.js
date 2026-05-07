@@ -2357,15 +2357,11 @@ function initSpeechRecognition() {
   };
   recognition.onend = () => {
     recognizing = false;
-    if (speechRecognitionWanted && !speechRecognitionBlocked) {
-      promoteLiveInterimTranscript();
-      speechSessionBaseFinal = currentLiveFinalText();
-      window.setTimeout(() => startSpeechRecognitionSafe(), 250);
-      return;
-    }
     promoteLiveInterimTranscript();
+    recordSpeechRecognitionEvent("end", { finalText: currentLiveFinalText() });
+    speechRecognitionWanted = false;
     activeSpeechTaskId = null;
-    voiceState = recordingAudio ? "已录音，识别已暂停" : "待说";
+    voiceState = recordingAudio ? "已录音，识别已暂停" : "识别结束";
     render();
   };
   recognition.onerror = (event) => {
@@ -2382,7 +2378,7 @@ function initSpeechRecognition() {
 }
 
 function toggleVoiceInput() {
-  if (recognizing || recordingAudio) stopVoiceInput();
+  if (recognizing || recordingAudio || speechRecognitionWanted) stopVoiceInput();
   else startVoiceInput();
 }
 
