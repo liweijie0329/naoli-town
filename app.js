@@ -12,6 +12,13 @@ const MEMORY_OPTIONS_B = ["菊花", "鼻子", "天鹅绒", "绿色", "面孔", "
 const ABSTRACTION_DISTRACTORS = ["电脑", "学校", "无聊", "天气", "杯子", "音乐", "铅笔", "花园", "电视", "袜子", "面包", "椅子", "彩虹", "玩具", "月亮", "云朵"];
 const CITY_DISTRACTORS = ["北京市", "上海市", "杭州市", "苏州市", "广州市", "深圳市", "成都市", "武汉市", "西安市", "青岛市", "厦门市", "天津市"];
 const PLACE_DISTRACTORS = ["北京大学", "上海瑞金医院", "杭州西湖社区中心", "苏州人民医院", "广州越秀学校", "深圳南山社区中心", "成都华西医院", "武汉光谷学校", "西安碑林社区中心", "青岛市立医院"];
+const VOICE_PROFILES = {
+  cartoon: { label: "卡通童声", hints: ["xiaoxiao", "xiaoyi", "xiaobei", "tingting", "美佳", "sin-ji"], rateScale: 0.96, pitchOffset: 0.1 },
+  gentle: { label: "温柔女声", hints: ["xiaoxiao", "ting-ting", "tingting", "mei-jia", "meijia", "female", "美佳"], rateScale: 1, pitchOffset: -0.04 },
+  clear: { label: "清晰慢速", hints: ["google 普通话", "google 國語", "mandarin", "普通话", "中文"], rateScale: 0.82, pitchOffset: -0.16 },
+  system: { label: "系统默认", hints: [], rateScale: 1.04, pitchOffset: -0.26 }
+};
+const VOICE_PROFILE_ORDER = ["cartoon", "gentle", "clear", "system"];
 
 const animalEmojis = {
   lion: "🦁",
@@ -325,6 +332,7 @@ function createInitialState() {
     memoryWaitStartedAt: null,
     resumeAfterMemory2Index: null,
     playedInstructionKeys: {},
+    voiceProfile: "cartoon",
     setupAttempted: false,
     adminSessions: [],
     selectedSession: null
@@ -430,6 +438,7 @@ function migrateState() {
   state.drawings = state.drawings || {};
   state.trail = normalizeTrailState(state.trail);
   state.playedInstructionKeys = state.playedInstructionKeys || {};
+  state.voiceProfile = VOICE_PROFILES[state.voiceProfile] ? state.voiceProfile : "cartoon";
   state.setupAttempted = Boolean(state.setupAttempted);
   state.resumeAfterMemory2Index = Number.isInteger(state.resumeAfterMemory2Index) ? state.resumeAfterMemory2Index : null;
 }
@@ -603,6 +612,12 @@ function renderShell(current) {
           <button class="drawer-item" data-action="navView" data-view="design">评分标准</button>
           <button class="drawer-item" data-action="navView" data-view="admin">后台</button>
           <button class="drawer-item" data-action="goHome">返回首页</button>
+          <label class="drawer-voice">
+            <span>语音风格</span>
+            <select data-voice-profile>
+              ${VOICE_PROFILE_ORDER.map((key) => `<option value="${key}" ${state.voiceProfile === key ? "selected" : ""}>${VOICE_PROFILES[key].label}</option>`).join("")}
+            </select>
+          </label>
           <div class="drawer-score"><span>${state.view === "test" ? `${state.activeTaskIndex + 1}/${tasks.length}` : `${totals.totalScore}/30`}</span></div>
           <nav class="drawer-task-list">
             ${tasks.map((task, index) => renderTaskNav(task, index)).join("")}
@@ -1624,6 +1639,11 @@ root.addEventListener("input", (event) => {
 
 root.addEventListener("change", (event) => {
   const target = event.target;
+  if (target.dataset.voiceProfile !== undefined) {
+    state.voiceProfile = VOICE_PROFILES[target.value] ? target.value : "cartoon";
+    saveDraft();
+    return;
+  }
   if (target.dataset.bind) {
     const [, key] = target.dataset.bind.split(".");
     state.participant[key] = target.value;
@@ -1895,10 +1915,11 @@ function speakText(text, options = {}) {
     if (done) done();
     return;
   }
+  const profile = currentVoiceProfile();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "zh-CN";
-  utterance.rate = rate;
-  utterance.pitch = pitch;
+  utterance.rate = clampSpeech(rate * profile.rateScale, 0.55, 1.08);
+  utterance.pitch = clampSpeech(pitch + profile.pitchOffset, 0.72, 1.55);
   const voice = pickNaturalVoice();
   if (voice) utterance.voice = voice;
   utterance.onstart = () => {
@@ -1924,7 +1945,9 @@ function pickNaturalVoice() {
   if (!("speechSynthesis" in window)) return null;
   const voices = window.speechSynthesis.getVoices();
   const zhVoices = voices.filter((voice) => /^zh/i.test(voice.lang) || /chinese|mandarin|普通话|中文|國語|国语/i.test(voice.name));
-  return zhVoices.find((voice) => NATURAL_VOICE_HINTS.some((hint) => voice.name.toLowerCase().includes(hint))) || zhVoices[0] || null;
+  const profile = currentVoiceProfile();
+  const hints = [...profile.hints, ...NATURAL_VOICE_HINTS].map((hint) => hint.toLowerCase());
+  return zhVoices.find((voice) => hints.some((hint) => voice.name.toLowerCase().includes(hint))) || zhVoices[0] || null;
 }
 
 function speakItemsSlow(items, options = {}) {
@@ -1947,9 +1970,10 @@ function speakItemsSlow(items, options = {}) {
     const value = items[index];
     if (onItemStart) onItemStart(value, index);
     const utterance = new SpeechSynthesisUtterance(value);
+    const profile = currentVoiceProfile();
     utterance.lang = "zh-CN";
-    utterance.rate = rate;
-    utterance.pitch = 1.18;
+    utterance.rate = clampSpeech(rate * profile.rateScale, 0.55, 1.08);
+    utterance.pitch = clampSpeech(1.18 + profile.pitchOffset, 0.72, 1.55);
     const voice = pickNaturalVoice();
     if (voice) utterance.voice = voice;
     utterance.onend = () => {
@@ -1960,6 +1984,14 @@ function speakItemsSlow(items, options = {}) {
     window.speechSynthesis.speak(utterance);
   };
   speakNext();
+}
+
+function currentVoiceProfile() {
+  return VOICE_PROFILES[state.voiceProfile] || VOICE_PROFILES.cartoon;
+}
+
+function clampSpeech(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function playDigitStimulus(task) {
