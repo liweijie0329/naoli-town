@@ -1319,6 +1319,7 @@ function drawTrailCanvas(canvas, tick = 0) {
   activeCtx.fillStyle = "#fffdf7";
   activeCtx.fillRect(0, 0, rect.width, rect.height);
   const nodes = trailNodes(canvas);
+  let fingerCue = null;
 
   const guideLabels = trailGuideLabels();
   if (guideLabels) {
@@ -1337,7 +1338,7 @@ function drawTrailCanvas(canvas, tick = 0) {
       y: guide[0].y + (guide[1].y - guide[0].y) * progress
     };
     const angle = Math.atan2(guide[1].y - guide[0].y, guide[1].x - guide[0].x);
-    drawFingerCue(activeCtx, moving.x, moving.y, tick, angle);
+    fingerCue = { ...moving, angle };
   }
 
   const nodeMap = new Map(nodes.map((node) => [node.label, node]));
@@ -1382,103 +1383,30 @@ function drawTrailCanvas(canvas, tick = 0) {
     activeCtx.textBaseline = "middle";
     activeCtx.fillText(node.label, node.x, node.y);
   });
+
+  if (fingerCue) drawFingerCue(activeCtx, fingerCue.x, fingerCue.y, tick, fingerCue.angle);
 }
 
 function drawFingerCue(ctx, x, y, tick, angle = 0) {
-  const bob = Math.sin(tick / 14) * 2.2;
+  const bob = Math.sin(tick / 14) * 3;
+  const pulse = 1 + Math.sin(tick / 18) * 0.05;
   ctx.save();
   ctx.translate(x, y + bob);
-  ctx.rotate(angle - 0.02);
-  ctx.translate(-54, 10);
-  ctx.scale(1.08, 1.08);
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(170, 82, 52, 0.36)";
-  ctx.shadowColor = "rgba(127, 72, 43, 0.24)";
-  ctx.shadowBlur = 14;
+  ctx.rotate(angle);
+  ctx.scale(pulse, pulse);
+  ctx.shadowColor = "rgba(36, 52, 71, 0.22)";
+  ctx.shadowBlur = 16;
   ctx.shadowOffsetY = 8;
-
-  const skin = ctx.createLinearGradient(-58, -42, 86, 58);
-  skin.addColorStop(0, "#ffd9bd");
-  skin.addColorStop(0.52, "#f3a877");
-  skin.addColorStop(1, "#ffd9bd");
-  const skinSoft = ctx.createLinearGradient(-36, -36, 46, 54);
-  skinSoft.addColorStop(0, "#ffe3cf");
-  skinSoft.addColorStop(1, "#ee9a69");
-
-  ctx.fillStyle = skin;
+  ctx.fillStyle = "rgba(255, 255, 255, 0.78)";
   ctx.beginPath();
-  roundedRectPath(ctx, -48, 28, 44, 40, 14);
+  ctx.arc(0, 0, 36, 0, Math.PI * 2);
   ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = skinSoft;
-  ctx.beginPath();
-  ctx.ellipse(-22, 12, 33, 31, -0.14, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  [
-    [-27, -25, 24, 48, -0.48],
-    [-7, -32, 24, 50, -0.18],
-    [12, -28, 23, 46, 0.16]
-  ].forEach(([cx, cy, width, height, rotate]) => {
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(rotate);
-    ctx.fillStyle = skin;
-    ctx.beginPath();
-    roundedRectPath(ctx, -width / 2, -height / 2, width, height, 12);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-  });
-
-  ctx.save();
-  ctx.translate(-34, 4);
-  ctx.rotate(0.82);
-  ctx.fillStyle = skinSoft;
-  ctx.beginPath();
-  roundedRectPath(ctx, -10, -12, 52, 25, 13);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-
-  ctx.save();
-  ctx.rotate(-0.03);
-  ctx.fillStyle = skin;
-  ctx.beginPath();
-  roundedRectPath(ctx, -6, -13, 93, 27, 15);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "rgba(255, 238, 222, 0.78)";
-  ctx.beginPath();
-  ctx.ellipse(68, -4, 14, 7, -0.12, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
   ctx.shadowColor = "transparent";
-  ctx.fillStyle = "rgba(255, 238, 222, 0.55)";
-  ctx.beginPath();
-  ctx.ellipse(-26, 0, 15, 9, -0.35, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.font = "64px 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("👉", 0, 2);
   ctx.restore();
-}
-
-function roundedRectPath(ctx, x, y, width, height, radius) {
-  if (typeof ctx.roundRect === "function") {
-    ctx.roundRect(x, y, width, height, radius);
-    return;
-  }
-  const r = Math.min(radius, width / 2, height / 2);
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + width - r, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-  ctx.lineTo(x + width, y + height - r);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-  ctx.lineTo(x + r, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
 }
 
 function shouldShowTrailGuide() {
