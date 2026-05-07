@@ -2438,7 +2438,7 @@ function speechRecognitionErrorText(error) {
   if (error === "not-allowed" || error === "service-not-allowed") return "请允许麦克风和语音识别权限";
   if (error === "no-speech") return "没有听到声音，请靠近麦克风再试";
   if (error === "audio-capture") return "没有检测到麦克风";
-  if (error === "network") return "语音识别网络不可用";
+  if (error === "network") return "浏览器语音识别服务不可用，请换 Chrome/Edge 或接入云端识别";
   return "识别未完成，请再试一次";
 }
 
@@ -2545,7 +2545,8 @@ function orientationOptions(prompt) {
     return optionObjects(DEFAULT_PLACE_OPTIONS, "社区中心");
   }
   const sameCityDistractors = Array.isArray(location.placeDistractors) ? location.placeDistractors.map((entry) => entry.name) : [];
-  return optionObjects(stableOptionValues(response, `orientation:place:${expectedPlace}`, expectedPlace, sameCityDistractors), expectedPlace);
+  const placeDistractors = [...sameCityDistractors, ...DEFAULT_PLACE_OPTIONS].filter((value) => value !== expectedPlace);
+  return optionObjects(stableOptionValues(response, `orientation:place:${expectedPlace}`, expectedPlace, placeDistractors), expectedPlace);
 }
 
 function currentPlaceName() {
