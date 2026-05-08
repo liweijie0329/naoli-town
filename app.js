@@ -480,10 +480,13 @@ window.addEventListener("pageshow", (event) => {
 
 function updateViewportMetrics() {
   const viewport = window.visualViewport;
-  const width = Math.floor(viewport?.width || window.innerWidth || document.documentElement.clientWidth || 1024);
-  const height = Math.floor(viewport?.height || window.innerHeight || document.documentElement.clientHeight || 768);
-  document.documentElement.style.setProperty("--app-width", `${Math.max(320, width)}px`);
-  document.documentElement.style.setProperty("--app-height", `${Math.max(360, height)}px`);
+  const width = Math.max(1, Math.floor(viewport?.width || window.innerWidth || document.documentElement.clientWidth || 1024));
+  const height = Math.max(1, Math.floor(viewport?.height || window.innerHeight || document.documentElement.clientHeight || 768));
+  document.documentElement.style.setProperty("--app-width", `${width}px`);
+  document.documentElement.style.setProperty("--app-height", `${height}px`);
+  document.documentElement.style.setProperty("--app-short", `${Math.min(width, height)}px`);
+  document.documentElement.style.setProperty("--app-long", `${Math.max(width, height)}px`);
+  document.documentElement.dataset.orientation = width >= height ? "landscape" : "portrait";
 }
 
 function bindViewportMetrics() {
