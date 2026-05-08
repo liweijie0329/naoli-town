@@ -22,8 +22,8 @@ const LOCAL_DEV_API_ORIGIN = "http://127.0.0.1:5178";
 const API_ORIGIN = location.protocol === "file:" ? LOCAL_DEV_API_ORIGIN : "";
 const ASR_ENDPOINT = `${API_ORIGIN}/api/asr`;
 const ASR_TIMEOUT_MS = 90000;
-const FLUENCY_LIVE_ASR_INTERVAL_MS = 6500;
-const FLUENCY_LIVE_ASR_MIN_CHUNKS = 18;
+const FLUENCY_LIVE_ASR_INTERVAL_MS = 5000;
+const FLUENCY_LIVE_ASR_MIN_CHUNKS = 12;
 const PREFER_CLOUDFLARE_ASR = true;
 const MAX_DRAFT_AUDIO_RECORDING_BYTES = 700 * 1024;
 const RECORDER_MIME_TYPES = [
@@ -42,6 +42,66 @@ const VOICE_PROFILES = {
   clear: { label: "清晰慢速", hints: ["google 普通话", "google 國語", "mandarin", "普通话", "中文"], rateScale: 0.82, pitchOffset: -0.16 },
   system: { label: "系统默认", hints: [], rateScale: 1.04, pitchOffset: -0.26 }
 };
+
+const TRADITIONAL_PHRASE_REPLACEMENTS = [
+  ["甚麼", "什么"],
+  ["什麼", "什么"],
+  ["為什麼", "为什么"],
+  ["怎麼", "怎么"],
+  ["這個", "这个"],
+  ["那個", "那个"],
+  ["裡面", "里面"],
+  ["裏面", "里面"],
+  ["臺灣", "台湾"],
+  ["鐘錶", "钟表"],
+  ["時鐘", "时钟"],
+  ["語音", "语音"],
+  ["轉文字", "转文字"],
+  ["識別", "识别"],
+  ["動物", "动物"],
+  ["詞語", "词语"],
+  ["複述", "复述"],
+  ["聽力", "听力"],
+  ["認知", "认知"],
+  ["測驗", "测验"],
+  ["測試", "测试"],
+  ["記憶", "记忆"],
+  ["數字", "数字"],
+  ["順序", "顺序"],
+  ["畫圖", "画图"],
+  ["後台", "后台"],
+  ["資料", "数据"]
+];
+
+const TRADITIONAL_CHAR_REPLACEMENTS = {
+  語: "语", 題: "题", 轉: "转", 錄: "录", 識: "识", 別: "别", 顯: "显", 體: "体", 簡: "简",
+  聽: "听", 說: "说", 請: "请", 動: "动", 詞: "词", 暢: "畅", 複: "复", 選: "选", 擇: "择",
+  記: "记", 憶: "忆", 測: "测", 驗: "验", 視: "视", 覺: "觉", 執: "执", 結: "结", 資: "资",
+  後: "后", 臺: "台", 這: "这", 個: "个", 麼: "么", 為: "为", 對: "对", 還: "还", 會: "会",
+  開: "开", 關: "关", 門: "门", 間: "间", 時: "时", 鐘: "钟", 錶: "表", 畫: "画", 圖: "图",
+  長: "长", 順: "顺", 應: "应", 該: "该", 歲: "岁", 無: "无", 聲: "声", 麥: "麦", 風: "风",
+  權: "权", 傳: "传", 雲: "云", 華: "华", 寫: "写", 廣: "广", 雙: "双", 發: "发", 髮: "发",
+  隻: "只", 裡: "里", 裏: "里", 萬: "万", 與: "与", 來: "来", 國: "国", 樂: "乐", 電: "电",
+  腦: "脑", 點: "点", 擊: "击", 報: "报", 導: "导", 匯: "汇", 歷: "历", 曆: "历", 實: "实",
+  際: "际", 醫: "医", 學: "学", 樣: "样", 標: "标", 準: "准", 儘: "尽", 盡: "尽", 讓: "让",
+  讀: "读", 錯: "错", 過: "过", 連: "连", 線: "线", 邊: "边", 張: "张", 將: "将", 區: "区",
+  項: "项", 類: "类", 規: "规", 則: "则", 問: "问", 評: "评", 總: "总", 調: "调", 質: "质",
+  貓: "猫", 雞: "鸡", 鷄: "鸡", 鴨: "鸭", 鵝: "鹅", 馬: "马", 魚: "鱼", 鳥: "鸟", 豬: "猪",
+  龍: "龙", 龜: "龟", 鯨: "鲸", 鯊: "鲨", 鱷: "鳄", 鴿: "鸽", 鷹: "鹰", 鶴: "鹤", 獅: "狮",
+  駱: "骆", 駝: "驼", 驢: "驴", 騾: "骡", 犛: "牦", 獵: "猎", 錢: "钱", 獺: "獭",
+  鴉: "鸦", 鵲: "鹊", 鴕: "鸵", 鱸: "鲈", 鮭: "鲑", 鮑: "鲍", 蟬: "蝉", 蠍: "蝎",
+  蠶: "蚕", 蟲: "虫", 蟻: "蚁", 蠅: "蝇", 蝸: "蜗", 鸚: "鹦", 鵡: "鹉", 蝦: "虾", 鳳: "凤",
+  麗: "丽", 壞: "坏", 乾: "干", 併: "并", 並: "并", 於: "于", 卻: "却", 親: "亲", 愛: "爱",
+  變: "变", 優: "优", 勢: "势", 劃: "划", 參: "参", 處: "处"
+};
+
+function toSimplifiedChinese(text) {
+  let output = String(text || "");
+  TRADITIONAL_PHRASE_REPLACEMENTS.forEach(([from, to]) => {
+    output = output.split(from).join(to);
+  });
+  return Array.from(output, (char) => TRADITIONAL_CHAR_REPLACEMENTS[char] || char).join("");
+}
 
 const SFX_SOURCES = {
   nav: "./assets/sfx/nav.mp3",
@@ -89,7 +149,14 @@ const animalNameBank = [
   "大象", "猴", "猩猩", "熊", "鹿", "长颈鹿", "斑马", "豹子", "狼", "狐狸", "河马", "袋鼠", "熊猫",
   "蛇", "乌龟", "鳄鱼", "青蛙", "鱼", "鲸", "海豚", "鲨鱼", "鸟", "鹰", "孔雀", "企鹅", "老虎", "猴子",
   "兔子", "老鼠", "猫头鹰", "燕子", "麻雀", "鹦鹉", "鸽子", "蝴蝶", "蜜蜂", "蚂蚁", "蜻蜓", "蜗牛",
-  "螃蟹", "虾", "章鱼", "海星", "海马", "海狮", "海豹", "海龟", "金鱼", "鲤鱼", "鲫鱼"
+  "螃蟹", "虾", "章鱼", "海星", "海马", "海狮", "海豹", "海龟", "金鱼", "鲤鱼", "鲫鱼", "驴",
+  "骡子", "牦牛", "羚羊", "梅花鹿", "驯鹿", "麋鹿", "野猪", "豪猪", "刺猬", "松鼠", "仓鼠",
+  "蝙蝠", "猎豹", "金钱豹", "美洲豹", "北极熊", "棕熊", "黑熊", "考拉", "树懒", "水獭", "海獭",
+  "鼹鼠", "穿山甲", "食蚁兽", "海牛", "海象", "海鸥", "喜鹊", "乌鸦", "鹤", "天鹅", "火鸡",
+  "鸵鸟", "啄木鸟", "百灵鸟", "壁虎", "蜥蜴", "变色龙", "蟒蛇", "眼镜蛇", "娃娃鱼", "蝾螈",
+  "河豚", "带鱼", "鲈鱼", "鲑鱼", "鲍鱼", "水母", "海胆", "蚯蚓", "螳螂", "蟋蟀", "蝉",
+  "蚊子", "苍蝇", "蟑螂", "蜘蛛", "蝎子", "蜈蚣", "蚕", "瓢虫", "甲虫", "蛾子", "蚂蚱",
+  "蝗虫", "龙", "凤凰", "麒麟"
 ];
 
 const animalAliasPairs = [
@@ -101,7 +168,15 @@ const animalAliasPairs = [
   ["鸭子", "鸭"], ["鹅子", "鹅"],
   ["兔子", "兔"], ["老鼠", "鼠"], ["耗子", "鼠"], ["老虎", "虎"], ["猴子", "猴"],
   ["鲸鱼", "鲸"], ["鱼儿", "鱼"],
-  ["大象", "大象"], ["长颈鹿", "长颈鹿"], ["猫头鹰", "猫头鹰"]
+  ["狮", "狮子"], ["豹", "豹子"], ["大熊猫", "熊猫"], ["熊猫", "熊猫"],
+  ["象", "大象"], ["鲸鱼", "鲸"], ["鲨", "鲨鱼"], ["鲨鱼", "鲨鱼"], ["海豚", "海豚"],
+  ["乌龟", "乌龟"], ["海龟", "海龟"], ["龟", "乌龟"], ["鳄", "鳄鱼"], ["鳄鱼", "鳄鱼"],
+  ["青蛙", "青蛙"], ["蛙", "青蛙"], ["蟒", "蟒蛇"], ["蟒蛇", "蟒蛇"], ["眼镜蛇", "眼镜蛇"],
+  ["大象", "大象"], ["长颈鹿", "长颈鹿"], ["猫头鹰", "猫头鹰"], ["小白兔", "兔"],
+  ["天鹅", "天鹅"], ["鸵鸟", "鸵鸟"], ["海鸥", "海鸥"], ["乌鸦", "乌鸦"], ["喜鹊", "喜鹊"],
+  ["狐狸", "狐狸"], ["狐", "狐狸"], ["狼", "狼"], ["熊", "熊"], ["鹿", "鹿"], ["驴", "驴"],
+  ["蚂蚱", "蚂蚱"], ["蚊", "蚊子"], ["苍蝇", "苍蝇"], ["蜗牛", "蜗牛"], ["螃蟹", "螃蟹"],
+  ["龙", "龙"], ["凤凰", "凤凰"], ["麒麟", "麒麟"]
 ];
 
 const orientationPrompts = [
@@ -725,7 +800,7 @@ async function toggleSetupVoiceRegistration() {
     let text = "";
     try {
       const result = await requestAsrJson({ id: "setup" }, "registration", blob);
-      text = String(result?.text || result?.transcription || "").trim();
+      text = toSimplifiedChinese(String(result?.text || result?.transcription || "").trim());
     } catch (error) {
       console.error("Setup voice ASR failed", error);
     }
@@ -2144,9 +2219,9 @@ root.addEventListener("input", (event) => {
   }
   if (target.dataset.fluencyManual !== undefined) {
     const response = getResponse("fluency");
-    response.answer.rawTranscript = target.value;
+    response.answer.rawTranscript = toSimplifiedChinese(target.value);
     response.answer.interimTranscript = "";
-    response.answer.animals = extractAnimalNames(target.value);
+    response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
     saveDraft();
   }
 });
@@ -3322,8 +3397,14 @@ async function finishPcmAudioRecording(recorder) {
   releaseMicAfterRecordingStop = false;
   let micReleased = false;
   try {
-    recorder.finished = true;
     stopFluencyLiveAsr(recorder);
+    if (recorder.liveRequestPromise) {
+      await recorder.liveRequestPromise.catch(() => {});
+    }
+    if (recorder.taskId === "fluency" && recorder.transcribeOnStop) {
+      await flushFluencyLiveAsr(recorder, { force: true, finalChunk: true });
+    }
+    recorder.finished = true;
     cleanupPcmRecorder(recorder);
     const task = tasks.find((entry) => entry.id === recorder.taskId);
     const response = getResponse(recorder.taskId);
@@ -3391,11 +3472,13 @@ function stopFluencyLiveAsr(recorder) {
   recorder.liveTimer = null;
 }
 
-async function flushFluencyLiveAsr(recorder) {
+async function flushFluencyLiveAsr(recorder, options = {}) {
+  const { force = false, finalChunk = false } = options;
   if (!recorder || recorder.finished || recorder.liveRequestActive || recorder.taskId !== "fluency") return;
   const endIndex = recorder.chunks.length;
-  if (endIndex - recorder.liveChunkIndex < FLUENCY_LIVE_ASR_MIN_CHUNKS) return;
+  if (!force && endIndex - recorder.liveChunkIndex < FLUENCY_LIVE_ASR_MIN_CHUNKS) return;
   const chunks = recorder.chunks.slice(recorder.liveChunkIndex, endIndex);
+  if (!chunks.length) return;
   recorder.liveChunkIndex = endIndex;
   recorder.liveRequestActive = true;
   const sequence = recorder.liveSequence + 1;
@@ -3408,32 +3491,40 @@ async function flushFluencyLiveAsr(recorder) {
     step: recorder.step,
     eventType: "cloudflare-asr-live-upload",
     sequence,
+    finalChunk,
     size: blob.size,
     at: new Date().toISOString()
   });
-  try {
+  const uploadPromise = (async () => {
     const result = await requestAsrJson(task, `live-${sequence}`, blob);
-    if (recorder.finished) return;
-    const text = String(result?.text || result?.transcription || "").trim();
+    if (recorder.finished && !finalChunk) return;
+    const text = toSimplifiedChinese(String(result?.text || result?.transcription || "").trim());
     response.behavior.speechRecognition.push({
       step: recorder.step,
       eventType: "cloudflare-asr-live-result",
       sequence,
+      finalChunk,
       text,
       at: new Date().toISOString()
     });
     if (text) applyFluencyLiveText(response, recorder.step, text);
+  })();
+  recorder.liveRequestPromise = uploadPromise;
+  try {
+    await uploadPromise;
   } catch (error) {
     response.behavior.speechRecognition.push({
       step: recorder.step,
       eventType: "cloudflare-asr-live-error",
       sequence,
+      finalChunk,
       message: error?.message || "Live ASR failed",
       at: new Date().toISOString()
     });
     saveDraft();
   } finally {
     recorder.liveRequestActive = false;
+    if (recorder.liveRequestPromise === uploadPromise) recorder.liveRequestPromise = null;
   }
 }
 
@@ -3583,7 +3674,7 @@ async function transcribeAudioBlob(blob, taskId, step) {
   render();
   try {
     const result = await requestAsrJson(task, step, blob);
-    const text = String(result?.text || result?.transcription || "").trim();
+    const text = toSimplifiedChinese(String(result?.text || result?.transcription || "").trim());
     response.behavior.speechRecognition.push({
       step,
       eventType: "cloudflare-asr-result",
@@ -3642,6 +3733,7 @@ async function requestAsrJson(task, step, blob) {
 }
 
 function applyVoiceTextForTask(task, response, step, text) {
+  text = toSimplifiedChinese(text);
   if (!text) return;
   if (task.type === "sentence") {
     response.answer.transcript = response.answer.transcript || {};
@@ -3715,7 +3807,7 @@ function recognitionTranscriptFromEvent(event) {
   let interimText = "";
   for (let i = 0; i < event.results.length; i += 1) {
     const result = event.results[i];
-    const text = result?.[0]?.transcript || "";
+    const text = toSimplifiedChinese(result?.[0]?.transcript || "");
     if (result?.isFinal) finalPart = joinTranscriptText(finalPart, text);
     else interimText = joinTranscriptText(interimText, text);
   }
@@ -3752,6 +3844,8 @@ function currentLiveFinalText() {
 }
 
 function applyLiveVoiceText({ finalText = "", interimText = "" } = {}) {
+  finalText = toSimplifiedChinese(finalText);
+  interimText = toSimplifiedChinese(interimText);
   const { task, step } = activeVoiceContext();
   if (["sentence", "fluency"].includes(task?.type)) {
     const response = getResponse(task.id);
@@ -3762,6 +3856,8 @@ function applyLiveVoiceText({ finalText = "", interimText = "" } = {}) {
 }
 
 function setLiveVoiceText(task, response, step, { finalText = "", interimText = "", eventType = "update" } = {}) {
+  finalText = toSimplifiedChinese(finalText);
+  interimText = toSimplifiedChinese(interimText);
   if (task.type === "sentence") {
     response.answer.transcript = response.answer.transcript || {};
     response.answer.interimTranscript = response.answer.interimTranscript || {};
@@ -3817,6 +3913,7 @@ function recordSpeechRecognitionEvent(eventType, details = {}) {
 }
 
 function applyVoiceText(text) {
+  text = toSimplifiedChinese(text);
   if (!text) return;
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
@@ -3839,6 +3936,7 @@ function applyVoiceText(text) {
 }
 
 function applyManualVoiceText(text) {
+  text = toSimplifiedChinese(text);
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
   const step = getTaskStep(task);
@@ -3853,6 +3951,7 @@ function applyManualVoiceText(text) {
 }
 
 function applyOrientationText(response, step, text) {
+  text = toSimplifiedChinese(text);
   const prompt = orientationPrompts[step];
   response.answer.orientationTranscript = response.answer.orientationTranscript || {};
   response.answer.orientationTranscript[prompt.key] = text;
@@ -4499,7 +4598,7 @@ function todayParts() {
 }
 
 function normalizeText(text) {
-  return String(text || "").replace(/\s/g, "").replace(/市$/, "");
+  return toSimplifiedChinese(text).replace(/\s/g, "").replace(/市$/, "");
 }
 
 function uniqueWords(words) {
@@ -4511,10 +4610,28 @@ function extractAnimalNames(text) {
 }
 
 function fluencyTranscriptFromAsrText(text, existingText = "") {
-  const existingAnimals = extractAnimalNames(existingText);
-  const newAnimals = extractAnimalNames(text).filter((animal) => !existingAnimals.includes(animal));
-  const animals = uniqueWords(existingAnimals.concat(newAnimals));
-  return animals.join(" ");
+  const existing = normalizeFluencyTranscript(existingText);
+  const incoming = normalizeFluencyTranscript(text);
+  if (!incoming) return existing;
+  if (!existing) return incoming;
+  const existingKey = fluencyTranscriptKey(existing);
+  const incomingKey = fluencyTranscriptKey(incoming);
+  if (!incomingKey) return existing;
+  if (!existingKey) return incoming;
+  if (existingKey.includes(incomingKey)) return existing;
+  if (incomingKey.includes(existingKey)) return incoming;
+  return `${existing} ${incoming}`;
+}
+
+function normalizeFluencyTranscript(text) {
+  return toSimplifiedChinese(text)
+    .replace(/[，,、；;。.!！?？\n\r\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function fluencyTranscriptKey(text) {
+  return normalizeFluencyTranscript(text).replace(/[^\u4e00-\u9fa5A-Za-z0-9]/g, "");
 }
 
 function animalMatchesFromText(text) {
