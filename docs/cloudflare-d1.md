@@ -29,6 +29,12 @@ git push origin master
 
 创建后打开这个数据库的 `Console` / `Query`，把项目根目录的 `schema.sql` 全部复制进去运行。
 
+如果是已经创建过的旧数据库，保存接口会自动补充 `participant_age` 列；也可以在 D1 Console 手动执行：
+
+```sql
+ALTER TABLE sessions ADD COLUMN participant_age INTEGER;
+```
+
 也可以用 Wrangler CLI：
 
 ```bash

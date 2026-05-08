@@ -17,6 +17,62 @@ function toInteger(value, fallback = 0) {
   return Number.isFinite(number) ? Math.round(number) : fallback;
 }
 
+function birthDateParts(value) {
+  const match = String(value || "").trim().match(/^(\d{4})(?:\D+(\d{1,2}))?(?:\D+(\d{1,2}))?/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = match[2] ? Number(match[2]) : null;
+  const day = match[3] ? Number(match[3]) : null;
+  if (!Number.isInteger(year) || year < 1900 || year > 2100) return null;
+  if (month !== null && (month < 1 || month > 12)) return null;
+  if (day !== null && (day < 1 || day > 31)) return null;
+  return { year, month, day };
+}
+
+function todayParts() {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map((part) => [part.type, Number(part.value)]));
+    return { year: values.year, month: values.month, day: values.day };
+  } catch {
+    const now = new Date();
+    return {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+      day: now.getDate()
+    };
+  }
+}
+
+function ageFromBirthDate(value, today = todayParts()) {
+  const birth = birthDateParts(value);
+  if (!birth) return null;
+  let age = today.year - birth.year;
+  if (birth.month !== null && birth.day !== null) {
+    const birthdayPassed = today.month > birth.month || (today.month === birth.month && today.day >= birth.day);
+    if (!birthdayPassed) age -= 1;
+  }
+  return age >= 0 && age <= 130 ? age : null;
+}
+
+function normalizeParticipant(participant = {}) {
+  const copy = { ...participant };
+  const birth = birthDateParts(copy.birthYear);
+  const age = ageFromBirthDate(copy.birthYear);
+  if (age !== null) copy.age = age;
+  else delete copy.age;
+  return {
+    participant: copy,
+    birthYear: birth?.year ?? null,
+    age
+  };
+}
+
 function dataUrlBytes(value) {
   if (typeof value !== "string") return 0;
   const comma = value.indexOf(",");
@@ -47,6 +103,7 @@ function compactItemResponse(item) {
 export function normalizeSessionPayload(payload) {
   const now = new Date().toISOString();
   const id = payload.id || crypto.randomUUID();
+  const participantInfo = normalizeParticipant(payload.participant);
   const itemResponses = Array.isArray(payload.itemResponses)
     ? payload.itemResponses.map(compactItemResponse)
     : [];
@@ -54,6 +111,8 @@ export function normalizeSessionPayload(payload) {
   return {
     ...payload,
     id,
+    participant: participantInfo.participant,
+    participantAge: participantInfo.age,
     savedAt: now,
     itemResponses,
     storageMode: "cloudflare-d1"
@@ -62,8 +121,11 @@ export function normalizeSessionPayload(payload) {
 
 export function sessionRowParams(session) {
   const participant = session.participant || {};
+  const participantInfo = normalizeParticipant(participant);
   const slimPayload = {
     ...session,
+    participant: participantInfo.participant,
+    participantAge: participantInfo.age,
     itemResponses: session.itemResponses.map((item) => ({
       taskId: item.taskId,
       domain: item.domain,
@@ -80,10 +142,11 @@ export function sessionRowParams(session) {
   return [
     session.id,
     participant.name || "",
-    toInteger(participant.birthYear, null),
+    participantInfo.birthYear,
+    participantInfo.age,
     participant.gender || "",
     participant.educationLevel || "",
-    jsonString(participant, {}),
+    jsonString(participantInfo.participant, {}),
     session.startedAt || null,
     session.finishedAt || null,
     session.savedAt,
@@ -120,9 +183,12 @@ export function itemRowParams(sessionId, item) {
 }
 
 export function slimSessionFromRow(row) {
+  const participant = parseJson(row.participant_json, {});
+  if (row.participant_age !== undefined && row.participant_age !== null) participant.age = row.participant_age;
   return {
     id: row.id,
-    participant: parseJson(row.participant_json, {}),
+    participant,
+    participantAge: row.participant_age ?? participant.age ?? null,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
     savedAt: row.saved_at,
@@ -138,10 +204,13 @@ export function slimSessionFromRow(row) {
 
 export function fullSessionFromRows(sessionRow, itemRows) {
   const base = parseJson(sessionRow.payload_json, {});
+  const participant = parseJson(sessionRow.participant_json, {});
+  if (sessionRow.participant_age !== undefined && sessionRow.participant_age !== null) participant.age = sessionRow.participant_age;
   return {
     ...base,
     id: sessionRow.id,
-    participant: parseJson(sessionRow.participant_json, {}),
+    participant,
+    participantAge: sessionRow.participant_age ?? participant.age ?? base.participantAge ?? null,
     startedAt: sessionRow.started_at,
     finishedAt: sessionRow.finished_at,
     savedAt: sessionRow.saved_at,

@@ -18,7 +18,9 @@ const MIN_PLACE_DISTRACTOR_KM = 10;
 const DRAWING_CONFIRM_NUDGE_MS = 10000;
 const SPEECH_VOLUME = 1;
 const STATIC_TTS_MANIFEST_SRC = "./assets/audio/manifest.json";
-const ASR_ENDPOINT = "/api/asr";
+const LOCAL_DEV_API_ORIGIN = "http://127.0.0.1:5178";
+const API_ORIGIN = location.protocol === "file:" ? LOCAL_DEV_API_ORIGIN : "";
+const ASR_ENDPOINT = `${API_ORIGIN}/api/asr`;
 const ASR_TIMEOUT_MS = 90000;
 const FLUENCY_LIVE_ASR_INTERVAL_MS = 6500;
 const FLUENCY_LIVE_ASR_MIN_CHUNKS = 18;
@@ -40,6 +42,41 @@ const VOICE_PROFILES = {
   clear: { label: "清晰慢速", hints: ["google 普通话", "google 國語", "mandarin", "普通话", "中文"], rateScale: 0.82, pitchOffset: -0.16 },
   system: { label: "系统默认", hints: [], rateScale: 1.04, pitchOffset: -0.26 }
 };
+
+const SFX_SOURCES = {
+  nav: "./assets/sfx/nav.mp3",
+  pick: "./assets/sfx/pick.mp3",
+  recordStart: "./assets/sfx/record_start.mp3",
+  start: "./assets/sfx/start.mp3",
+  finish: "./assets/sfx/finish.mp3",
+  success: "./assets/sfx/success.mp3"
+};
+
+const ENCOURAGEMENTS = [
+  { text: "你真棒！", emoji: "🌟" },
+  { text: "完成得很好！", emoji: "👏" },
+  { text: "太出色了！", emoji: "✨" },
+  { text: "做得对，继续加油！", emoji: "💪" },
+  { text: "非常有耐心！", emoji: "👍" }
+];
+
+function playSfx(name) {
+  const src = SFX_SOURCES[name];
+  if (!src) return;
+  const audio = new Audio(src);
+  audio.volume = 0.5;
+  audio.play().catch(() => {});
+}
+
+function showEncouragement() {
+  const item = ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)];
+  const el = document.createElement("div");
+  el.className = "encouragement-toast";
+  el.innerHTML = `<span class="emoji">${item.emoji}</span><span>${item.text}</span>`;
+  document.body.appendChild(el);
+  playSfx("success");
+  window.setTimeout(() => el.remove(), 2600);
+}
 
 const animalEmojis = {
   lion: "🦁",
@@ -352,6 +389,7 @@ let trailDragPoint = null;
 let viewportRenderTimer = null;
 let drawingIdleTimers = [];
 let immediateInstructionPlayback = false;
+let setupVoiceRecorder = null;
 
 updateViewportMetrics();
 bindViewportMetrics();
@@ -406,6 +444,8 @@ function createInitialState() {
     permissions: { microphone: "unknown", location: "unknown" },
     voiceProfile: "cartoon",
     setupAttempted: false,
+    setupVoiceRecording: false,
+    setupVoiceTranscribing: false,
     adminSessions: [],
     selectedSession: null
   };
@@ -513,6 +553,8 @@ function migrateState() {
   state.permissions = state.permissions || { microphone: "unknown", location: "unknown" };
   state.voiceProfile = VOICE_PROFILES[state.voiceProfile] ? state.voiceProfile : "cartoon";
   state.setupAttempted = Boolean(state.setupAttempted);
+  state.setupVoiceRecording = Boolean(state.setupVoiceRecording);
+  state.setupVoiceTranscribing = Boolean(state.setupVoiceTranscribing);
   state.resumeAfterMemory2Index = Number.isInteger(state.resumeAfterMemory2Index) ? state.resumeAfterMemory2Index : null;
 }
 
@@ -539,6 +581,7 @@ function compactStateForDraft(value) {
 function resetState() {
   stopTimers();
   stopAudioPlayback();
+  stopSetupVoiceCapture({ releaseMic: true });
   stopVoiceInput({ releaseMic: true, shouldRender: false });
   localStorage.removeItem("moca-game-draft");
   state = createInitialState();
@@ -634,9 +677,14 @@ function renderSetup() {
           </div>
           <div class="setup-grid">
             ${inputField("participant.name", "姓名", state.participant.name, "", "text", isSetupFieldInvalid("name"))}
-            ${inputField("participant.birthYear", "出生年份", state.participant.birthYear, "", "number", isSetupFieldInvalid("birthYear"))}
+            ${inputField("participant.birthYear", "出生日期", setupBirthDateValue(state.participant.birthYear), "", "date", isSetupFieldInvalid("birthYear"))}
             ${segmentedField("sex", "性别", state.participant.sex, ["男", "女"], isSetupFieldInvalid("sex"))}
-            ${selectField("participant.educationLevel", "教育水平", state.participant.educationLevel, educationLevels, isSetupFieldInvalid("educationLevel"))}
+            ${segmentedField("educationLevel", "教育水平", state.participant.educationLevel, educationLevels.filter(Boolean), isSetupFieldInvalid("educationLevel"))}
+          </div>
+          <div class="voice-setup-row">
+            <button type="button" class="setup-voice-button ${state.setupVoiceRecording ? "recording" : ""} ${state.setupVoiceTranscribing ? "transcribing" : ""}" data-action="toggleSetupVoice" ${state.setupVoiceTranscribing ? "disabled" : ""}>
+              ${state.setupVoiceRecording ? "⏹ 正在聆听..." : state.setupVoiceTranscribing ? "⏳ 正在识别..." : "🎤 语音智能填表"}
+            </button>
           </div>
         </div>
         <div class="setup-play-zone">
@@ -654,6 +702,130 @@ function renderSetup() {
 
 function isSetupFieldInvalid(key) {
   return state.setupAttempted && !String(state.participant[key] || "").trim();
+}
+
+function setupBirthDateValue(value) {
+  const text = String(value || "").trim();
+  if (/^\d{4}$/.test(text)) return `${text}-01-01`;
+  return text;
+}
+
+async function toggleSetupVoiceRegistration() {
+  if (state.setupVoiceTranscribing) return;
+  if (state.setupVoiceRecording) {
+    const recorder = setupVoiceRecorder;
+    setupVoiceRecorder = null;
+    state.setupVoiceRecording = false;
+    state.setupVoiceTranscribing = true;
+    cleanupSetupVoiceRecorder(recorder);
+    releaseMicStream();
+    render();
+
+    const blob = wavBlobFromFloat32Chunks(recorder?.chunks || [], recorder?.sampleRate || 16000);
+    let text = "";
+    try {
+      const result = await requestAsrJson({ id: "setup" }, "registration", blob);
+      text = String(result?.text || result?.transcription || "").trim();
+    } catch (error) {
+      console.error("Setup voice ASR failed", error);
+    }
+
+    if (text) {
+      parseRegistrationVoiceText(text);
+      state.setupAttempted = false;
+    } else {
+      window.alert("没有识别到有效信息，请再试一次，或手动填写。");
+    }
+    state.setupVoiceTranscribing = false;
+    saveDraft();
+    render();
+    return;
+  }
+
+  try {
+    const stream = await getReusableMicStream();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass?.prototype?.createScriptProcessor) throw new Error("当前浏览器不支持录音");
+    const context = new AudioContextClass();
+    await context.resume?.().catch(() => {});
+    const source = context.createMediaStreamSource(stream);
+    const processor = context.createScriptProcessor(4096, 1, 1);
+    const chunks = [];
+    processor.onaudioprocess = (event) => {
+      chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+      event.outputBuffer.getChannelData(0).fill(0);
+    };
+    source.connect(processor);
+    processor.connect(context.destination);
+    setupVoiceRecorder = { chunks, context, processor, sampleRate: context.sampleRate, source };
+    state.setupVoiceRecording = true;
+    playSfx("recordStart");
+    render();
+  } catch (error) {
+    console.error("Setup voice recording failed", error);
+    state.permissions.microphone = "denied";
+    window.alert("无法启动麦克风，请允许浏览器麦克风权限后重试。");
+    saveDraft();
+    render();
+  }
+}
+
+function cleanupSetupVoiceRecorder(recorder = setupVoiceRecorder) {
+  if (!recorder) return;
+  recorder.processor.onaudioprocess = null;
+  try {
+    recorder.processor.disconnect();
+  } catch {}
+  try {
+    recorder.source.disconnect();
+  } catch {}
+  recorder.context.close?.().catch(() => {});
+}
+
+function stopSetupVoiceCapture({ releaseMic = false } = {}) {
+  cleanupSetupVoiceRecorder();
+  setupVoiceRecorder = null;
+  state.setupVoiceRecording = false;
+  state.setupVoiceTranscribing = false;
+  if (releaseMic) releaseMicStream();
+}
+
+function parseRegistrationVoiceText(text) {
+  const normalized = String(text || "").replace(/\s+/g, "");
+  const nameMatch = normalized.match(/(?:我叫|我是|姓名是|姓名叫|名字是|名字叫|名字叫作)([\u4e00-\u9fa5]{2,5})/);
+  if (nameMatch) {
+    state.participant.name = nameMatch[1].replace(/(今年|性别|出生|学历|文化|的|啊|呢|吧|啦).*$/, "");
+  } else if (!state.participant.name && normalized.length <= 8) {
+    state.participant.name = normalized;
+  }
+
+  const dateMatch = normalized.match(/(\d{4})年(?:(\d{1,2})月)?(?:(\d{1,2})[日号])?/);
+  if (dateMatch) {
+    const [, year, month = "1", day = "1"] = dateMatch;
+    state.participant.birthYear = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  if (normalized.includes("男")) state.participant.sex = "男";
+  else if (normalized.includes("女")) state.participant.sex = "女";
+
+  const eduMap = {
+    小学: "小学",
+    初中: "初中",
+    中专: "中专",
+    高中: "高中",
+    大专: "大专",
+    专科: "大专",
+    本科: "本科及以上",
+    大学: "本科及以上",
+    研究生: "本科及以上",
+    硕士: "本科及以上",
+    博士: "本科及以上"
+  };
+  Object.entries(eduMap).some(([keyword, value]) => {
+    if (!normalized.includes(keyword)) return false;
+    state.participant.educationLevel = value;
+    return true;
+  });
 }
 
 function inputField(path, label, value, placeholder, type = "text", invalid = false) {
@@ -677,10 +849,11 @@ function selectField(path, label, value, options, invalid = false) {
 }
 
 function segmentedField(key, label, value, options, invalid = false) {
+  const extraClass = options.length > 2 ? "edu-segment-options" : "";
   return html`
     <div class="field segmented-field ${invalid ? "invalid" : ""}">
       <span>${label}</span>
-      <div class="segmented-options">
+      <div class="segmented-options ${extraClass}">
         ${options.map((option) => `<button type="button" class="segment-option ${value === option ? "picked" : ""}" data-action="chooseParticipant" data-key="${key}" data-value="${escapeHtml(option)}">${escapeHtml(option)}</button>`).join("")}
       </div>
     </div>
@@ -760,8 +933,14 @@ function renderTask(task) {
   const waitAttr = speechTranscribing ? "disabled" : "";
   return html`
     <section class="single-page task-page">
-      <button class="edge-arrow edge-arrow-left" data-action="previousTask" aria-label="上一题" ${state.activeTaskIndex === 0 && step === 0 ? "disabled" : waitAttr}>‹</button>
-      <button class="edge-arrow edge-arrow-right" data-action="skipTask" aria-label="下一步" ${waitAttr}>›</button>
+      <button class="edge-arrow edge-arrow-left" data-action="previousTask" aria-label="上一题" ${state.activeTaskIndex === 0 && step === 0 ? "disabled" : waitAttr}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        <span class="arrow-label">上一题</span>
+      </button>
+      <button class="edge-arrow edge-arrow-right" data-action="skipTask" aria-label="下一题" ${waitAttr}>
+        <span class="arrow-label">下一题</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
       <div class="task-workspace">${renderTaskWorkspace(task, step)}</div>
       ${renderTaskActions(task, step)}
     </section>
@@ -789,7 +968,7 @@ function taskActionSecondaryButtons(task) {
   if (task.type === "drawing") return `<button class="utility-button" data-action="clearDrawing">重画</button>`;
   if (task.type === "choice" && getResponse(task.id).answer.audioReady) return `<button class="utility-button" data-action="backspaceDigit">删除</button>`;
   if (task.type === "serial7") return `<button class="utility-button" data-action="backspaceSerial">删除</button>`;
-  if (task.type === "memory" && getResponse(task.id).answer.audioReady) return `<button class="utility-button" data-action="playCurrentAudio">重听</button>`;
+  if (task.type === "memory" && getResponse(task.id).answer.audioReady) return `<button class="utility-button replay-button" data-action="playCurrentAudio">再听一遍</button>`;
   return "";
 }
 
@@ -849,11 +1028,25 @@ function renderTrailTask() {
 function renderDrawingTask(task) {
   return html`
     <div class="drawing-page ${task.drawingKind === "clock" ? "clock-page" : ""} ${task.drawingKind === "cube" ? "cube-page" : ""}">
-      ${task.drawingKind === "cube" ? `<div class="reference-panel">${cubeReferenceSvg()}</div>` : ""}
+      ${task.drawingKind === "cube" ? `
+        <div class="reference-panel">
+          <div class="reference-label">参照图</div>
+          ${cubeReferenceSvg()}
+        </div>
+        <div class="cube-arrow-hint">→</div>
+      ` : ""}
       <div class="canvas-wrap">
-        ${task.drawingKind === "clock" ? `<div class="clock-label">11:10</div>` : ""}
+        ${task.drawingKind === "clock" ? `
+          <div class="clock-label-block">
+            <span class="clock-label-icon">⏰</span>
+            <div class="clock-label-info">
+              <span class="clock-label-hint">目标时刻</span>
+              <span class="clock-label-time">11:10</span>
+            </div>
+          </div>
+        ` : ""}
         <div class="canvas-surface">
-          <canvas id="taskCanvas" class="task-canvas" aria-label="${escapeHtml(task.title)}画图区域"></canvas>
+          <canvas id="taskCanvas" class="task-canvas ${task.drawingKind === "cube" ? "cube-canvas" : ""}" aria-label="${escapeHtml(task.title)}画图区域"></canvas>
         </div>
       </div>
     </div>
@@ -970,8 +1163,10 @@ function renderFluencyTask() {
   return html`
     <div class="fluency-page">
       ${renderAudioWave()}
-      <button class="timer-button ${running ? "running" : waiting ? "" : "pulse"}" ${waiting ? "disabled" : `data-action="startFluency"`}>${waiting ? "请稍等" : running ? remaining : "开始"}</button>
-      <strong>已识别 ${animals.length} 个</strong>
+      <div class="speech-controls">
+        <button class="timer-button ${running ? "running" : waiting ? "" : "pulse"}" ${waiting ? "disabled" : `data-action="${running ? "stopFluency" : "startFluency"}"`}>${waiting ? "请稍等" : running ? "停止" : "开始"}</button>
+      </div>
+      <strong>${running ? `剩余 ${remaining} 秒` : `已识别 ${animals.length} 个`}</strong>
       ${renderTranscriptEditor(live, "fluency")}
     </div>
   `;
@@ -1078,8 +1273,11 @@ function renderAudioWave() {
         : "";
   const showLabel = voiceInputActive && label && !speechTranscribing;
   return html`
-    <div class="audio-wave ${active ? "active" : ""}" aria-label="${escapeHtml(label)}">
-      <span></span><span></span><span></span><span></span><span></span>
+    <div class="audio-wave-container">
+      <div class="audio-wave ${active ? "active" : ""}" aria-label="${escapeHtml(label)}">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      ${(playState === "播放中..." || speechTranscribing) ? `<div class="audio-progress"><div class="audio-progress-fill" id="audioProgressFill"></div></div>` : ""}
     </div>
     ${showLabel ? `<strong class="voice-status">${escapeHtml(label)}</strong>` : ""}
   `;
@@ -1093,7 +1291,7 @@ function renderAudioButton(action) {
   if (speechTranscribing) return `<button class="secondary circle-button sound-button" disabled>请稍等</button>`;
   if (recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">停止</button>`;
   if (current?.type === "sentence" && sentenceStepHasSpeechAttempt(current, getTaskStep(current))) {
-    return `<button class="primary circle-button sound-button" data-action="${action}">重播</button>`;
+    return `<button class="primary circle-button sound-button replay-button" data-action="${action}">再听一遍</button>`;
   }
   return `<button class="primary circle-button pulse sound-button" data-action="${action}">开始</button>`;
 }
@@ -1210,11 +1408,21 @@ function renderAdmin() {
 }
 
 function formatParticipantAge(participant = {}) {
-  const birthYear = Number.parseInt(participant.birthYear, 10);
-  if (!Number.isFinite(birthYear)) return "-";
-  const currentYear = new Date().getFullYear();
-  if (birthYear < 1900 || birthYear > currentYear) return "-";
-  return String(currentYear - birthYear);
+  const recordedAge = Number(participant.age);
+  if (Number.isFinite(recordedAge) && recordedAge >= 0 && recordedAge <= 130) return String(Math.round(recordedAge));
+  const match = String(participant.birthYear || "").trim().match(/^(\d{4})(?:\D+(\d{1,2}))?(?:\D+(\d{1,2}))?/);
+  if (!match) return "-";
+  const birthYear = Number(match[1]);
+  const birthMonth = match[2] ? Number(match[2]) : null;
+  const birthDay = match[3] ? Number(match[3]) : null;
+  const today = new Date();
+  if (!Number.isFinite(birthYear) || birthYear < 1900 || birthYear > today.getFullYear()) return "-";
+  let age = today.getFullYear() - birthYear;
+  if (birthMonth !== null && birthDay !== null) {
+    const birthdayPassed = today.getMonth() + 1 > birthMonth || (today.getMonth() + 1 === birthMonth && today.getDate() >= birthDay);
+    if (!birthdayPassed) age -= 1;
+  }
+  return age >= 0 && age <= 130 ? String(age) : "-";
 }
 
 function formatSavedTime(session) {
@@ -1236,7 +1444,8 @@ function renderSessionDetail(session) {
         ${detailMetric("原始分", session.rawScore ?? "-")}
         ${detailMetric("教育加分", session.educationBonus ?? "-")}
         ${detailMetric("题目数", itemResponses.length || session.itemCount || "-")}
-        ${detailMetric("出生年份", participant.birthYear || "-")}
+        ${detailMetric("出生日期", participant.birthYear || "-")}
+        ${detailMetric("年龄", formatParticipantAge(participant))}
         ${detailMetric("性别", participant.sex || participant.gender || "-")}
         ${detailMetric("教育水平", participant.educationLevel || "-")}
         ${detailMetric("保存时间", session.savedAt ? new Date(session.savedAt).toLocaleString() : "-")}
@@ -1382,7 +1591,7 @@ function renderRubricModal(item) {
 function databaseSchemaText() {
   return `Cloudflare D1 后台字段
 sessions:
-  id, participant_name, birth_year, gender, education_level
+  id, participant_name, birth_year, participant_age, gender, education_level
   started_at, finished_at, saved_at, total_duration_ms
   raw_score, education_bonus, total_score, risk_band, domain_scores_json
 
@@ -1413,15 +1622,23 @@ function setupFreeCanvas(task) {
   activeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   activeCtx.lineCap = "round";
   activeCtx.lineJoin = "round";
-  activeCtx.lineWidth = 5;
+  activeCtx.lineWidth = 8;
   activeCtx.strokeStyle = "#243447";
-  activeCtx.fillStyle = "#fffdf7";
+  activeCtx.fillStyle = "#ffffff";
   activeCtx.fillRect(0, 0, rect.width, rect.height);
 
   if (state.drawings[task.id]) {
     const image = new Image();
     image.onload = () => activeCtx.drawImage(image, 0, 0, rect.width, rect.height);
     image.src = state.drawings[task.id];
+  } else {
+    activeCtx.save();
+    activeCtx.font = "bold 28px Inter, PingFang SC, system-ui";
+    activeCtx.fillStyle = "rgba(36, 52, 71, 0.12)";
+    activeCtx.textAlign = "center";
+    activeCtx.textBaseline = "middle";
+    activeCtx.fillText("在这里画", rect.width / 2, rect.height / 2);
+    activeCtx.restore();
   }
 
   canvas.onpointerdown = (event) => {
@@ -1429,9 +1646,14 @@ function setupFreeCanvas(task) {
     markDrawingInteraction(task);
     canvas.setPointerCapture(event.pointerId);
     const point = canvasPoint(event, canvas);
+    const response = getResponse(task.id);
+    if (!response.behavior.strokes && !state.drawings[task.id]) {
+      activeCtx.fillStyle = "#ffffff";
+      activeCtx.fillRect(0, 0, rect.width, rect.height);
+      activeCtx.strokeStyle = "#243447";
+    }
     activeCtx.beginPath();
     activeCtx.moveTo(point.x, point.y);
-    const response = getResponse(task.id);
     response.behavior.strokes = (response.behavior.strokes || 0) + 1;
   };
   canvas.onpointermove = (event) => {
@@ -1499,6 +1721,7 @@ function setupTrailCanvas() {
     const point = canvasPoint(event, canvas);
     const node = nearestTrailNode(point, canvas);
     if (!node) return;
+    playSfx("pick");
     trailDragStart = node;
     trailDragPoint = point;
     canvas.setPointerCapture(event.pointerId);
@@ -1620,9 +1843,10 @@ function drawTrailCanvas(canvas, tick = 0) {
   activeCtx.setLineDash([]);
 
   if (trailDragStart && trailDragPoint) {
-    activeCtx.strokeStyle = "rgba(32, 166, 107, 0.72)";
-    activeCtx.lineWidth = 6;
-    activeCtx.setLineDash([12, 10]);
+    activeCtx.strokeStyle = "rgba(32, 166, 107, 0.80)";
+    activeCtx.lineWidth = 8;
+    activeCtx.setLineDash([14, 10]);
+    activeCtx.lineCap = "round";
     activeCtx.beginPath();
     activeCtx.moveTo(trailDragStart.x, trailDragStart.y);
     activeCtx.lineTo(trailDragPoint.x, trailDragPoint.y);
@@ -1632,15 +1856,25 @@ function drawTrailCanvas(canvas, tick = 0) {
 
   nodes.forEach((node) => {
     const used = state.trail.sequence.includes(node.label);
+    const isNewest = state.trail.sequence[state.trail.sequence.length - 1] === node.label && used;
+    if (isNewest) {
+      const pulse = (tick % 40) / 40;
+      const ringR = node.r + 8 + pulse * 14;
+      activeCtx.beginPath();
+      activeCtx.arc(node.x, node.y, ringR, 0, Math.PI * 2);
+      activeCtx.strokeStyle = `rgba(32, 166, 107, ${(1 - pulse) * 0.6})`;
+      activeCtx.lineWidth = 3;
+      activeCtx.stroke();
+    }
     activeCtx.beginPath();
-    activeCtx.fillStyle = used ? "#e8f8ef" : "#ffffff";
-    activeCtx.strokeStyle = used ? "#20a66b" : "#243447";
-    activeCtx.lineWidth = 3;
+    activeCtx.fillStyle = used ? "#d0f5e4" : "#ffffff";
+    activeCtx.strokeStyle = used ? "#16a865" : "#243447";
+    activeCtx.lineWidth = used ? 4 : 2.5;
     activeCtx.arc(node.x, node.y, node.r, 0, Math.PI * 2);
     activeCtx.fill();
     activeCtx.stroke();
-    activeCtx.fillStyle = "#243447";
-    activeCtx.font = "700 22px system-ui";
+    activeCtx.fillStyle = used ? "#0d7a48" : "#243447";
+    activeCtx.font = "800 28px Inter, 'PingFang SC', system-ui";
     activeCtx.textAlign = "center";
     activeCtx.textBaseline = "middle";
     activeCtx.fillText(node.label, node.x, node.y);
@@ -1698,11 +1932,11 @@ function trailNodes(canvas) {
     ["3", 0.78, 0.80],
     ["丙", 0.28, 0.86]
   ];
-  return points.map(([label, x, y]) => ({ label, x: x * w, y: y * h, r: 26 }));
+  return points.map(([label, x, y]) => ({ label, x: x * w, y: y * h, r: 34 }));
 }
 
 function nearestTrailNode(point, canvas) {
-  return trailNodes(canvas).find((node) => Math.sqrt((point.x - node.x) ** 2 + (point.y - node.y) ** 2) <= node.r + 10);
+  return trailNodes(canvas).find((node) => Math.sqrt((point.x - node.x) ** 2 + (point.y - node.y) ** 2) <= node.r + 14);
 }
 
 function canvasPoint(event, canvas) {
@@ -1733,7 +1967,16 @@ root.addEventListener("click", async (event) => {
   if (!target) return;
   const action = target.dataset.action;
   const current = tasks[state.activeTaskIndex];
+  if (action === "startSession") playSfx("start");
+  else if (["previousTask", "skipTask", "nextTask", "skipLogin", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
+  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoTrail", "clearTrail", "selectSavedSession"].includes(action)) playSfx("pick");
+
   if (action !== "tapVigilance") stopAudioPlayback();
+
+  if (action === "toggleSetupVoice") {
+    await toggleSetupVoiceRegistration();
+    return;
+  }
 
   if (action === "startSession") {
     if (!isParticipantComplete()) {
@@ -1835,6 +2078,7 @@ root.addEventListener("click", async (event) => {
     if (Date.now() - vigilancePointerTapAt > 500) tapVigilance();
   }
   if (action === "startFluency") await startFluency();
+  if (action === "stopFluency") stopFluency();
   if (action === "clearDrawing") {
     delete state.drawings[current.id];
     const response = getResponse(current.id);
@@ -1955,6 +2199,7 @@ async function nextTask() {
   const nextIndex = nextTaskIndexAfterSubmit(task);
   if (nextIndex < 0) {
     state.view = "results";
+    playSfx("finish");
     state.finishedAt = new Date().toISOString();
   } else {
     state.activeTaskIndex = nextIndex;
@@ -2024,6 +2269,7 @@ async function skipTask() {
   const nextIndex = nextTaskIndexAfterSubmit(task);
   if (nextIndex < 0) {
     state.view = "results";
+    playSfx("finish");
     state.finishedAt = new Date().toISOString();
   } else {
     state.activeTaskIndex = nextIndex;
@@ -2146,6 +2392,7 @@ async function submitActiveTask() {
   finishTask(task.id);
   if (needsAiScore(task)) response.ai = await scoreTaskWithAi(task);
   response.score = computeTaskScore(task, response);
+  showEncouragement();
   saveDraft();
 }
 
@@ -2251,12 +2498,24 @@ function playSentenceForRepeat(task, step) {
   const text = task.sentences[step];
   prepareSpeechInputBeforePlayback();
   if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
+  let started = false;
+  const fallbackTimer = window.setTimeout(() => {
+    if (started) return;
+    started = true;
+    startSentenceRepeat(task, step);
+  }, sentencePlaybackFallbackMs(text) + 1200);
+  const startRepeatOnce = () => {
+    if (started) return;
+    started = true;
+    window.clearTimeout(fallbackTimer);
+    startSentenceRepeat(task, step);
+  };
   return speakText(text, {
     audioKey: `stimulus:sentence:${step}`,
     rate: 0.86,
     purpose: "sentence",
     fallbackMs: sentencePlaybackFallbackMs(text),
-    done: () => startSentenceRepeat(task, step)
+    done: startRepeatOnce
   });
 }
 
@@ -2556,13 +2815,30 @@ function playAudioUrl(url, playbackId, onStart, done) {
       resolve(value);
     };
     const audio = new Audio(url);
+    let progressFrame = null;
+    const stopProgress = () => {
+      if (progressFrame) cancelAnimationFrame(progressFrame);
+      progressFrame = null;
+    };
+    const updateProgress = () => {
+      if (activeSpeechAudio !== audio || playbackId !== speechPlaybackId) return;
+      const fill = document.getElementById("audioProgressFill");
+      if (fill && Number.isFinite(audio.duration) && audio.duration > 0) {
+        fill.style.width = `${Math.min(100, (audio.currentTime / audio.duration) * 100)}%`;
+      }
+      progressFrame = requestAnimationFrame(updateProgress);
+    };
     activeSpeechAudio = audio;
     audio.volume = SPEECH_VOLUME;
     audio.onended = () => {
+      stopProgress();
+      const fill = document.getElementById("audioProgressFill");
+      if (fill) fill.style.width = "100%";
       if (activeSpeechAudio === audio) activeSpeechAudio = null;
       if (done) done();
     };
     audio.onerror = () => {
+      stopProgress();
       if (activeSpeechAudio === audio) activeSpeechAudio = null;
       if (resolved) {
         if (done) done();
@@ -2578,6 +2854,7 @@ function playAudioUrl(url, playbackId, onStart, done) {
           return;
         }
         if (onStart) onStart();
+        updateProgress();
         resolveOnce(true);
       })
       .catch(() => {
@@ -2963,6 +3240,7 @@ async function startAudioRecording(options = {}) {
       mediaRecorder.start();
     }
     recordingAudio = true;
+    playSfx("recordStart");
     voiceState = voicePromptText();
     render();
     return true;
@@ -3019,6 +3297,7 @@ async function startPcmAudioRecording(options = {}) {
     releaseMicAfterRecordingStop = false;
     recordingWillTranscribe = transcribeOnStop;
     recordingAudio = true;
+    playSfx("recordStart");
     voiceState = voicePromptText();
     if (task.type === "fluency" && transcribeOnStop) startFluencyLiveAsr(pcmRecorder);
     render();
@@ -3878,6 +4157,7 @@ async function autoAdvanceVigilance() {
   const nextIndex = nextTaskIndexAfterSubmit(task);
   if (nextIndex < 0) {
     state.view = "results";
+    playSfx("finish");
     state.finishedAt = new Date().toISOString();
   } else {
     state.activeTaskIndex = nextIndex;
@@ -3889,6 +4169,7 @@ async function autoAdvanceVigilance() {
 function tapVigilance(at = Date.now()) {
   const response = getResponse("vigilance");
   if (!response.answer.startedAt) return;
+  playSfx("pick");
   response.answer.taps = response.answer.taps || [];
   response.answer.taps.push(at);
   render();
@@ -3920,6 +4201,15 @@ async function startFluency() {
     }
     render();
   }, 1000);
+  render();
+}
+
+function stopFluency() {
+  const response = getResponse("fluency");
+  response.answer.running = false;
+  window.clearInterval(fluencyTimer);
+  stopVoiceInput();
+  saveDraft();
   render();
 }
 

@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
   participant_name TEXT,
   birth_year INTEGER,
+  participant_age INTEGER,
   gender TEXT,
   education_level TEXT,
   participant_json TEXT NOT NULL DEFAULT '{}',

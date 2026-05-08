@@ -12,6 +12,12 @@ const dataDir = process.env.DATA_DIR || join(root, "data");
 const sessionsFile = join(dataDir, "sessions.json");
 const port = Number(process.env.PORT || 5177);
 const host = process.env.HOST || (process.env.RENDER ? "0.0.0.0" : "127.0.0.1");
+const asrProxyEndpoint = process.env.ASR_PROXY_ENDPOINT || "https://cognition-hearing-game.pages.dev/api/asr";
+const apiCorsHeaders = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET,POST,OPTIONS",
+  "access-control-allow-headers": "content-type"
+};
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -55,21 +61,80 @@ async function writeSessions(sessions) {
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
-    let data = "";
+    const chunks = [];
+    let len = 0;
     req.on("data", (chunk) => {
-      data += chunk;
-      if (data.length > 25 * 1024 * 1024) {
+      chunks.push(chunk);
+      len += chunk.length;
+      if (len > 25 * 1024 * 1024) {
         reject(new Error("Request body too large"));
         req.destroy();
       }
     });
-    req.on("end", () => resolve(data));
+    req.on("end", () => resolve(Buffer.concat(chunks)));
     req.on("error", reject);
   });
 }
 
+async function readJsonBody(req) {
+  const body = await readBody(req);
+  return body.length ? JSON.parse(body.toString("utf8")) : {};
+}
+
+function birthDateParts(value) {
+  const match = String(value || "").trim().match(/^(\d{4})(?:\D+(\d{1,2}))?(?:\D+(\d{1,2}))?/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = match[2] ? Number(match[2]) : null;
+  const day = match[3] ? Number(match[3]) : null;
+  if (!Number.isInteger(year) || year < 1900 || year > 2100) return null;
+  if (month !== null && (month < 1 || month > 12)) return null;
+  if (day !== null && (day < 1 || day > 31)) return null;
+  return { year, month, day };
+}
+
+function todayParts() {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map((part) => [part.type, Number(part.value)]));
+    return { year: values.year, month: values.month, day: values.day };
+  } catch {
+    const now = new Date();
+    return {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+      day: now.getDate()
+    };
+  }
+}
+
+function ageFromBirthDate(value, today = todayParts()) {
+  const birth = birthDateParts(value);
+  if (!birth) return null;
+  let age = today.year - birth.year;
+  if (birth.month !== null && birth.day !== null) {
+    const birthdayPassed = today.month > birth.month || (today.month === birth.month && today.day >= birth.day);
+    if (!birthdayPassed) age -= 1;
+  }
+  return age >= 0 && age <= 130 ? age : null;
+}
+
+function normalizeParticipant(participant = {}) {
+  const copy = { ...participant };
+  const age = ageFromBirthDate(copy.birthYear);
+  if (age !== null) copy.age = age;
+  else delete copy.age;
+  return { participant: copy, age };
+}
+
 function sendJson(res, status, payload) {
   res.writeHead(status, {
+    ...apiCorsHeaders,
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store"
   });
@@ -81,6 +146,15 @@ function notFound(res) {
 }
 
 async function handleApi(req, res, url) {
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, {
+      ...apiCorsHeaders,
+      "cache-control": "no-store"
+    });
+    res.end();
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/health") {
     sendJson(res, 200, {
       ok: true,
@@ -96,6 +170,7 @@ async function handleApi(req, res, url) {
     const slim = sessions.map((session) => ({
       id: session.id,
       participant: session.participant,
+      participantAge: session.participantAge ?? session.participant?.age ?? null,
       startedAt: session.startedAt,
       finishedAt: session.finishedAt,
       totalDurationMs: session.totalDurationMs,
@@ -122,13 +197,15 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/sessions") {
-    const body = await readBody(req);
-    const payload = body ? JSON.parse(body) : {};
+    const payload = await readJsonBody(req);
     const sessions = await readSessions();
     const now = new Date().toISOString();
+    const participantInfo = normalizeParticipant(payload.participant);
     const saved = {
       ...payload,
       id: payload.id || crypto.randomUUID(),
+      participant: participantInfo.participant,
+      participantAge: participantInfo.age,
       savedAt: now
     };
     const index = sessions.findIndex((entry) => entry.id === saved.id);
@@ -143,8 +220,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/ai-score") {
-    const body = await readBody(req);
-    const payload = body ? JSON.parse(body) : {};
+    const payload = await readJsonBody(req);
 
     if (process.env.AI_SCORE_ENDPOINT) {
       const aiResponse = await fetch(process.env.AI_SCORE_ENDPOINT, {
@@ -186,22 +262,37 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/asr") {
-    await readBody(req);
-    sendJson(res, 501, {
-      error: "Local ASR is not configured",
-      message: "Cloudflare Workers AI Whisper 只在绑定了 AI 的 Cloudflare Pages Functions 中运行。本地调试请使用 wrangler pages dev --ai=AI。"
-    });
+    const body = await readBody(req);
+    try {
+      const remote = await fetch(`${asrProxyEndpoint}${url.search}`, {
+        method: "POST",
+        headers: { "content-type": req.headers["content-type"] || "application/octet-stream" },
+        body
+      });
+      const result = await remote.text();
+      res.writeHead(remote.status, {
+        ...apiCorsHeaders,
+        "content-type": remote.headers.get("content-type") || "application/json; charset=utf-8",
+        "cache-control": "no-store"
+      });
+      res.end(result);
+    } catch (error) {
+      sendJson(res, 502, {
+        error: "ASR proxy failed",
+        message: error?.message || "无法连接语音识别服务。"
+      });
+    }
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/tts") {
-    const body = await readBody(req);
-    const payload = body ? JSON.parse(body) : {};
+    const payload = await readJsonBody(req);
 
     try {
       const result = await synthesizeDoubaoSpeech(payload, process.env);
       const bytes = base64ChunksToUint8Array(result.audioBase64Chunks);
       res.writeHead(200, {
+        ...apiCorsHeaders,
         "content-type": result.mimeType,
         "cache-control": "no-store",
         "x-tts-provider": result.provider,
@@ -236,7 +327,7 @@ async function serveStatic(req, res, url) {
     const ext = extname(requested);
     res.writeHead(200, {
       "content-type": contentTypes[ext] || "application/octet-stream",
-      "cache-control": ["html", "js", "json"].includes(ext.slice(1)) ? "no-store" : "public, max-age=31536000, immutable"
+      "cache-control": ["html", "js", "json", "css"].includes(ext.slice(1)) ? "no-store" : "public, max-age=31536000, immutable"
     });
     createReadStream(requested).pipe(res);
   } catch {
