@@ -362,6 +362,18 @@ h4 {
   margin-top: 35px;
 }
 
+.setup-age-note {
+  margin: 16px 0 0;
+  color: var(--leaf-dark);
+  font-size: 18px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.setup-age-note.warning {
+  color: #d7392f;
+}
+
 .setup-voice-button {
   z-index: 2;
   min-height: 66px;
@@ -1071,6 +1083,7 @@ h4 {
 }
 
 .trail-page {
+  position: relative;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   gap: 10px;
@@ -1091,12 +1104,9 @@ h4 {
   align-items: stretch;
 }
 
-.drawing-page.cube-page {
-  grid-template-columns: minmax(260px, 1fr) 44px minmax(0, 1.35fr);
-}
-
+.drawing-page.cube-page,
 .drawing-page.clock-page {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(260px, 1fr) 44px minmax(0, 1.35fr);
 }
 
 .reference-panel {
@@ -1142,7 +1152,8 @@ h4 {
   height: 100%;
 }
 
-.cube-page .canvas-wrap {
+.cube-page .canvas-wrap,
+.clock-page .canvas-wrap {
   grid-template-rows: minmax(0, 1fr);
 }
 
@@ -1154,51 +1165,32 @@ h4 {
   height: 100%;
 }
 
-.clock-label-block {
-  justify-self: center;
-  display: flex;
-  align-items: center;
+.clock-reference-panel {
+  border-color: #c8d4e4;
+  border-left-color: var(--sky);
+  background: #f5f9ff;
+}
+
+.clock-time-reference {
+  display: grid;
+  place-items: center;
   gap: 14px;
-  margin-bottom: 14px;
-  padding: 10px 24px 10px 18px;
-  border: 2px solid #f5c97a;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #fff8f0 0%, #fff3e6 100%);
-  box-shadow: 0 4px 14px rgba(245, 166, 35, 0.18);
-}
-
-.clock-label-icon {
-  font-size: 40px;
-  line-height: 1;
-}
-
-.clock-label-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.clock-label-hint {
-  color: #c97c20;
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.clock-label-time {
-  color: #b86210;
-  font-size: 54px;
-  font-weight: 1000;
-  line-height: 1;
-}
-
-.clock-label {
-  justify-self: center;
-  margin-bottom: 12px;
+  padding: 28px 16px 10px;
   color: var(--ink);
-  font-size: 56px;
+  text-align: center;
+}
+
+.clock-time-reference strong {
+  font-size: clamp(82px, 10vw, 146px);
   font-weight: 1000;
-  line-height: 1;
+  line-height: 0.9;
+}
+
+.clock-time-reference span {
+  color: var(--muted);
+  font-size: clamp(26px, 2.8vw, 42px);
+  font-weight: 950;
+  line-height: 1.1;
 }
 
 .task-canvas {
@@ -1227,6 +1219,50 @@ h4 {
   font-size: 36px;
   font-weight: 950;
   opacity: 0.72;
+}
+
+.trail-completion-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(36, 52, 71, 0.22);
+}
+
+.trail-completion-panel {
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+  width: min(460px, 92%);
+  padding: 28px;
+  border: 3px solid var(--leaf);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(36, 52, 71, 0.22);
+  text-align: center;
+}
+
+.trail-completion-panel strong {
+  color: var(--ink);
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 1000;
+  line-height: 1.1;
+}
+
+.trail-completion-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(20px, 2.4vw, 28px);
+  font-weight: 900;
+}
+
+.trail-completion-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 12px;
+  width: min(340px, 100%);
 }
 
 .redraw-button {
@@ -2809,7 +2845,8 @@ h4 {
     display: none;
   }
 
-  .drawing-page.cube-page {
+  .drawing-page.cube-page,
+  .drawing-page.clock-page {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(170px, 0.42fr) 28px minmax(0, 1fr);
   }
@@ -3245,13 +3282,10 @@ h4 {
     padding: 8px;
   }
 
-  .drawing-page.cube-page {
+  .drawing-page.cube-page,
+  .drawing-page.clock-page {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(118px, 0.32fr) 22px minmax(0, 1fr);
-  }
-
-  .drawing-page.clock-page {
-    grid-template-rows: minmax(0, 1fr);
   }
 
   .reference-svg {
@@ -3259,18 +3293,17 @@ h4 {
     max-height: 96%;
   }
 
-  .clock-label-block {
-    margin-bottom: 6px;
-    padding: 8px 14px;
+  .clock-time-reference {
+    gap: 6px;
+    padding: 24px 10px 6px;
   }
 
-  .clock-label-time {
-    font-size: clamp(34px, 10vw, 44px);
+  .clock-time-reference strong {
+    font-size: clamp(48px, 12vw, 74px);
   }
 
-  .clock-label {
-    margin-bottom: 6px;
-    font-size: clamp(34px, 10vw, 44px);
+  .clock-time-reference span {
+    font-size: clamp(20px, 4vw, 28px);
   }
 
   .redraw-button {
@@ -3662,12 +3695,9 @@ h4 {
   }
 
   .drawing-page,
-  .drawing-page.cube-page {
-    grid-template-rows: minmax(104px, 0.3fr) minmax(0, 1fr);
-  }
-
+  .drawing-page.cube-page,
   .drawing-page.clock-page {
-    grid-template-rows: minmax(0, 1fr);
+    grid-template-rows: minmax(104px, 0.3fr) minmax(0, 1fr);
   }
 
   .option {
@@ -4314,7 +4344,8 @@ body,
     grid-template-columns: minmax(128px, 0.8fr) minmax(0, 1.45fr);
   }
 
-  .drawing-page.cube-page {
+  .drawing-page.cube-page,
+  .drawing-page.clock-page {
     grid-template-columns: minmax(128px, 0.8fr) 20px minmax(0, 1.45fr);
   }
 
@@ -4323,17 +4354,86 @@ body,
     font-size: 12px;
   }
 
-  .clock-label-block {
-    margin-bottom: 5px;
-    padding: 6px 12px;
+  .clock-time-reference {
+    gap: 4px;
+    padding: 20px 8px 4px;
   }
 
-  .clock-label-time,
-  .clock-label {
-    font-size: clamp(28px, 12svh, 42px);
+  .clock-time-reference strong {
+    font-size: clamp(44px, 13svh, 68px);
+  }
+
+  .clock-time-reference span {
+    font-size: clamp(16px, 5svh, 24px);
   }
 
   .transcript-input {
     height: clamp(48px, 17svh, 72px);
+  }
+}
+
+.setup-screen {
+  place-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+
+.setup-panel {
+  align-self: stretch;
+  justify-self: stretch;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  grid-template-columns: minmax(0, 1.18fr) minmax(220px, 0.62fr);
+  gap: clamp(28px, 4.8vw, 76px);
+  padding: clamp(28px, 5.2dvh, 76px) clamp(44px, 7.2vw, 118px);
+  border: 0;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.93);
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.setup-left {
+  align-self: center;
+}
+
+.setup-play-zone {
+  align-self: center;
+}
+
+@media (orientation: portrait), (max-width: 760px) {
+  .setup-screen {
+    overflow-y: auto;
+  }
+
+  .setup-panel {
+    width: 100%;
+    max-width: none;
+    min-height: 100%;
+    height: auto;
+    max-height: none;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(150px, auto);
+    align-content: center;
+    padding: clamp(22px, 4.6svh, 54px) clamp(20px, 6vw, 62px);
+    overflow-y: auto;
+  }
+
+  .setup-play-zone {
+    min-height: auto;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .setup-panel {
+    height: 100%;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(116px, 0.34fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: center;
+    padding: clamp(10px, 3svh, 18px) clamp(18px, 5vw, 50px);
+    overflow-y: auto;
   }
 }

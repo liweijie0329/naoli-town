@@ -29,7 +29,7 @@
     },
     {
       "key": "instruction:memory1:0",
-      "text": "这是一个记忆力测验。我会给您读几个词，您要注意听，一定要记住。当我读完后，请选出您记住的词。"
+      "text": "这是一个记忆力测验。我会给您读几个词，您要注意听，一定要记住，这些词后面还会再问。当我读完后，请选出您记住的词。"
     },
     {
       "key": "instruction:memory2:0",
@@ -46,26 +46,6 @@
     {
       "key": "instruction:vigilance:0",
       "text": "下面我要读出一系列数字，请注意听。每当我读到 1 的时候，您就敲一下按钮。当我读其他的数字时不要敲。"
-    },
-    {
-      "key": "instruction:serial7:0",
-      "text": "100 减 7 等于多少？"
-    },
-    {
-      "key": "instruction:serial7:1",
-      "text": "再减 7，等于多少？"
-    },
-    {
-      "key": "instruction:serial7:2",
-      "text": "再减 7，等于多少？"
-    },
-    {
-      "key": "instruction:serial7:3",
-      "text": "再减 7，等于多少？"
-    },
-    {
-      "key": "instruction:serial7:4",
-      "text": "再减 7，等于多少？"
     },
     {
       "key": "instruction:sentence:0",
@@ -112,71 +92,6 @@
       "text": "这里是什么地方？"
     },
     {
-      "key": "stimulus:memory1:word:0",
-      "text": "面孔",
-      "speedRatio": 0.82
-    },
-    {
-      "key": "stimulus:memory1:word:1",
-      "text": "天鹅绒",
-      "speedRatio": 0.82
-    },
-    {
-      "key": "stimulus:memory1:word:2",
-      "text": "教堂",
-      "speedRatio": 0.82
-    },
-    {
-      "key": "stimulus:memory1:word:3",
-      "text": "菊花",
-      "speedRatio": 0.82
-    },
-    {
-      "key": "stimulus:memory1:word:4",
-      "text": "红色",
-      "speedRatio": 0.82
-    },
-    {
-      "key": "stimulus:digitForward:digit:0",
-      "text": "2",
-      "speedRatio": 0.78
-    },
-    {
-      "key": "stimulus:digitForward:digit:1",
-      "text": "1",
-      "speedRatio": 0.78
-    },
-    {
-      "key": "stimulus:digitForward:digit:2",
-      "text": "8",
-      "speedRatio": 0.78
-    },
-    {
-      "key": "stimulus:digitForward:digit:3",
-      "text": "5",
-      "speedRatio": 0.78
-    },
-    {
-      "key": "stimulus:digitForward:digit:4",
-      "text": "4",
-      "speedRatio": 0.78
-    },
-    {
-      "key": "stimulus:digitBackward:digit:0",
-      "text": "7",
-      "speedRatio": 0.78
-    },
-    {
-      "key": "stimulus:digitBackward:digit:1",
-      "text": "4",
-      "speedRatio": 0.78
-    },
-    {
-      "key": "stimulus:digitBackward:digit:2",
-      "text": "2",
-      "speedRatio": 0.78
-    },
-    {
       "key": "stimulus:vigilance:digit:0",
       "text": "1",
       "speedRatio": 0.78
@@ -215,6 +130,1274 @@
       "key": "stimulus:sentence:1",
       "text": "当狗在房间里的时候，猫总是藏在沙发下",
       "speedRatio": 0.86
+    },
+    {
+      "key": "word:memory:01",
+      "text": "面孔",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:02",
+      "text": "天鹅绒",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:03",
+      "text": "教堂",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:04",
+      "text": "菊花",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:05",
+      "text": "红色",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:06",
+      "text": "学校",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:07",
+      "text": "苹果",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:08",
+      "text": "火车",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:09",
+      "text": "尺子",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:10",
+      "text": "蓝色",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:11",
+      "text": "鼻子",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:12",
+      "text": "医院",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:13",
+      "text": "绿色",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:14",
+      "text": "自行车",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:15",
+      "text": "手掌",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:16",
+      "text": "杯子",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:17",
+      "text": "钥匙",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:18",
+      "text": "窗户",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:19",
+      "text": "河流",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:20",
+      "text": "花园",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:21",
+      "text": "书包",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:22",
+      "text": "茶叶",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:23",
+      "text": "雨伞",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:24",
+      "text": "月亮",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:25",
+      "text": "桌子",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:26",
+      "text": "椅子",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:27",
+      "text": "电话",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:28",
+      "text": "鞋子",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:29",
+      "text": "衣服",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:30",
+      "text": "香蕉",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:31",
+      "text": "橙子",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:32",
+      "text": "报纸",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:33",
+      "text": "钱包",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:34",
+      "text": "门票",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:35",
+      "text": "铅笔",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:36",
+      "text": "毛巾",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:37",
+      "text": "手表",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:38",
+      "text": "灯泡",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:39",
+      "text": "桥梁",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:40",
+      "text": "森林",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:41",
+      "text": "面包",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:42",
+      "text": "牛奶",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:43",
+      "text": "剪刀",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:44",
+      "text": "枕头",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:45",
+      "text": "邮票",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:46",
+      "text": "照片",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:47",
+      "text": "草地",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:48",
+      "text": "石头",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:49",
+      "text": "海洋",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "word:memory:50",
+      "text": "音乐",
+      "speedRatio": 0.82
+    },
+    {
+      "key": "stimulus:digitForward:bank:01",
+      "text": "2 1 8 5 4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:02",
+      "text": "4 9 3 1 7",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:03",
+      "text": "7 2 6 0 5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:04",
+      "text": "5 8 4 2 9",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:05",
+      "text": "1 3 7 8 6",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:06",
+      "text": "9 0 5 2 4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:07",
+      "text": "6 4 1 3 9",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:08",
+      "text": "3 7 2 8 1",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:09",
+      "text": "8 5 0 7 3",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:10",
+      "text": "2 9 6 1 4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:11",
+      "text": "7 1 9 4 2",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:12",
+      "text": "4 6 3 8 0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:13",
+      "text": "5 2 8 1 6",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:14",
+      "text": "9 7 0 3 5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:15",
+      "text": "3 1 4 6 9",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:16",
+      "text": "6 8 2 0 7",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:17",
+      "text": "1 5 9 3 8",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:18",
+      "text": "7 4 6 2 1",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:19",
+      "text": "8 3 0 5 6",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:20",
+      "text": "2 9 1 7 5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:21",
+      "text": "6 0 8 2 4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:22",
+      "text": "4 7 5 9 0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:23",
+      "text": "1 3 2 5 8",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:24",
+      "text": "8 6 4 1 3",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:25",
+      "text": "5 2 0 9 7",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:26",
+      "text": "3 8 9 6 1",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:27",
+      "text": "7 4 1 0 5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:28",
+      "text": "9 2 6 4 8",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:29",
+      "text": "7 0 5 3 2",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:30",
+      "text": "6 1 4 8 2",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:31",
+      "text": "2 7 9 5 0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:32",
+      "text": "8 3 6 1 4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:33",
+      "text": "1 5 2 7 9",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:34",
+      "text": "4 9 7 2 0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:35",
+      "text": "3 6 0 8 1",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:36",
+      "text": "7 8 5 2 4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:37",
+      "text": "2 4 1 9 6",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:38",
+      "text": "9 0 8 5 3",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:39",
+      "text": "6 7 4 2 0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:40",
+      "text": "3 1 9 8 5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:41",
+      "text": "5 6 2 9 0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:42",
+      "text": "8 4 7 1 3",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:43",
+      "text": "2 9 5 0 6",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:44",
+      "text": "7 3 0 4 8",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:45",
+      "text": "4 1 8 6 2",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:46",
+      "text": "9 6 3 1 5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:47",
+      "text": "5 0 7 2 9",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:48",
+      "text": "6 8 1 4 3",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:49",
+      "text": "2 5 4 8 7",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitForward:bank:50",
+      "text": "7 9 0 1 6",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:01",
+      "text": "7 4 2",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:02",
+      "text": "3 1 8",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:03",
+      "text": "9 6 5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:04",
+      "text": "2 0 4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:05",
+      "text": "5 7 1",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:06",
+      "text": "8 3 6",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:07",
+      "text": "4 2 9",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:08",
+      "text": "7 5 0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:09",
+      "text": "1 6 3",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:10",
+      "text": "5 9 2",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:11",
+      "text": "8 4 7",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:12",
+      "text": "3 0 6",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:13",
+      "text": "9 1 8",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:14",
+      "text": "2 7 5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:15",
+      "text": "6 4 0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:16",
+      "text": "3 8 1",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:17",
+      "text": "7 2 9",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:18",
+      "text": "5 0 4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:19",
+      "text": "1 9 6",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:20",
+      "text": "8 5 2",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:21",
+      "text": "4 1 7",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:22",
+      "text": "6 3 0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:23",
+      "text": "2 8 4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:24",
+      "text": "7 5 9",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:25",
+      "text": "3 2 1",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:26",
+      "text": "9 0 7",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:27",
+      "text": "5 6 8",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:28",
+      "text": "1 4 3",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:29",
+      "text": "6 9 0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:30",
+      "text": "2 3 5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:31",
+      "text": "8 1 4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:32",
+      "text": "3 7 6",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:33",
+      "text": "9 2 0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:34",
+      "text": "4 8 5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:35",
+      "text": "1 3 7",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:36",
+      "text": "6 0 2",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:37",
+      "text": "9 5 1",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:38",
+      "text": "7 2 4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:39",
+      "text": "5 8 0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:40",
+      "text": "3 6 9",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:41",
+      "text": "2 4 8",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:42",
+      "text": "7 9 1",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:43",
+      "text": "4 3 0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:44",
+      "text": "8 6 5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:45",
+      "text": "1 2 9",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:46",
+      "text": "7 0 4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:47",
+      "text": "5 8 6",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:48",
+      "text": "3 1 2",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:49",
+      "text": "9 4 7",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "stimulus:digitBackward:bank:50",
+      "text": "2 6 0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "digit:0",
+      "text": "0",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "digit:1",
+      "text": "1",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "digit:2",
+      "text": "2",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "digit:3",
+      "text": "3",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "digit:4",
+      "text": "4",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "digit:5",
+      "text": "5",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "digit:6",
+      "text": "6",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "digit:7",
+      "text": "7",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "digit:8",
+      "text": "8",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "digit:9",
+      "text": "9",
+      "speedRatio": 0.78
+    },
+    {
+      "key": "instruction:serialSubtraction:1:0",
+      "text": "100 减 1 等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:1:1",
+      "text": "再减 1，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:1:2",
+      "text": "再减 1，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:1:3",
+      "text": "再减 1，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:1:4",
+      "text": "再减 1，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:2:0",
+      "text": "100 减 2 等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:2:1",
+      "text": "再减 2，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:2:2",
+      "text": "再减 2，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:2:3",
+      "text": "再减 2，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:2:4",
+      "text": "再减 2，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:3:0",
+      "text": "100 减 3 等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:3:1",
+      "text": "再减 3，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:3:2",
+      "text": "再减 3，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:3:3",
+      "text": "再减 3，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:3:4",
+      "text": "再减 3，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:4:0",
+      "text": "100 减 4 等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:4:1",
+      "text": "再减 4，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:4:2",
+      "text": "再减 4，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:4:3",
+      "text": "再减 4，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:4:4",
+      "text": "再减 4，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:5:0",
+      "text": "100 减 5 等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:5:1",
+      "text": "再减 5，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:5:2",
+      "text": "再减 5，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:5:3",
+      "text": "再减 5，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:5:4",
+      "text": "再减 5，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:6:0",
+      "text": "100 减 6 等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:6:1",
+      "text": "再减 6，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:6:2",
+      "text": "再减 6，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:6:3",
+      "text": "再减 6，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:6:4",
+      "text": "再减 6，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:7:0",
+      "text": "100 减 7 等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:7:1",
+      "text": "再减 7，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:7:2",
+      "text": "再减 7，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:7:3",
+      "text": "再减 7，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:7:4",
+      "text": "再减 7，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:8:0",
+      "text": "100 减 8 等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:8:1",
+      "text": "再减 8，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:8:2",
+      "text": "再减 8，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:8:3",
+      "text": "再减 8，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:8:4",
+      "text": "再减 8，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:9:0",
+      "text": "100 减 9 等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:9:1",
+      "text": "再减 9，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:9:2",
+      "text": "再减 9，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:9:3",
+      "text": "再减 9，等于多少？"
+    },
+    {
+      "key": "instruction:serialSubtraction:9:4",
+      "text": "再减 9，等于多少？"
+    },
+    {
+      "key": "text:d8vzub",
+      "text": "狮子"
+    },
+    {
+      "key": "text:1r46mp2",
+      "text": "老虎"
+    },
+    {
+      "key": "text:4gmi3w",
+      "text": "豹子"
+    },
+    {
+      "key": "text:194u47p",
+      "text": "狐狸"
+    },
+    {
+      "key": "text:5exq0a",
+      "text": "河马"
+    },
+    {
+      "key": "text:7etu4",
+      "text": "犀牛"
+    },
+    {
+      "key": "text:her9rc",
+      "text": "水牛"
+    },
+    {
+      "key": "text:evv8gx",
+      "text": "野猪"
+    },
+    {
+      "key": "text:1hulp9z",
+      "text": "长颈鹿"
+    },
+    {
+      "key": "text:1semtxn",
+      "text": "马"
+    },
+    {
+      "key": "text:1peime7",
+      "text": "骆驼"
+    },
+    {
+      "key": "text:1xziacz",
+      "text": "羊驼"
+    },
+    {
+      "key": "text:1m8vot",
+      "text": "水果"
+    },
+    {
+      "key": "text:19qaby4",
+      "text": "运输工具"
+    },
+    {
+      "key": "text:xlmlt3",
+      "text": "交通工具"
+    },
+    {
+      "key": "text:1k5zy5c",
+      "text": "旅行用的"
+    },
+    {
+      "key": "text:8w1fdu",
+      "text": "劳动工具"
+    },
+    {
+      "key": "text:32zmb3",
+      "text": "清洁工具"
+    },
+    {
+      "key": "text:1b990j4",
+      "text": "厨房工具"
+    },
+    {
+      "key": "text:1ay5fqd",
+      "text": "修理工具"
+    },
+    {
+      "key": "text:1dah0qy",
+      "text": "园艺工具"
+    },
+    {
+      "key": "text:12b9w61",
+      "text": "写字工具"
+    },
+    {
+      "key": "text:1t84jy4",
+      "text": "绘画工具"
+    },
+    {
+      "key": "text:paz8kh",
+      "text": "计算工具"
+    },
+    {
+      "key": "text:92j45h",
+      "text": "测量仪器"
+    },
+    {
+      "key": "text:1g4syf7",
+      "text": "测量用的"
+    },
+    {
+      "key": "text:ru2uzl",
+      "text": "吃饭用的"
+    },
+    {
+      "key": "text:195g47o",
+      "text": "做饭用的"
+    },
+    {
+      "key": "text:1xyh3wc",
+      "text": "照明用的"
+    },
+    {
+      "key": "text:1dhikf6",
+      "text": "穿戴用的"
+    },
+    {
+      "key": "text:17hgfj4",
+      "text": "娱乐用的"
+    },
+    {
+      "key": "text:61ffwt",
+      "text": "装东西用的"
+    },
+    {
+      "key": "text:h7r3tp",
+      "text": "医疗仪器"
+    },
+    {
+      "key": "text:7yub84",
+      "text": "音乐仪器"
+    },
+    {
+      "key": "text:vkv1eu",
+      "text": "通信仪器"
+    },
+    {
+      "key": "text:17ecasv",
+      "text": "运动仪器"
+    },
+    {
+      "key": "text:bl8oxg",
+      "text": "教学仪器"
+    },
+    {
+      "key": "text:hi8jb8",
+      "text": "摄影仪器"
+    },
+    {
+      "key": "text:rcd29e",
+      "text": "星期日"
+    },
+    {
+      "key": "text:1h2mt5l",
+      "text": "星期一"
+    },
+    {
+      "key": "text:kvz4al",
+      "text": "星期二"
+    },
+    {
+      "key": "text:1j0k10e",
+      "text": "星期三"
+    },
+    {
+      "key": "text:154of3c",
+      "text": "星期四"
+    },
+    {
+      "key": "text:n3vxud",
+      "text": "星期五"
+    },
+    {
+      "key": "text:1szltje",
+      "text": "星期六"
+    },
+    {
+      "key": "text:m4yqcw",
+      "text": "杭州市"
+    },
+    {
+      "key": "text:1khrudw",
+      "text": "上海市"
+    },
+    {
+      "key": "text:1g28wro",
+      "text": "南京市"
+    },
+    {
+      "key": "text:1x7cif9",
+      "text": "西安市"
+    },
+    {
+      "key": "text:hsxb0l",
+      "text": "社区中心"
+    },
+    {
+      "key": "text:1prg2aw",
+      "text": "医院"
+    },
+    {
+      "key": "text:12aasa0",
+      "text": "学校"
+    },
+    {
+      "key": "text:fum976",
+      "text": "公园"
+    },
+    {
+      "key": "text:8b57f7",
+      "text": "电脑"
+    },
+    {
+      "key": "text:sh9agf",
+      "text": "无聊"
+    },
+    {
+      "key": "text:yqzr2d",
+      "text": "写字用的"
+    },
+    {
+      "key": "text:150kitb",
+      "text": "清洁用的"
+    },
+    {
+      "key": "text:q64zlm",
+      "text": "照明仪器"
+    },
+    {
+      "key": "text:1w5ykuy",
+      "text": "厨房仪器"
+    },
+    {
+      "key": "text:1ajyf8k",
+      "text": "北京市"
+    },
+    {
+      "key": "text:1wssarq",
+      "text": "苏州市"
+    },
+    {
+      "key": "text:1wr1sxi",
+      "text": "广州市"
+    },
+    {
+      "key": "text:841n3h",
+      "text": "深圳市"
+    },
+    {
+      "key": "text:1n6jisc",
+      "text": "成都市"
+    },
+    {
+      "key": "text:8szek6",
+      "text": "武汉市"
+    },
+    {
+      "key": "text:eaxi9k",
+      "text": "青岛市"
+    },
+    {
+      "key": "text:kcqfhv",
+      "text": "厦门市"
+    },
+    {
+      "key": "text:ik26eb",
+      "text": "天津市"
+    },
+    {
+      "key": "text:16qjs9s",
+      "text": "大学"
+    },
+    {
+      "key": "text:i2fxdl",
+      "text": "图书馆"
+    },
+    {
+      "key": "text:1uaq418",
+      "text": "体育中心"
+    },
+    {
+      "key": "text:ra1s7y",
+      "text": "博物馆"
     }
   ]
 }

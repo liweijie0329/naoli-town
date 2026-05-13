@@ -1,15 +1,39 @@
-const WORDS = ["面孔", "天鹅绒", "教堂", "菊花", "红色"];
+const MEMORY_WORD_BANK = [
+  "面孔", "天鹅绒", "教堂", "菊花", "红色", "学校", "苹果", "火车", "尺子", "蓝色",
+  "鼻子", "医院", "绿色", "自行车", "手掌", "杯子", "钥匙", "窗户", "河流", "花园",
+  "书包", "茶叶", "雨伞", "月亮", "桌子", "椅子", "电话", "鞋子", "衣服", "香蕉",
+  "橙子", "报纸", "钱包", "门票", "铅笔", "毛巾", "手表", "灯泡", "桥梁", "森林",
+  "面包", "牛奶", "剪刀", "枕头", "邮票", "照片", "草地", "石头", "海洋", "音乐"
+];
+const MEMORY_TARGET_COUNT = 5;
+const MEMORY_CANDIDATE_COUNT = 10;
 const TRAIL_EXPECTED = ["1", "甲", "2", "乙", "3", "丙", "4", "丁", "5", "戊"];
 const VIGILANCE_DIGITS = "152945".split("");
 const DIGIT_PAD = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+const DIGIT_FORWARD_BANK = [
+  "21854", "49317", "72605", "58429", "13786", "90524", "64139", "37281", "85073", "29614",
+  "71942", "46380", "52816", "97035", "31469", "68207", "15938", "74621", "83056", "29175",
+  "60824", "47590", "13258", "86413", "52097", "38961", "74105", "92648", "70532", "61482",
+  "27950", "83614", "15279", "49720", "36081", "78524", "24196", "90853", "67420", "31985",
+  "56290", "84713", "29506", "73048", "41862", "96315", "50729", "68143", "25487", "79016"
+].map((stimulus, index) => ({ id: String(index + 1).padStart(2, "0"), stimulus, answer: stimulus }));
+const DIGIT_BACKWARD_BANK = [
+  "742", "318", "965", "204", "571", "836", "429", "750", "163", "592",
+  "847", "306", "918", "275", "640", "381", "729", "504", "196", "852",
+  "417", "630", "284", "759", "321", "907", "568", "143", "690", "235",
+  "814", "376", "920", "485", "137", "602", "951", "724", "580", "369",
+  "248", "791", "430", "865", "129", "704", "586", "312", "947", "260"
+].map((stimulus, index) => ({ id: String(index + 1).padStart(2, "0"), stimulus, answer: stimulus.split("").reverse().join("") }));
 const MEMORY_WAIT_MS = 5 * 60 * 1000;
 const LOCAL_SESSIONS_KEY = "moca-game-local-sessions";
 const LOGO_SRC = "./assets/logo.svg";
 const MOCA_SHEET_IMAGE = "./assets/moca/moca-page.png";
 const NATURAL_VOICE_HINTS = ["xiaoxiao", "xiaoyi", "xiaobei", "ting-ting", "tingting", "mei-jia", "meijia", "google 普通话", "google 國語", "mandarin", "普通话", "美佳", "sin-ji"];
-const MEMORY_OPTIONS_A = ["面孔", "学校", "红色", "天鹅绒", "苹果", "教堂", "火车", "菊花", "尺子", "蓝色"];
-const MEMORY_OPTIONS_B = ["菊花", "鼻子", "天鹅绒", "绿色", "面孔", "医院", "红色", "自行车", "教堂", "手掌"];
-const ABSTRACTION_DISTRACTORS = ["电脑", "学校", "无聊", "天气", "杯子", "音乐", "铅笔", "花园", "电视", "袜子", "面包", "椅子", "彩虹", "玩具", "月亮", "云朵"];
+const ABSTRACTION_DISTRACTORS_BY_SUFFIX = {
+  工具: ["劳动工具", "清洁工具", "厨房工具", "修理工具", "园艺工具", "写字工具", "绘画工具", "计算工具"],
+  用的: ["吃饭用的", "写字用的", "做饭用的", "清洁用的", "照明用的", "穿戴用的", "娱乐用的", "装东西用的"],
+  仪器: ["医疗仪器", "音乐仪器", "照明仪器", "通信仪器", "厨房仪器", "运动仪器", "教学仪器", "摄影仪器"]
+};
 const CITY_DISTRACTORS = ["北京市", "上海市", "杭州市", "苏州市", "广州市", "深圳市", "成都市", "武汉市", "西安市", "青岛市", "厦门市", "天津市"];
 const DEFAULT_CITY_OPTIONS = ["杭州市", "上海市", "南京市", "西安市"];
 const DEFAULT_PLACE_OPTIONS = ["社区中心", "医院", "学校", "公园"];
@@ -112,30 +136,13 @@ const SFX_SOURCES = {
   success: "./assets/sfx/success.mp3"
 };
 
-const ENCOURAGEMENTS = [
-  { text: "你真棒！", emoji: "🌟" },
-  { text: "完成得很好！", emoji: "👏" },
-  { text: "太出色了！", emoji: "✨" },
-  { text: "做得对，继续加油！", emoji: "💪" },
-  { text: "非常有耐心！", emoji: "👍" }
-];
-
 function playSfx(name) {
+  if (["pick", "success", "finish"].includes(name)) return;
   const src = SFX_SOURCES[name];
   if (!src) return;
   const audio = new Audio(src);
-  audio.volume = 0.5;
+  audio.volume = 0.18;
   audio.play().catch(() => {});
-}
-
-function showEncouragement() {
-  const item = ENCOURAGEMENTS[Math.floor(Math.random() * ENCOURAGEMENTS.length)];
-  const el = document.createElement("div");
-  el.className = "encouragement-toast";
-  el.innerHTML = `<span class="emoji">${item.emoji}</span><span>${item.text}</span>`;
-  document.body.appendChild(el);
-  playSfx("success");
-  window.setTimeout(() => el.remove(), 2600);
 }
 
 const animalEmojis = {
@@ -247,10 +254,9 @@ const tasks = [
     type: "memory",
     modality: "语音+10选5",
     prompt: "我会读几个词，请您注意听并记住。读完后，把记住的词告诉我。",
-    instruction: "这是一个记忆力测验。我会给您读几个词，您要注意听，一定要记住。当我读完后，请选出您记住的词。",
+    instruction: "这是一个记忆力测验。我会给您读几个词，您要注意听，一定要记住，这些词后面还会再问。当我读完后，请选出您记住的词。",
     scoring: "第一次学习不计入总分，仅记录编码表现和用时。",
-    trial: 1,
-    options: MEMORY_OPTIONS_A
+    trial: 1
   },
   {
     id: "memory2",
@@ -261,9 +267,8 @@ const tasks = [
     modality: "10选5",
     prompt: "请从这些词中选出刚才记过的 5 个词。",
     instruction: "刚才我给您读了几个词让您记住，请您再尽量回忆一下，选出这些词都有什么。",
-    scoring: "选出一个正确词给 1 分，共 5 分。",
-    trial: 2,
-    options: MEMORY_OPTIONS_B
+    scoring: "选出一个正确目标词给 1 分，共 5 分。",
+    trial: 2
   },
   {
     id: "digitForward",
@@ -274,9 +279,8 @@ const tasks = [
     modality: "听觉+数字卡",
     prompt: "请听一串数字，听完后按原顺序点击数字卡。",
     instruction: "下面我说一些数字，您仔细听。说完后，请按原来的顺序选择出来。",
-    scoring: "顺背 21854 完全正确给 1 分，否则 0 分。",
-    stimulus: "21854",
-    answer: "21854"
+    scoring: "从 50 道五位数字题本中随机抽取 1 道，按原顺序完全正确给 1 分，否则 0 分。",
+    bank: DIGIT_FORWARD_BANK
   },
   {
     id: "digitBackward",
@@ -287,9 +291,8 @@ const tasks = [
     modality: "听觉+数字卡",
     prompt: "请听一串数字，听完后按倒着的顺序点击数字卡。",
     instruction: "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。",
-    scoring: "读出 742，倒背正确答案为 247；完全正确给 1 分，否则 0 分。",
-    stimulus: "742",
-    answer: "247"
+    scoring: "从 50 道三位数字题本中随机抽取 1 道，倒背完全正确给 1 分，否则 0 分。",
+    bank: DIGIT_BACKWARD_BANK
   },
   {
     id: "vigilance",
@@ -305,13 +308,13 @@ const tasks = [
   {
     id: "serial7",
     domain: "注意",
-    title: "100 连续减 7",
+    title: "100 连续减随机数",
     maxScore: 3,
     type: "serial7",
     modality: "数字键盘",
-    prompt: "请从 100 中减去 7，再从得数中继续减 7，一共算 5 次。",
-    instruction: "现在请您做一道计算题，从 100 中减去一个 7，而后从得数中再减去一个 7，一直往下减，直到我让您停下为止。",
-    scoring: "4-5 个正确给 3 分，2-3 个正确给 2 分，1 个正确给 1 分，0 个正确给 0 分。"
+    prompt: "请从 100 中减去指定数字，再从得数中继续减同一个数字，一共算 5 次。",
+    instruction: "现在请您做一道计算题，从 100 中减去指定数字，而后从得数中再减去同一个数字，一直往下减，直到我让您停下为止。",
+    scoring: "每次测评从 1-9 中随机抽取一个减数。4-5 个正确给 3 分，2-3 个正确给 2 分，1 个正确给 1 分，0 个正确给 0 分。"
   },
   {
     id: "sentence",
@@ -351,8 +354,8 @@ const tasks = [
     scoring: "交通/运输工具 1 分；测量仪器/测量用的 1 分。",
     items: [
       { key: "orangeBanana", words: ["桔子", "香蕉"], emojis: ["🍊", "🍌"], answer: "水果", options: ["水果", "电脑", "学校", "无聊"], practice: true },
-      { key: "trainBike", words: ["火车", "自行车"], emojis: ["🚆", "🚲"], answer: "交通工具", options: ["交通工具", "电脑", "学校", "无聊"] },
-      { key: "watchRuler", words: ["手表", "尺子"], emojis: ["⌚", "📏"], answer: "测量仪器", options: ["测量仪器", "电脑", "学校", "无聊"] }
+      { key: "trainBike", words: ["火车", "自行车"], emojis: ["🚆", "🚲"], correctAnswers: ["运输工具", "交通工具", "旅行用的"] },
+      { key: "watchRuler", words: ["手表", "尺子"], emojis: ["⌚", "📏"], correctAnswers: ["测量仪器", "测量用的"] }
     ]
   },
   {
@@ -391,7 +394,7 @@ const rubricGroups = [
       { title: "数字顺背", prompt: "下面我说一些数字，您仔细听。说完后，请按原来的顺序选择出来。", scoring: "复述准确给 1 分。", image: false },
       { title: "数字倒背", prompt: "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。", scoring: "倒背正确回答为 2-4-7，复述准确给 1 分。", image: false },
       { title: "警觉性", prompt: "下面我要读出一系列数字，请注意听。每当我读到 1 的时候，您就敲一下按钮。当我读其他数字时不要敲。", scoring: "完全正确或只有一次错误给 1 分，否则不给分。错误指读 1 时没有敲，或读其他数字时敲了。", image: false },
-      { title: "连续减 7", prompt: "从 100 中减去一个 7，而后从得数中再减去一个 7，一直往下减。", scoring: "全部错误记 0 分，1 个正确给 1 分，2-3 个正确给 2 分，4-5 个正确给 3 分。每一个减数单独评定。", image: false }
+      { title: "100 连续减随机数", prompt: "从 100 中连续减去本次随机抽到的同一个数字，一共回答 5 步。", scoring: "全部错误记 0 分，1 个正确给 1 分，2-3 个正确给 2 分，4-5 个正确给 3 分。每一步按本次随机减数单独评定。", image: false }
     ]
   },
   {
@@ -516,6 +519,7 @@ function createInitialState() {
     responses: {},
     drawings: {},
     trail: createTrailState(),
+    taskRuntime: createTaskRuntime(),
     memoryWaitStartedAt: null,
     resumeAfterMemory2Index: null,
     playedInstructionKeys: {},
@@ -626,6 +630,7 @@ function migrateState() {
   delete state.participant.expectedCity;
   state.responses = state.responses || {};
   state.drawings = state.drawings || {};
+  state.taskRuntime = normalizeTaskRuntime(state.taskRuntime);
   state.trail = normalizeTrailState(state.trail);
   state.playedInstructionKeys = state.playedInstructionKeys || {};
   state.permissions = state.permissions || { microphone: "unknown", location: "unknown" };
@@ -703,6 +708,106 @@ function getResponse(taskId) {
   return state.responses[taskId];
 }
 
+function createTaskRuntime() {
+  const memoryCandidates = shuffle(MEMORY_WORD_BANK).slice(0, MEMORY_CANDIDATE_COUNT);
+  const memoryTargets = shuffle(memoryCandidates).slice(0, MEMORY_TARGET_COUNT);
+  const digitForward = randomBankItem(DIGIT_FORWARD_BANK);
+  const digitBackward = randomBankItem(DIGIT_BACKWARD_BANK);
+  return {
+    memoryCandidateWords: memoryCandidates,
+    memoryTargetWords: memoryTargets,
+    digitForwardBankId: digitForward.id,
+    digitForwardStimulus: digitForward.stimulus,
+    digitForwardAnswer: digitForward.answer,
+    digitBackwardBankId: digitBackward.id,
+    digitBackwardStimulus: digitBackward.stimulus,
+    digitBackwardAnswer: digitBackward.answer,
+    serialSubtractionNumber: randomInteger(1, 9)
+  };
+}
+
+function normalizeTaskRuntime(runtime = {}) {
+  const base = runtime && typeof runtime === "object" ? { ...runtime } : {};
+  const candidates = Array.isArray(base.memoryCandidateWords)
+    ? base.memoryCandidateWords.filter((word) => MEMORY_WORD_BANK.includes(word))
+    : [];
+  const targets = Array.isArray(base.memoryTargetWords)
+    ? base.memoryTargetWords.filter((word) => candidates.includes(word))
+    : [];
+  if (candidates.length !== MEMORY_CANDIDATE_COUNT || targets.length !== MEMORY_TARGET_COUNT) {
+    const fresh = createTaskRuntime();
+    base.memoryCandidateWords = fresh.memoryCandidateWords;
+    base.memoryTargetWords = fresh.memoryTargetWords;
+  }
+  const forward = DIGIT_FORWARD_BANK.find((entry) => entry.id === base.digitForwardBankId)
+    || DIGIT_FORWARD_BANK.find((entry) => entry.stimulus === base.digitForwardStimulus)
+    || randomBankItem(DIGIT_FORWARD_BANK);
+  base.digitForwardBankId = forward.id;
+  base.digitForwardStimulus = forward.stimulus;
+  base.digitForwardAnswer = forward.answer;
+
+  const backward = DIGIT_BACKWARD_BANK.find((entry) => entry.id === base.digitBackwardBankId)
+    || DIGIT_BACKWARD_BANK.find((entry) => entry.stimulus === base.digitBackwardStimulus)
+    || randomBankItem(DIGIT_BACKWARD_BANK);
+  base.digitBackwardBankId = backward.id;
+  base.digitBackwardStimulus = backward.stimulus;
+  base.digitBackwardAnswer = backward.answer;
+
+  const serialNumber = Number(base.serialSubtractionNumber);
+  base.serialSubtractionNumber = Number.isInteger(serialNumber) && serialNumber >= 1 && serialNumber <= 9
+    ? serialNumber
+    : randomInteger(1, 9);
+  return base;
+}
+
+function ensureTaskRuntime() {
+  state.taskRuntime = normalizeTaskRuntime(state.taskRuntime);
+  return state.taskRuntime;
+}
+
+function randomBankItem(bank) {
+  return bank[Math.floor(Math.random() * bank.length)];
+}
+
+function randomInteger(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function memoryCandidateWords() {
+  return ensureTaskRuntime().memoryCandidateWords;
+}
+
+function memoryTargetWords() {
+  return ensureTaskRuntime().memoryTargetWords;
+}
+
+function memoryWordAudioKey(word) {
+  const index = MEMORY_WORD_BANK.indexOf(word);
+  return index >= 0 ? `word:memory:${String(index + 1).padStart(2, "0")}` : "";
+}
+
+function activeDigitItem(task) {
+  const runtime = ensureTaskRuntime();
+  if (task.id === "digitForward") {
+    return {
+      bankId: runtime.digitForwardBankId,
+      stimulus: runtime.digitForwardStimulus,
+      answer: runtime.digitForwardAnswer,
+      audioKey: `stimulus:digitForward:bank:${runtime.digitForwardBankId}`
+    };
+  }
+  return {
+    bankId: runtime.digitBackwardBankId,
+    stimulus: runtime.digitBackwardStimulus,
+    answer: runtime.digitBackwardAnswer,
+    audioKey: `stimulus:digitBackward:bank:${runtime.digitBackwardBankId}`
+  };
+}
+
+function serialSubtractionNumber() {
+  return ensureTaskRuntime().serialSubtractionNumber;
+}
+
 function beginTask(taskId) {
   const response = getResponse(taskId);
   if (!response.startedAt) {
@@ -759,6 +864,7 @@ function renderSetup() {
             ${segmentedField("sex", "性别", state.participant.sex, ["男", "女"], isSetupFieldInvalid("sex"))}
             ${segmentedField("educationLevel", "教育水平", state.participant.educationLevel, educationLevels.filter(Boolean), isSetupFieldInvalid("educationLevel"))}
           </div>
+          ${renderAgeEligibilityNotice()}
           <div class="voice-setup-row">
             <button type="button" class="setup-voice-button ${state.setupVoiceRecording ? "recording" : ""} ${state.setupVoiceTranscribing ? "transcribing" : ""}" data-action="toggleSetupVoice" ${state.setupVoiceTranscribing ? "disabled" : ""}>
               ${state.setupVoiceRecording ? "⏹ 正在聆听..." : state.setupVoiceTranscribing ? "⏳ 正在识别..." : "🎤 语音智能填表"}
@@ -786,6 +892,13 @@ function setupBirthDateValue(value) {
   const text = String(value || "").trim();
   if (/^\d{4}$/.test(text)) return `${text}-01-01`;
   return text;
+}
+
+function renderAgeEligibilityNotice() {
+  const age = participantAgeAtTest(state.participant);
+  if (age === null) return `<p class="setup-age-note">适用于 60 岁及以上基层老年人筛查研究</p>`;
+  if (age < 60) return `<p class="setup-age-note warning">非目标人群，仅作演示/预试</p>`;
+  return `<p class="setup-age-note">目标人群：${age} 岁</p>`;
 }
 
 async function toggleSetupVoiceRegistration() {
@@ -1046,7 +1159,7 @@ function taskActionSecondaryButtons(task) {
   if (task.type === "drawing") return `<button class="utility-button" data-action="clearDrawing">重画</button>`;
   if (task.type === "choice" && getResponse(task.id).answer.audioReady) return `<button class="utility-button" data-action="backspaceDigit">删除</button>`;
   if (task.type === "serial7") return `<button class="utility-button" data-action="backspaceSerial">删除</button>`;
-  if (task.type === "memory" && getResponse(task.id).answer.audioReady) return `<button class="utility-button replay-button" data-action="playCurrentAudio">再听一遍</button>`;
+  if (task.type === "memory" && task.trial === 1 && getResponse(task.id).answer.audioReady) return `<button class="utility-button replay-button" data-action="playCurrentAudio">再听一遍</button>`;
   return "";
 }
 
@@ -1099,11 +1212,13 @@ function renderTrailTask() {
   return html`
     <div class="trail-page">
       <canvas id="taskCanvas" class="task-canvas" aria-label="交替连线画图区域"></canvas>
+      ${renderTrailCompletionPrompt()}
     </div>
   `;
 }
 
 function renderDrawingTask(task) {
+  const hasReference = task.drawingKind === "cube" || task.drawingKind === "clock";
   return html`
     <div class="drawing-page ${task.drawingKind === "clock" ? "clock-page" : ""} ${task.drawingKind === "cube" ? "cube-page" : ""}">
       ${task.drawingKind === "cube" ? `
@@ -1111,20 +1226,37 @@ function renderDrawingTask(task) {
           <div class="reference-label">参照图</div>
           ${cubeReferenceSvg()}
         </div>
-        <div class="cube-arrow-hint">→</div>
       ` : ""}
-      <div class="canvas-wrap">
-        ${task.drawingKind === "clock" ? `
-          <div class="clock-label-block">
-            <span class="clock-label-icon">⏰</span>
-            <div class="clock-label-info">
-              <span class="clock-label-hint">目标时刻</span>
-              <span class="clock-label-time">11:10</span>
-            </div>
+      ${task.drawingKind === "clock" ? `
+        <div class="reference-panel clock-reference-panel">
+          <div class="reference-label">目标时刻</div>
+          <div class="clock-time-reference">
+            <strong>11:10</strong>
+            <span>11 点 10 分</span>
           </div>
-        ` : ""}
+        </div>
+      ` : ""}
+      ${hasReference ? `<div class="cube-arrow-hint">→</div>` : ""}
+      <div class="canvas-wrap">
         <div class="canvas-surface">
           <canvas id="taskCanvas" class="task-canvas ${task.drawingKind === "cube" ? "cube-canvas" : ""}" aria-label="${escapeHtml(task.title)}画图区域"></canvas>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderTrailCompletionPrompt() {
+  const response = getResponse("trail");
+  if (!response.behavior.trailCompletionPromptVisible) return "";
+  return html`
+    <div class="trail-completion-modal" role="dialog" aria-modal="true" aria-label="连线完成确认">
+      <div class="trail-completion-panel">
+        <strong>所有圆圈都连完了</strong>
+        <p>是否确定提交这一题？</p>
+        <div class="trail-completion-actions">
+          <button class="primary" data-action="confirmTrailCompletion">确定</button>
+          <button class="ghost" data-action="cancelTrailCompletion">取消</button>
         </div>
       </div>
     </div>
@@ -1140,7 +1272,7 @@ function renderNamingTask(task, step) {
       <div class="animal-side">
         <h4>这是什么动物？</h4>
         <div class="option-grid">
-          ${item.options.map((option) => `<button class="option ${response.answer[item.key] === option ? "picked" : ""}" data-action="chooseNaming" data-value="${escapeHtml(option)}">${escapeHtml(option)}</button>`).join("")}
+          ${item.options.map((option) => `<button class="option ${response.answer[item.key] === option ? "picked" : ""}" data-action="chooseNaming" data-value="${escapeHtml(option)}"${speechAttrs(option, audioKeyForText(option))}>${escapeHtml(option)}</button>`).join("")}
         </div>
       </div>
     </div>
@@ -1150,7 +1282,7 @@ function renderNamingTask(task, step) {
 function renderMemoryTask(task) {
   const response = getResponse(task.id);
   const selected = response.answer.selectedWords || [];
-  const complete = selected.length === WORDS.length;
+  const options = memoryCandidateWords();
   const ready = task.trial === 2 || Boolean(response.answer.audioReady);
   return html`
     <div class="memory-page ${ready ? "ready" : ""}">
@@ -1161,13 +1293,12 @@ function renderMemoryTask(task) {
       ${ready ? `
         <div class="memory-choice-panel">
           <strong>请选择 5 个词</strong>
-          <span>${selected.length}/5</span>
+          <span>${selected.length}/${MEMORY_TARGET_COUNT}</span>
         </div>
         <div class="option-grid memory-options">
-          ${task.options.map((word) => `<button class="option ${selected.includes(word) ? "picked" : ""}" data-action="toggleMemoryWord" data-word="${escapeHtml(word)}">${escapeHtml(word)}</button>`).join("")}
+          ${options.map((word) => `<button class="option ${selected.includes(word) ? "picked" : ""}" data-action="toggleMemoryWord" data-word="${escapeHtml(word)}"${speechAttrs(word, memoryWordAudioKey(word))}>${escapeHtml(word)}</button>`).join("")}
         </div>
         ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
-        ${task.trial === 1 && complete ? `<p class="task-ok">选对后再继续。</p>` : ""}
       ` : `<p class="memory-wait-copy">请先点击开始，听完 5 个词后再选择。</p>`}
     </div>
   `;
@@ -1213,11 +1344,13 @@ function renderVigilanceTask() {
 
 function renderSerial7Task(step) {
   const response = getResponse("serial7");
+  ensureSerialStepTiming(response, step);
   const values = response.answer.values || ["", "", "", "", ""];
-  const previous = step === 0 ? 100 : Number(values[step - 1] || 100 - step * 7);
+  const subtractBy = serialSubtractionNumber();
+  const previous = step === 0 ? 100 : Number(values[step - 1] || 100 - step * subtractBy);
   return html`
     <div class="serial-page">
-      <div class="math-question">${previous} - 7 = ?</div>
+      <div class="math-question">${previous} - ${subtractBy} = ?</div>
       <div class="serial-display">${escapeHtml(values[step] || " ")}</div>
       <div class="keypad serial-keypad">
         ${renderKeypadDigits("inputSerialDigit")}
@@ -1261,7 +1394,7 @@ function renderAbstractionTask(task, step) {
         ${item.words.map((word, index) => `<div class="word-card"><span>${item.emojis[index]}</span><strong>${escapeHtml(word)}</strong></div>`).join("")}
       </div>
       <div class="option-grid abstraction-options">
-        ${options.map((option) => `<button class="option ${value === option ? "picked" : ""} ${item.practice && option === item.answer ? "guided-option" : ""}" data-action="chooseAbstraction" data-key="${item.key}" data-value="${escapeHtml(option)}">${escapeHtml(option)}${item.practice && option === item.answer ? `<span class="hand-cue">👉</span>` : ""}</button>`).join("")}
+        ${options.map((option) => `<button class="option ${value === option ? "picked" : ""} ${item.practice && option === item.answer ? "guided-option" : ""}" data-action="chooseAbstraction" data-key="${item.key}" data-value="${escapeHtml(option)}"${speechAttrs(option, audioKeyForText(option))}>${escapeHtml(option)}${item.practice && option === item.answer ? `<span class="hand-cue">👉</span>` : ""}</button>`).join("")}
       </div>
       ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
     </div>
@@ -1278,7 +1411,7 @@ function renderOrientationTask(step) {
       <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
       ${options.length ? `
         <div class="option-grid orientation-options">
-          ${options.map((option) => `<button class="option ${picked === option.value ? "picked" : ""}" data-action="chooseOrientation" data-key="${prompt.key}" data-value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</button>`).join("")}
+          ${options.map((option) => `<button class="option ${picked === option.value ? "picked" : ""}" data-action="chooseOrientation" data-key="${prompt.key}" data-value="${escapeHtml(option.value)}"${speechAttrs(option.label, audioKeyForText(option.label))}>${escapeHtml(option.label)}</button>`).join("")}
         </div>
       ` : ""}
     </div>
@@ -1369,7 +1502,7 @@ function renderAudioButton(action) {
   if (speechTranscribing) return `<button class="secondary circle-button sound-button" disabled>请稍等</button>`;
   if (recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">停止</button>`;
   if (current?.type === "sentence" && sentenceStepHasSpeechAttempt(current, getTaskStep(current))) {
-    return `<button class="primary circle-button sound-button replay-button" data-action="${action}">再听一遍</button>`;
+    return `<button class="primary circle-button sound-button" disabled>已播放</button>`;
   }
   return `<button class="primary circle-button pulse sound-button" data-action="${action}">开始</button>`;
 }
@@ -1385,26 +1518,40 @@ function sentenceStepHasSpeechAttempt(task, step) {
 function renderKeypadDigits(action) {
   return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""]
     .map((digit) => digit
-      ? `<button data-action="${action}" data-digit="${digit}">${digit}</button>`
+      ? `<button data-action="${action}" data-digit="${digit}"${speechAttrs(digit, `digit:${digit}`)}>${digit}</button>`
       : `<span class="keypad-spacer"></span>`)
     .join("");
 }
 
+function speechAttrs(text, audioKey = "") {
+  return ` data-speech="${escapeHtml(text)}"${audioKey ? ` data-audio-key="${escapeHtml(audioKey)}"` : ""}`;
+}
+
+function audioKeyForText(text) {
+  return `text:${textKey(text)}`;
+}
+
+function textKey(text) {
+  let hash = 2166136261;
+  Array.from(String(text || "")).forEach((char) => {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 16777619);
+  });
+  return (hash >>> 0).toString(36);
+}
+
 function renderResults() {
   const totals = computeTotals();
-  const success = totals.totalScore >= 26;
   return html`
     <section class="single-page results-page">
-      <div class="result-hero ${success ? "celebrate" : "soft-alert"}">
-        <div class="confetti"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="result-sparkles"><i></i><i></i><i></i><i></i></div>
-        <img class="result-logo ${success ? "bounce-in" : "floaty"}" src="${LOGO_SRC}" alt="" />
-        <span>${success ? "闯关完成" : "闯关结束"}</span>
+      <div class="result-hero soft-alert">
+        <img class="result-logo floaty" src="${LOGO_SRC}" alt="" />
+        <span>筛查完成</span>
         <strong>${totals.totalScore}<em>/30</em></strong>
-        <p>${success ? "表现很棒，继续保持。" : "这次有点吃力，建议再做一次专业评估。"}</p>
+        <p>${totals.riskBand}</p>
         ${renderRadarChart(totals.domainScores)}
         <div class="result-medals">
-          <b>专注</b><b>记忆</b><b>反应</b>
+          <b>分项</b><b>用时</b><b>记录</b>
         </div>
       </div>
       <div class="control-row results-actions">
@@ -1501,6 +1648,11 @@ function formatParticipantAge(participant = {}) {
     if (!birthdayPassed) age -= 1;
   }
   return age >= 0 && age <= 130 ? String(age) : "-";
+}
+
+function participantAgeAtTest(participant = {}) {
+  const age = Number(formatParticipantAge(participant));
+  return Number.isFinite(age) ? age : null;
 }
 
 function formatSavedTime(session) {
@@ -1856,6 +2008,48 @@ function commitTrailDrag(startNode, endNode, canvas) {
     at: new Date().toISOString()
   };
   if (canvas) response.drawingImage = canvas.toDataURL("image/png");
+  maybeOpenTrailCompletionPrompt(response);
+}
+
+function trailCompletionEdgeCount() {
+  return Array.isArray(state.trail.edges) ? state.trail.edges.length : 0;
+}
+
+function isTrailFullyConnected() {
+  const labels = new Set(state.trail.sequence || []);
+  return trailCompletionEdgeCount() >= TRAIL_EXPECTED.length - 1
+    && TRAIL_EXPECTED.every((label) => labels.has(label));
+}
+
+function maybeOpenTrailCompletionPrompt(response = getResponse("trail")) {
+  const edgeCount = trailCompletionEdgeCount();
+  if (!isTrailFullyConnected()) {
+    delete response.behavior.trailCompletionPromptVisible;
+    return false;
+  }
+  if (response.behavior.trailCompletionPromptDismissedEdgeCount === edgeCount) return false;
+  response.behavior.trailCompletionPromptVisible = true;
+  response.behavior.trailCompletionPromptOpenedAt = new Date().toISOString();
+  response.behavior.trailCompletionPromptEdgeCount = edgeCount;
+  return true;
+}
+
+async function confirmTrailCompletion() {
+  const response = getResponse("trail");
+  response.behavior.trailCompletionPromptVisible = false;
+  response.behavior.trailCompletionConfirmedAt = new Date().toISOString();
+  response.behavior.trailCompletionConfirmedEdgeCount = trailCompletionEdgeCount();
+  await nextTask();
+}
+
+function cancelTrailCompletion() {
+  const response = getResponse("trail");
+  const edgeCount = trailCompletionEdgeCount();
+  response.behavior.trailCompletionPromptVisible = false;
+  response.behavior.trailCompletionPromptDismissedAt = new Date().toISOString();
+  response.behavior.trailCompletionPromptDismissedEdgeCount = edgeCount;
+  saveDraft();
+  render();
 }
 
 function startTrailGuide() {
@@ -2045,11 +2239,13 @@ root.addEventListener("click", async (event) => {
   if (!target) return;
   const action = target.dataset.action;
   const current = tasks[state.activeTaskIndex];
+  const buttonSpeech = buttonSpeechData(target);
   if (action === "startSession") playSfx("start");
   else if (["previousTask", "skipTask", "nextTask", "skipLogin", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
-  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoTrail", "clearTrail", "selectSavedSession"].includes(action)) playSfx("pick");
+  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession"].includes(action)) playSfx("pick");
 
   if (action !== "tapVigilance") stopAudioPlayback();
+  if (buttonSpeech) speakButtonSelection(buttonSpeech);
 
   if (action === "toggleSetupVoice") {
     await toggleSetupVoiceRegistration();
@@ -2177,9 +2373,13 @@ root.addEventListener("click", async (event) => {
     response.behavior.errors = state.trail.errors;
     response.behavior.correctStep = state.trail.correctStep;
     response.behavior.undoCount = state.trail.undoCount;
+    delete response.behavior.trailCompletionPromptVisible;
+    delete response.behavior.trailCompletionPromptDismissedEdgeCount;
     delete state.drawings.trail;
     render();
   }
+  if (action === "confirmTrailCompletion") await confirmTrailCompletion();
+  if (action === "cancelTrailCompletion") cancelTrailCompletion();
   if (action === "clearTrail") {
     state.trail = createTrailState({ undoCount: state.trail.undoCount || 0 });
     const response = getResponse("trail");
@@ -2187,6 +2387,8 @@ root.addEventListener("click", async (event) => {
     response.behavior.edges = [];
     response.behavior.errors = 0;
     response.behavior.correctStep = 0;
+    delete response.behavior.trailCompletionPromptVisible;
+    delete response.behavior.trailCompletionPromptDismissedEdgeCount;
     delete response.drawingImage;
     delete state.drawings.trail;
     render();
@@ -2200,6 +2402,25 @@ root.addEventListener("click", async (event) => {
   if (action === "exportCsv") await exportSessionsCsv();
   if (action === "selectSavedSession") await selectSavedSession(target.dataset.id);
 });
+
+function buttonSpeechData(target) {
+  const text = target?.dataset?.speech;
+  if (!text) return null;
+  return {
+    text,
+    audioKey: target.dataset.audioKey || "",
+    action: target.dataset.action || ""
+  };
+}
+
+function speakButtonSelection({ text, audioKey, action }) {
+  const task = tasks[state.activeTaskIndex];
+  if (!task || ["playCurrentAudio", "toggleVoiceInput", "tapVigilance"].includes(action)) return;
+  const response = getResponse(task.id);
+  response.behavior.optionAudioPlayback = response.behavior.optionAudioPlayback || [];
+  response.behavior.optionAudioPlayback.push({ text, audioKey, action, at: new Date().toISOString() });
+  speakText(text, { audioKey, rate: 0.82, pitch: 1.1, purpose: "option" });
+}
 
 root.addEventListener("pointerdown", (event) => {
   const target = event.target.closest("[data-action='tapVigilance']");
@@ -2266,6 +2487,7 @@ async function nextTask() {
     render();
     return;
   }
+  if (task.type === "serial7") finishSerialStepTiming(response, step);
   if (step < getTaskStepCount(task) - 1) {
     response.answer.step = step + 1;
     requestImmediateInstructionPlayback(task, response.answer.step);
@@ -2364,15 +2586,13 @@ function canConfirmTask(task, response) {
       response.behavior.selectionWarning = "请先听完词语";
       return false;
     }
-    if (selected.length !== WORDS.length) {
+    if (selected.length !== MEMORY_TARGET_COUNT) {
       response.behavior.selectionWarning = "请先选满 5 个词";
       return false;
     }
-    const correct = selected.every((word) => WORDS.includes(word)) && WORDS.every((word) => selected.includes(word));
-    if (task.trial === 1 && !correct) {
-      response.behavior.selectionWarning = "还有词没有选对，请再听一遍或重新选择";
-      return false;
-    }
+    response.behavior.memoryCandidateWords = [...memoryCandidateWords()];
+    response.behavior.memoryTargetWords = [...memoryTargetWords()];
+    response.behavior.memorySelectedCorrectCount = selected.filter((word) => memoryTargetWords().includes(word)).length;
     delete response.behavior.selectionWarning;
   }
   if (task.type === "serial7") {
@@ -2460,6 +2680,7 @@ function taskIndex(taskId) {
 async function submitActiveTask() {
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
+  if (task.type === "serial7") finishSerialStepTiming(response, getTaskStep(task));
   if (recognizing || recordingAudio || speechRecognitionStartPending || speechRecognitionWanted) stopVoiceInput();
   if (task.type === "fluency" && response.answer.running) {
     response.answer.running = false;
@@ -2470,7 +2691,6 @@ async function submitActiveTask() {
   finishTask(task.id);
   if (needsAiScore(task)) response.ai = await scoreTaskWithAi(task);
   response.score = computeTaskScore(task, response);
-  showEncouragement();
   saveDraft();
 }
 
@@ -2511,7 +2731,8 @@ function taskInstructionText(task, step) {
       : "现在我再说另一句话，我说完后请您也把它尽可能原原本本地重复出来。";
   }
   if (task.type === "serial7") {
-    return step === 0 ? "100 减 7 等于多少？" : "再减 7，等于多少？";
+    const subtractBy = serialSubtractionNumber();
+    return step === 0 ? `100 减 ${subtractBy} 等于多少？` : `再减 ${subtractBy}，等于多少？`;
   }
   if (task.type === "abstractionChoice") {
     const item = task.items[step];
@@ -2524,6 +2745,7 @@ function taskInstructionText(task, step) {
 }
 
 function audioKeyForInstruction(task, step = getTaskStep(task)) {
+  if (task?.type === "serial7") return `instruction:serialSubtraction:${serialSubtractionNumber()}:${step}`;
   return task ? `instruction:${task.id}:${step}` : null;
 }
 
@@ -2544,10 +2766,16 @@ function playCurrentAudio() {
 }
 
 function playMemoryWords(response) {
+  const targets = memoryTargetWords();
+  const wasStarted = Boolean(response.answer.wordsPlaybackStarted);
   response.answer.audioReady = false;
   response.answer.wordsPlaybackStarted = true;
-  return speakItemsSlow(WORDS, {
-    audioKeyPrefix: "stimulus:memory1:word",
+  response.behavior.memoryTargetWords = [...targets];
+  response.behavior.memoryCandidateWords = [...memoryCandidateWords()];
+  response.behavior.memoryPlaybackCount = Number(response.behavior.memoryPlaybackCount || 0) + 1;
+  if (wasStarted) response.behavior.replayCount = Number(response.behavior.replayCount || 0) + 1;
+  return speakItemsSlow(targets, {
+    audioKeys: targets.map(memoryWordAudioKey),
     gapMs: 1000,
     rate: 0.72,
     done: () => {
@@ -3014,14 +3242,16 @@ function clampSpeech(value, min, max) {
 
 function playDigitStimulus(task) {
   const response = getResponse(task.id);
+  const digitItem = activeDigitItem(task);
   response.answer.sequence = [];
   response.answer.audioReady = false;
-  response.behavior.digitPlayback = [];
-  speakItemsSlow(task.stimulus.split(""), {
-    audioKeyPrefix: `stimulus:${task.id}:digit`,
-    gapMs: 1000,
+  response.behavior.digitPlayback = [{ stimulus: digitItem.stimulus, bankId: digitItem.bankId, at: Date.now() }];
+  response.behavior[`${task.id}BankId`] = digitItem.bankId;
+  response.behavior[`${task.id}Stimulus`] = digitItem.stimulus;
+  speakText(digitItem.stimulus.split("").join(" "), {
+    audioKey: digitItem.audioKey,
     rate: 0.66,
-    onItemStart: (digit, index) => response.behavior.digitPlayback.push({ digit, index, at: Date.now() }),
+    purpose: "instruction",
     done: () => {
       response.answer.audioReady = true;
       saveDraft();
@@ -3986,7 +4216,15 @@ function applyOrientationChoice(key, value) {
 }
 
 function abstractionOptions(response, item) {
-  return stableOptionValues(response, `abstraction:${item.key}`, item.answer, ABSTRACTION_DISTRACTORS);
+  if (item.practice) return stableOptionValues(response, `abstraction:${item.key}`, item.answer, item.options.filter((option) => option !== item.answer));
+  response.behavior.abstractionCorrectAnswers = response.behavior.abstractionCorrectAnswers || {};
+  const savedCorrect = response.behavior.abstractionCorrectAnswers[item.key];
+  const correctAnswers = Array.isArray(item.correctAnswers) ? item.correctAnswers : [item.answer].filter(Boolean);
+  const correct = correctAnswers.includes(savedCorrect) ? savedCorrect : randomBankItem(correctAnswers);
+  response.behavior.abstractionCorrectAnswers[item.key] = correct;
+  const suffix = correct.slice(-2);
+  const distractors = ABSTRACTION_DISTRACTORS_BY_SUFFIX[suffix] || [];
+  return stableOptionValues(response, `abstraction:${item.key}:${correct}`, correct, distractors);
 }
 
 function orientationOptions(prompt) {
@@ -4183,7 +4421,7 @@ function toggleMemoryWord(word) {
   delete response.behavior.selectionWarning;
   if (response.answer.selectedWords.includes(word)) {
     response.answer.selectedWords = response.answer.selectedWords.filter((entry) => entry !== word);
-  } else if (response.answer.selectedWords.length < WORDS.length) {
+  } else if (response.answer.selectedWords.length < MEMORY_TARGET_COUNT) {
     response.answer.selectedWords.push(word);
   } else {
     response.behavior.selectionWarning = "最多选择 5 个词";
@@ -4204,7 +4442,7 @@ async function appendDigit(digit) {
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
   response.answer.sequence = response.answer.sequence || [];
-  if (response.answer.sequence.length < task.answer.length) response.answer.sequence.push(digit);
+  if (response.answer.sequence.length < activeDigitItem(task).answer.length) response.answer.sequence.push(digit);
   render();
 }
 
@@ -4218,6 +4456,8 @@ function backspaceDigit() {
 function inputSerialDigit(digit) {
   const response = getResponse("serial7");
   const step = getTaskStep(tasks[state.activeTaskIndex]);
+  const timing = ensureSerialStepTiming(response, step);
+  if (!timing.firstInputAt) timing.firstInputAt = new Date().toISOString();
   response.answer.values = response.answer.values || ["", "", "", "", ""];
   response.answer.values[step] = `${response.answer.values[step] || ""}${digit}`;
   render();
@@ -4226,9 +4466,32 @@ function inputSerialDigit(digit) {
 function backspaceSerial() {
   const response = getResponse("serial7");
   const step = getTaskStep(tasks[state.activeTaskIndex]);
+  ensureSerialStepTiming(response, step);
   response.answer.values = response.answer.values || ["", "", "", "", ""];
   response.answer.values[step] = response.answer.values[step].slice(0, -1);
   render();
+}
+
+function ensureSerialStepTiming(response, step) {
+  response.behavior.serialStepTimings = response.behavior.serialStepTimings || [];
+  const timings = response.behavior.serialStepTimings;
+  if (!timings[step]) {
+    timings[step] = {
+      step: step + 1,
+      startedAt: new Date().toISOString(),
+      startedAtMs: Date.now()
+    };
+  }
+  return timings[step];
+}
+
+function finishSerialStepTiming(response, step) {
+  const timing = ensureSerialStepTiming(response, step);
+  const now = Date.now();
+  timing.endedAt = new Date().toISOString();
+  const startedAtMs = Number(timing.startedAtMs);
+  timing.durationMs = Number.isFinite(startedAtMs) ? Math.max(0, now - startedAtMs) : null;
+  return timing;
 }
 
 function startVigilance() {
@@ -4489,7 +4752,7 @@ function computeTaskScore(task, response = getResponse(task.id)) {
   if (task.id === "cube" || task.id === "clock") return aiScore ?? 0;
   if (task.type === "naming") return task.items.reduce((sum, item) => sum + (response.answer?.[item.key] === item.answer ? 1 : 0), 0);
   if (task.type === "memory") return task.trial === 2 ? scoreMemoryChoices(response) : 0;
-  if (task.type === "choice") return (response.answer?.sequence || []).join("") === task.answer ? 1 : 0;
+  if (task.type === "choice") return (response.answer?.sequence || []).join("") === activeDigitItem(task).answer ? 1 : 0;
   if (task.type === "vigilance") return scoreVigilance(response);
   if (task.type === "serial7") return scoreSerial7(response).score;
   if (task.type === "sentence") return aiScore ?? 0;
@@ -4552,15 +4815,36 @@ function scoreVigilance(response) {
 }
 
 function scoreSerial7(response) {
+  const subtractBy = serialSubtractionNumber();
   const values = (response.answer?.values || []).map((value) => Number(value));
+  const timings = response.behavior.serialStepTimings || [];
   let correct = 0;
+  const steps = [];
   values.forEach((value, index) => {
-    if (!Number.isFinite(value)) return;
-    if (index === 0 && value === 93) correct += 1;
-    if (index > 0 && Number.isFinite(values[index - 1]) && value === values[index - 1] - 7) correct += 1;
+    const previous = index === 0 ? 100 : values[index - 1];
+    const expected = Number.isFinite(previous) ? previous - subtractBy : null;
+    const isCorrect = Number.isFinite(value) && expected !== null && value === expected;
+    const timing = timings[index] || {};
+    if (isCorrect) correct += 1;
+    steps.push({
+      step: index + 1,
+      previous,
+      subtractBy,
+      answer: Number.isFinite(value) ? value : null,
+      expected,
+      correct: isCorrect,
+      startedAt: timing.startedAt || null,
+      firstInputAt: timing.firstInputAt || null,
+      endedAt: timing.endedAt || null,
+      durationMs: Number.isFinite(Number(timing.durationMs)) ? Number(timing.durationMs) : null
+    });
   });
-  response.behavior.serial7CorrectSteps = correct;
-  return { correct, score: correct >= 4 ? 3 : correct >= 2 ? 2 : correct === 1 ? 1 : 0 };
+  response.behavior.serialSubtractionNumber = subtractBy;
+  response.behavior.serialSubtractionSteps = steps;
+  response.behavior.serialSubtractionCorrectSteps = correct;
+  const score = correct >= 4 ? 3 : correct >= 2 ? 2 : correct === 1 ? 1 : 0;
+  response.behavior.serialSubtractionScore = score;
+  return { correct, score };
 }
 
 function scoreSentenceTranscript(task, response) {
@@ -4569,12 +4853,20 @@ function scoreSentenceTranscript(task, response) {
 }
 
 function scoreAbstractionChoice(task, response) {
-  return task.items.reduce((sum, item) => sum + (!item.practice && response.answer?.[item.key] === item.answer ? 1 : 0), 0);
+  return task.items.reduce((sum, item) => {
+    if (item.practice) return sum;
+    const correct = response.behavior?.abstractionCorrectAnswers?.[item.key]
+      || (Array.isArray(item.correctAnswers) ? item.correctAnswers[0] : item.answer);
+    return sum + (response.answer?.[item.key] === correct ? 1 : 0);
+  }, 0);
 }
 
 function scoreMemoryChoices(response) {
   const selected = response.answer?.selectedWords || [];
-  return selected.reduce((sum, word) => sum + (WORDS.includes(word) ? 1 : 0), 0);
+  const targets = memoryTargetWords();
+  response.behavior.memoryCandidateWords = [...memoryCandidateWords()];
+  response.behavior.memoryTargetWords = [...targets];
+  return selected.reduce((sum, word) => sum + (targets.includes(word) ? 1 : 0), 0);
 }
 
 function scoreOrientationByInputs(response) {
@@ -4741,7 +5033,11 @@ function buildSessionPayload({ includeAudioBlobs = false } = {}) {
   const now = new Date().toISOString();
   return {
     id: state.sessionId,
-    participant: state.participant,
+    participant: {
+      ...state.participant,
+      ageAtTest: participantAgeAtTest(state.participant),
+      targetAgeEligible: participantAgeAtTest(state.participant) === null ? null : participantAgeAtTest(state.participant) >= 60
+    },
     startedAt: state.startedAt,
     finishedAt: state.finishedAt || now,
     totalDurationMs: totals.totalDurationMs,
@@ -4750,6 +5046,8 @@ function buildSessionPayload({ includeAudioBlobs = false } = {}) {
     totalScore: totals.totalScore,
     riskBand: totals.riskBand,
     domainScores: totals.domainScores,
+    taskRuntime: ensureTaskRuntime(),
+    ttsManifestVersion: staticTtsManifest?.version ?? null,
     itemResponses: tasks.map((task) => {
       const response = getResponse(task.id);
       return {
