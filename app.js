@@ -864,15 +864,11 @@ function renderSetup() {
           </div>
           <div class="voice-setup-row">
             <button type="button" class="setup-voice-button ${state.setupVoiceRecording ? "recording" : ""} ${state.setupVoiceTranscribing ? "transcribing" : ""}" data-action="toggleSetupVoice" ${state.setupVoiceTranscribing ? "disabled" : ""}>
-              ${state.setupVoiceRecording ? "⏹ 正在聆听..." : state.setupVoiceTranscribing ? "⏳ 正在识别..." : "🎤 语音智能填表"}
+              ${state.setupVoiceRecording ? "正在聆听..." : state.setupVoiceTranscribing ? "正在识别..." : "语音智能填表"}
             </button>
           </div>
-        </div>
-        <div class="setup-play-zone">
-          <div class="play-orbit"><i></i><i></i><i></i></div>
           <button class="primary setup-start-button pulse" data-action="startSession">
-            <span>开始</span>
-            <small>游戏</small>
+            <span>开始游戏</span>
           </button>
         </div>
         <button class="skip-login-button" data-action="skipLogin">跳过登录</button>
