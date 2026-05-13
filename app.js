@@ -515,7 +515,7 @@ function createInitialState() {
     sessionId: crypto.randomUUID(),
     startedAt: null,
     finishedAt: null,
-    participant: { name: "", birthYear: "", sex: "", educationLevel: "" },
+    participant: { name: "", birthYear: "1966-01-01", sex: "", educationLevel: "" },
     responses: {},
     drawings: {},
     trail: createTrailState(),
@@ -849,22 +849,19 @@ function render() {
 function renderSetup() {
   return html`
     <div class="setup-screen">
-      <div class="floating-stars"><i></i><i></i><i></i></div>
       <section class="setup-panel">
         <div class="setup-left">
           <div class="brand-row">
-            <img class="logo-image bounce-in" src="${LOGO_SRC}" alt="MoCA Quest" />
             <div>
               <h1>脑力闯关</h1>
             </div>
           </div>
           <div class="setup-grid">
             ${inputField("participant.name", "姓名", state.participant.name, "", "text", isSetupFieldInvalid("name"))}
-            ${inputField("participant.birthYear", "出生日期", setupBirthDateValue(state.participant.birthYear), "", "date", isSetupFieldInvalid("birthYear"))}
+            ${birthDateField(state.participant.birthYear, isSetupFieldInvalid("birthYear"))}
             ${segmentedField("sex", "性别", state.participant.sex, ["男", "女"], isSetupFieldInvalid("sex"))}
             ${segmentedField("educationLevel", "教育水平", state.participant.educationLevel, educationLevels.filter(Boolean), isSetupFieldInvalid("educationLevel"))}
           </div>
-          ${renderAgeEligibilityNotice()}
           <div class="voice-setup-row">
             <button type="button" class="setup-voice-button ${state.setupVoiceRecording ? "recording" : ""} ${state.setupVoiceTranscribing ? "transcribing" : ""}" data-action="toggleSetupVoice" ${state.setupVoiceTranscribing ? "disabled" : ""}>
               ${state.setupVoiceRecording ? "⏹ 正在聆听..." : state.setupVoiceTranscribing ? "⏳ 正在识别..." : "🎤 语音智能填表"}
@@ -888,17 +885,56 @@ function isSetupFieldInvalid(key) {
   return state.setupAttempted && !String(state.participant[key] || "").trim();
 }
 
-function setupBirthDateValue(value) {
-  const text = String(value || "").trim();
-  if (/^\d{4}$/.test(text)) return `${text}-01-01`;
-  return text;
+function birthDateField(value, invalid = false) {
+  const parts = birthDateParts(value);
+  const years = birthYearOptions();
+  const months = Array.from({ length: 12 }, (_, index) => String(index + 1).padStart(2, "0"));
+  const days = Array.from({ length: daysInMonth(Number(parts.year), Number(parts.month)) }, (_, index) => String(index + 1).padStart(2, "0"));
+  return html`
+    <div class="field birth-date-field ${invalid ? "invalid" : ""}">
+      <span>出生日期</span>
+      <div class="birth-date-selects">
+        <select data-birth-part="year" aria-label="出生年份">
+          ${years.map((year) => `<option value="${year}" ${year === parts.year ? "selected" : ""}>${year}年</option>`).join("")}
+        </select>
+        <select data-birth-part="month" aria-label="出生月份">
+          ${months.map((month) => `<option value="${month}" ${month === parts.month ? "selected" : ""}>${Number(month)}月</option>`).join("")}
+        </select>
+        <select data-birth-part="day" aria-label="出生日期">
+          ${days.map((day) => `<option value="${day}" ${day === parts.day ? "selected" : ""}>${Number(day)}日</option>`).join("")}
+        </select>
+      </div>
+    </div>
+  `;
 }
 
-function renderAgeEligibilityNotice() {
-  const age = participantAgeAtTest(state.participant);
-  if (age === null) return `<p class="setup-age-note">适用于 60 岁及以上基层老年人筛查研究</p>`;
-  if (age < 60) return `<p class="setup-age-note warning">非目标人群，仅作演示/预试</p>`;
-  return `<p class="setup-age-note">目标人群：${age} 岁</p>`;
+function birthDateParts(value) {
+  const match = String(value || "").match(/^(\d{4})(?:\D+(\d{1,2}))?(?:\D+(\d{1,2}))?/);
+  const year = match?.[1] || "1966";
+  const month = String(Math.min(12, Math.max(1, Number(match?.[2] || 1)))).padStart(2, "0");
+  const maxDay = daysInMonth(Number(year), Number(month));
+  const day = String(Math.min(maxDay, Math.max(1, Number(match?.[3] || 1)))).padStart(2, "0");
+  return { year, month, day };
+}
+
+function birthYearOptions() {
+  const current = new Date().getFullYear();
+  const start = Math.max(1900, current - 130);
+  return Array.from({ length: current - start + 1 }, (_, index) => String(current - index));
+}
+
+function daysInMonth(year, month) {
+  const safeYear = Number.isFinite(year) && year >= 1900 ? year : 1966;
+  const safeMonth = Number.isFinite(month) && month >= 1 && month <= 12 ? month : 1;
+  return new Date(safeYear, safeMonth, 0).getDate();
+}
+
+function updateBirthDatePart(part, value) {
+  const parts = birthDateParts(state.participant.birthYear);
+  parts[part] = part === "year" ? String(value || "1966") : String(value || "1").padStart(2, "0");
+  const maxDay = daysInMonth(Number(parts.year), Number(parts.month));
+  parts.day = String(Math.min(maxDay, Math.max(1, Number(parts.day || 1)))).padStart(2, "0");
+  state.participant.birthYear = `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 async function toggleSetupVoiceRegistration() {
@@ -1045,7 +1081,7 @@ function segmentedField(key, label, value, options, invalid = false) {
     <div class="field segmented-field ${invalid ? "invalid" : ""}">
       <span>${label}</span>
       <div class="segmented-options ${extraClass}">
-        ${options.map((option) => `<button type="button" class="segment-option ${value === option ? "picked" : ""}" data-action="chooseParticipant" data-key="${key}" data-value="${escapeHtml(option)}">${escapeHtml(option)}</button>`).join("")}
+        ${options.map((option) => `<button type="button" class="segment-option ${value === option ? "picked" : ""}" data-action="chooseParticipant" data-key="${key}" data-value="${escapeHtml(option)}"${speechAttrs(option, audioKeyForText(option))}>${escapeHtml(option)}</button>`).join("")}
       </div>
     </div>
   `;
@@ -1124,16 +1160,9 @@ function renderTask(task) {
   const waitAttr = speechTranscribing ? "disabled" : "";
   return html`
     <section class="single-page task-page">
-      <button class="edge-arrow edge-arrow-left" data-action="previousTask" aria-label="上一题" ${state.activeTaskIndex === 0 && step === 0 ? "disabled" : waitAttr}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-        <span class="arrow-label">上一题</span>
-      </button>
-      <button class="edge-arrow edge-arrow-right" data-action="skipTask" aria-label="下一题" ${waitAttr}>
-        <span class="arrow-label">下一题</span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-      </button>
       <div class="task-workspace">${renderTaskWorkspace(task, step)}</div>
       ${renderTaskActions(task, step)}
+      <button class="task-skip-link" data-action="skipTask" ${waitAttr}>跳过</button>
     </section>
   `;
 }
@@ -1147,6 +1176,7 @@ function renderTaskActions(task, step) {
     <div class="task-actions">
       <div class="task-actions-left">${secondary || ""}</div>
       ${showConfirm ? `<button class="${confirmClass}" data-action="nextTask" ${speechTranscribing ? "disabled" : ""}>${confirmLabel(task, step)}</button>` : ""}
+      <div class="task-actions-right"></div>
     </div>
   `;
 }
@@ -1164,8 +1194,6 @@ function taskActionSecondaryButtons(task) {
 }
 
 function shouldShowConfirmButton(task) {
-  if (task.type === "memory") return task.trial === 2 || Boolean(getResponse(task.id).answer.audioReady);
-  if (task.type === "choice") return Boolean(getResponse(task.id).answer.audioReady);
   if (task.type === "vigilance") return false;
   return true;
 }
@@ -1232,7 +1260,6 @@ function renderDrawingTask(task) {
           <div class="reference-label">目标时刻</div>
           <div class="clock-time-reference">
             <strong>11:10</strong>
-            <span>11 点 10 分</span>
           </div>
         </div>
       ` : ""}
@@ -1347,10 +1374,10 @@ function renderSerial7Task(step) {
   ensureSerialStepTiming(response, step);
   const values = response.answer.values || ["", "", "", "", ""];
   const subtractBy = serialSubtractionNumber();
-  const previous = step === 0 ? 100 : Number(values[step - 1] || 100 - step * subtractBy);
+  const question = step === 0 ? `100减${subtractBy}等于多少？` : `再减${subtractBy}，等于多少？`;
   return html`
     <div class="serial-page">
-      <div class="math-question">${previous} - ${subtractBy} = ?</div>
+      <div class="math-question">${question}</div>
       <div class="serial-display">${escapeHtml(values[step] || " ")}</div>
       <div class="keypad serial-keypad">
         ${renderKeypadDigits("inputSerialDigit")}
@@ -1404,6 +1431,7 @@ function renderAbstractionTask(task, step) {
 function renderOrientationTask(step) {
   const response = getResponse("orientation");
   const prompt = orientationPrompts[step];
+  if (prompt.key === "year" || prompt.key === "date") return renderOrientationNumberTask(response, prompt);
   const options = orientationOptions(prompt);
   const picked = response.answer.orientationChoices?.[prompt.key] || "";
   return html`
@@ -1414,6 +1442,40 @@ function renderOrientationTask(step) {
           ${options.map((option) => `<button class="option ${picked === option.value ? "picked" : ""}" data-action="chooseOrientation" data-key="${prompt.key}" data-value="${escapeHtml(option.value)}"${speechAttrs(option.label, audioKeyForText(option.label))}>${escapeHtml(option.label)}</button>`).join("")}
         </div>
       ` : ""}
+    </div>
+  `;
+}
+
+function renderOrientationNumberTask(response, prompt) {
+  if (prompt.key === "year") {
+    const value = response.answer.year || "";
+    return html`
+      <div class="orientation-page orientation-number-page">
+        <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
+        <div class="orientation-number-display">${escapeHtml(value || " ")}</div>
+        <div class="keypad orientation-keypad">
+          ${renderOrientationKeypad("year")}
+        </div>
+      </div>
+    `;
+  }
+  const activeField = response.answer.orientationDateActiveField || "month";
+  return html`
+    <div class="orientation-page orientation-number-page">
+      <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
+      <div class="date-input-pair">
+        <button class="date-input-box ${activeField === "month" ? "active" : ""}" data-action="setOrientationDateField" data-field="month">
+          <span>月份</span>
+          <strong>${escapeHtml(response.answer.month || " ")}</strong>
+        </button>
+        <button class="date-input-box ${activeField === "day" ? "active" : ""}" data-action="setOrientationDateField" data-field="day">
+          <span>日期</span>
+          <strong>${escapeHtml(response.answer.day || " ")}</strong>
+        </button>
+      </div>
+      <div class="keypad orientation-keypad">
+        ${renderOrientationKeypad(activeField)}
+      </div>
     </div>
   `;
 }
@@ -1523,6 +1585,16 @@ function renderKeypadDigits(action) {
     .join("");
 }
 
+function renderOrientationKeypad(field) {
+  return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "删", "0", ""]
+    .map((value) => {
+      if (!value) return `<span class="keypad-spacer"></span>`;
+      if (value === "删") return `<button class="key-action" data-action="backspaceOrientation" data-field="${field}">删除</button>`;
+      return `<button data-action="inputOrientationDigit" data-field="${field}" data-digit="${value}"${speechAttrs(value, `digit:${value}`)}>${value}</button>`;
+    })
+    .join("");
+}
+
 function speechAttrs(text, audioKey = "") {
   return ` data-speech="${escapeHtml(text)}"${audioKey ? ` data-audio-key="${escapeHtml(audioKey)}"` : ""}`;
 }
@@ -1545,18 +1617,9 @@ function renderResults() {
   return html`
     <section class="single-page results-page">
       <div class="result-hero soft-alert">
-        <img class="result-logo floaty" src="${LOGO_SRC}" alt="" />
         <span>筛查完成</span>
         <strong>${totals.totalScore}<em>/30</em></strong>
-        <p>${totals.riskBand}</p>
-        ${renderRadarChart(totals.domainScores)}
-        <div class="result-medals">
-          <b>分项</b><b>用时</b><b>记录</b>
-        </div>
-      </div>
-      <div class="control-row results-actions">
-        <button class="primary" data-action="saveSession">保存到后台数据库</button>
-        <button class="ghost" data-action="newSession">再玩一次</button>
+        <p>谢谢您的参与！</p>
       </div>
     </section>
   `;
@@ -2241,8 +2304,8 @@ root.addEventListener("click", async (event) => {
   const current = tasks[state.activeTaskIndex];
   const buttonSpeech = buttonSpeechData(target);
   if (action === "startSession") playSfx("start");
-  else if (["previousTask", "skipTask", "nextTask", "skipLogin", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
-  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession"].includes(action)) playSfx("pick");
+  else if (["skipTask", "nextTask", "skipLogin", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
+  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession"].includes(action)) playSfx("pick");
 
   if (action !== "tapVigilance") stopAudioPlayback();
   if (buttonSpeech) speakButtonSelection(buttonSpeech);
@@ -2264,7 +2327,7 @@ root.addEventListener("click", async (event) => {
   if (action === "skipLogin") {
     await startNewSession({
       name: `访客${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
-      birthYear: "",
+      birthYear: "1966-01-01",
       sex: "",
       educationLevel: ""
     });
@@ -2310,10 +2373,7 @@ root.addEventListener("click", async (event) => {
     requestImmediateInstructionPlayback(tasks[nextIndex]);
     render();
   }
-  if (action === "previousTask") {
-    goPreviousStep();
-  }
-  if (action === "skipTask") await goNextStepOrSkip();
+  if (action === "skipTask") await skipTask();
   if (action === "nextTask") await nextTask();
   if (action === "chooseNaming") {
     const response = getResponse(current.id);
@@ -2336,6 +2396,9 @@ root.addEventListener("click", async (event) => {
   if (action === "backspaceDigit") backspaceDigit();
   if (action === "inputSerialDigit") inputSerialDigit(target.dataset.digit);
   if (action === "backspaceSerial") backspaceSerial();
+  if (action === "inputOrientationDigit") inputOrientationDigit(target.dataset.field, target.dataset.digit);
+  if (action === "backspaceOrientation") backspaceOrientation(target.dataset.field);
+  if (action === "setOrientationDateField") setOrientationDateField(target.dataset.field);
   if (action === "chooseOrientation") {
     applyOrientationChoice(target.dataset.key, target.dataset.value);
     render();
@@ -2452,6 +2515,13 @@ root.addEventListener("input", (event) => {
 
 root.addEventListener("change", (event) => {
   const target = event.target;
+  if (target.dataset.birthPart) {
+    updateBirthDatePart(target.dataset.birthPart, target.value);
+    state.setupAttempted = false;
+    saveDraft();
+    render();
+    return;
+  }
   if (target.dataset.bind) {
     const [, key] = target.dataset.bind.split(".");
     state.participant[key] = target.value;
@@ -2483,6 +2553,7 @@ async function nextTask() {
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
   const step = getTaskStep(task);
+  ensureBlankAnswerForStep(task, response, step);
   if (!canConfirmTask(task, response)) {
     render();
     return;
@@ -2504,46 +2575,6 @@ async function nextTask() {
   } else {
     state.activeTaskIndex = nextIndex;
     requestImmediateInstructionPlayback(tasks[nextIndex]);
-  }
-  render();
-}
-
-async function goNextStepOrSkip() {
-  if (speechTranscribing) return;
-  const task = tasks[state.activeTaskIndex];
-  const response = getResponse(task.id);
-  const step = getTaskStep(task);
-  if (step < getTaskStepCount(task) - 1) {
-    response.answer.step = step + 1;
-    requestImmediateInstructionPlayback(task, response.answer.step);
-    saveDraft();
-    render();
-    return;
-  }
-  await skipTask();
-}
-
-function goPreviousStep() {
-  if (speechTranscribing) return;
-  const current = tasks[state.activeTaskIndex];
-  const response = getResponse(current.id);
-  const step = getTaskStep(current);
-  if (step > 0) {
-    response.answer.step = step - 1;
-    requestImmediateInstructionPlayback(current, step - 1);
-    saveDraft();
-    render();
-    return;
-  }
-
-  const previousIndex = previousSequentialIndex(state.activeTaskIndex);
-  if (previousIndex >= 0) {
-    const previous = tasks[previousIndex];
-    state.activeTaskIndex = previousIndex;
-    const previousStep = Math.max(0, getTaskStepCount(previous) - 1);
-    getResponse(previous.id).answer.step = previousStep;
-    requestImmediateInstructionPlayback(previous, previousStep);
-    saveDraft();
   }
   render();
 }
@@ -2582,42 +2613,56 @@ async function skipTask() {
 function canConfirmTask(task, response) {
   if (task.type === "memory") {
     const selected = response.answer.selectedWords || [];
-    if (task.trial === 1 && !response.answer.audioReady) {
-      response.behavior.selectionWarning = "请先听完词语";
-      return false;
-    }
-    if (selected.length !== MEMORY_TARGET_COUNT) {
-      response.behavior.selectionWarning = "请先选满 5 个词";
-      return false;
-    }
     response.behavior.memoryCandidateWords = [...memoryCandidateWords()];
     response.behavior.memoryTargetWords = [...memoryTargetWords()];
     response.behavior.memorySelectedCorrectCount = selected.filter((word) => memoryTargetWords().includes(word)).length;
     delete response.behavior.selectionWarning;
   }
-  if (task.type === "serial7") {
-    const values = response.answer.values || [];
-    if (!String(values[getTaskStep(task)] || "").trim()) return false;
-  }
-  if (task.type === "choice" && !(response.answer.sequence || []).length) return false;
-  if (task.type === "naming") {
-    const item = task.items[getTaskStep(task)];
-    if (!response.answer[item.key]) return false;
-  }
   if (task.type === "abstractionChoice") {
     const item = task.items[getTaskStep(task)];
-    if (!response.answer[item.key]) return false;
-    if (item.practice && response.answer[item.key] !== item.answer) {
-      response.behavior.selectionWarning = "例题请选择“水果”";
-      return false;
-    }
-    delete response.behavior.selectionWarning;
-  }
-  if (task.type === "orientation") {
-    const prompt = orientationPrompts[getTaskStep(task)];
-    if (!response.answer.orientationChoices?.[prompt.key]) return false;
+    if (item.practice && response.answer[item.key] && response.answer[item.key] !== item.answer) response.behavior.selectionWarning = "例题请选择“水果”";
+    else delete response.behavior.selectionWarning;
   }
   return true;
+}
+
+function ensureBlankAnswerForStep(task, response, step = getTaskStep(task)) {
+  response.answer = response.answer || {};
+  if (task.type === "memory") response.answer.selectedWords = response.answer.selectedWords || [];
+  if (task.type === "choice") response.answer.sequence = response.answer.sequence || [];
+  if (task.type === "serial7") {
+    response.answer.values = response.answer.values || ["", "", "", "", ""];
+    if (response.answer.values[step] === undefined) response.answer.values[step] = "";
+  }
+  if (task.type === "naming") {
+    const item = task.items[step];
+    if (item && response.answer[item.key] === undefined) response.answer[item.key] = "";
+  }
+  if (task.type === "sentence") {
+    response.answer.transcript = response.answer.transcript || {};
+    response.answer.interimTranscript = response.answer.interimTranscript || {};
+    if (response.answer.transcript[step] === undefined) response.answer.transcript[step] = "";
+  }
+  if (task.type === "fluency") {
+    response.answer.rawTranscript = response.answer.rawTranscript || "";
+    response.answer.animals = response.answer.animals || [];
+  }
+  if (task.type === "abstractionChoice") {
+    const item = task.items[step];
+    if (item && response.answer[item.key] === undefined) response.answer[item.key] = "";
+  }
+  if (task.type === "orientation") {
+    const prompt = orientationPrompts[step];
+    response.answer.orientationChoices = response.answer.orientationChoices || {};
+    if (prompt?.key === "year") response.answer.year = response.answer.year || "";
+    if (prompt?.key === "date") {
+      response.answer.month = response.answer.month || "";
+      response.answer.day = response.answer.day || "";
+    }
+    if (prompt?.key === "weekday") response.answer.weekday = response.answer.weekday || "";
+    if (prompt?.key === "city") response.answer.city = response.answer.city || "";
+    if (prompt?.key === "place") response.answer.place = response.answer.place || "";
+  }
 }
 
 function nextTaskIndexAfterSubmit(task) {
@@ -2635,14 +2680,6 @@ function nextTaskIndexAfterSubmit(task) {
 
 function nextSequentialIndex(fromIndex) {
   for (let index = fromIndex + 1; index < tasks.length; index += 1) {
-    if (tasks[index].id === "memory2" && !isMemory2Available()) continue;
-    return index;
-  }
-  return -1;
-}
-
-function previousSequentialIndex(fromIndex) {
-  for (let index = fromIndex - 1; index >= 0; index -= 1) {
     if (tasks[index].id === "memory2" && !isMemory2Available()) continue;
     return index;
   }
@@ -2870,7 +2907,9 @@ async function speakText(text, options = {}) {
     finish();
     return;
   }
-  if (fallbackMs) speechTextFallbackTimer = window.setTimeout(finish, fallbackMs);
+  await prepareBrowserSpeechSynthesis();
+  if (playbackId !== speechPlaybackId || finished) return;
+  speechTextFallbackTimer = window.setTimeout(finish, fallbackMs || browserSpeechFallbackMs(text));
   speakTextWithBrowser(text, { playbackId, speechParams, onStart, finish });
 }
 
@@ -2897,7 +2936,25 @@ function speakTextWithBrowser(text, { playbackId, speechParams, onStart, finish 
   };
   utterance.onend = finish;
   utterance.onerror = finish;
+  window.speechSynthesis.resume?.();
   window.speechSynthesis.speak(utterance);
+}
+
+function prepareBrowserSpeechSynthesis() {
+  if (!("speechSynthesis" in window)) return Promise.resolve(false);
+  window.speechSynthesis.resume?.();
+  if (window.speechSynthesis.getVoices().length) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(() => resolve(false), 300);
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.clearTimeout(timer);
+      resolve(true);
+    };
+  });
+}
+
+function browserSpeechFallbackMs(text) {
+  return Math.max(1400, Math.min(14000, String(text || "").length * 360 + 1100));
 }
 
 function pickNaturalVoice() {
@@ -2957,6 +3014,8 @@ function speakItemsWithBrowser(items, { gapMs, rate, done, onItemStart, audioKey
       queueNext();
       return;
     }
+    await prepareBrowserSpeechSynthesis();
+    if (playbackId !== speechPlaybackId) return;
     const utterance = new SpeechSynthesisUtterance(value);
     utterance.lang = "zh-CN";
     utterance.rate = speechParams.speedRatio;
@@ -2964,9 +3023,23 @@ function speakItemsWithBrowser(items, { gapMs, rate, done, onItemStart, audioKey
     utterance.volume = SPEECH_VOLUME;
     const voice = pickNaturalVoice();
     if (voice) utterance.voice = voice;
+    let itemFinished = false;
+    const finishItem = () => {
+      if (itemFinished) return;
+      itemFinished = true;
+      queueNext();
+    };
+    const itemFallback = window.setTimeout(finishItem, browserSpeechFallbackMs(value));
     utterance.onstart = itemStart;
-    utterance.onend = queueNext;
-    utterance.onerror = queueNext;
+    utterance.onend = () => {
+      window.clearTimeout(itemFallback);
+      finishItem();
+    };
+    utterance.onerror = () => {
+      window.clearTimeout(itemFallback);
+      finishItem();
+    };
+    window.speechSynthesis.resume?.();
     window.speechSynthesis.speak(utterance);
   };
   speakNext();
@@ -4241,10 +4314,8 @@ function orientationOptions(prompt) {
     return optionObjects(stableOptionValues(response, "orientation:date", correct, distractors), correct).map((option) => ({ ...option, label: dateOptionLabel(option.value) }));
   }
   if (prompt.key === "weekday") {
-    const weekdays = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
-    const index = weekdays.indexOf(today.weekday);
-    const distractors = [1, 2, 3, 4, 5, 6].map((offset) => weekdays[(index + offset) % 7]);
-    return optionObjects(stableOptionValues(response, "orientation:weekday", today.weekday, distractors), today.weekday);
+    const weekdays = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"];
+    return optionObjects(weekdays, today.weekday);
   }
   if (prompt.key === "city") {
     const expected = cleanCityName(response.answer.expectedCity || response.behavior.location?.city || "");
@@ -4472,6 +4543,33 @@ function backspaceSerial() {
   render();
 }
 
+function inputOrientationDigit(field, digit) {
+  const response = getResponse("orientation");
+  const key = field === "day" ? "day" : field === "month" ? "month" : "year";
+  const maxLength = key === "year" ? 4 : 2;
+  response.answer[key] = String(response.answer[key] || "");
+  if (response.answer[key].length >= maxLength) return;
+  response.answer[key] = `${response.answer[key]}${digit}`;
+  if (key === "month" && response.answer.month.length >= 2) response.answer.orientationDateActiveField = "day";
+  saveDraft();
+  render();
+}
+
+function backspaceOrientation(field) {
+  const response = getResponse("orientation");
+  const key = field === "day" ? "day" : field === "month" ? "month" : "year";
+  response.answer[key] = String(response.answer[key] || "").slice(0, -1);
+  saveDraft();
+  render();
+}
+
+function setOrientationDateField(field) {
+  const response = getResponse("orientation");
+  response.answer.orientationDateActiveField = field === "day" ? "day" : "month";
+  saveDraft();
+  render();
+}
+
 function ensureSerialStepTiming(response, step) {
   response.behavior.serialStepTimings = response.behavior.serialStepTimings || [];
   const timings = response.behavior.serialStepTimings;
@@ -4509,7 +4607,9 @@ function startVigilance() {
     done: () => {
       window.clearInterval(vigilanceTimer);
       response.answer.running = false;
-      autoAdvanceVigilance();
+      response.behavior.autoAdvanceDelayMs = 3000;
+      render();
+      window.setTimeout(() => autoAdvanceVigilance(), 3000);
     }
   });
   render();
@@ -4816,7 +4916,10 @@ function scoreVigilance(response) {
 
 function scoreSerial7(response) {
   const subtractBy = serialSubtractionNumber();
-  const values = (response.answer?.values || []).map((value) => Number(value));
+  const values = (response.answer?.values || []).map((value) => {
+    const text = String(value ?? "").trim();
+    return text ? Number(text) : null;
+  });
   const timings = response.behavior.serialStepTimings || [];
   let correct = 0;
   const steps = [];

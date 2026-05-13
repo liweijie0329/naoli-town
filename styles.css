@@ -106,11 +106,19 @@ h4 {
   place-items: center;
   overflow: hidden;
   padding: 28px;
+  background-color: #a8dfeb;
+  background-image:
+    linear-gradient(90deg, rgba(196, 236, 241, 0.46) 0 30%, rgba(196, 236, 241, 0.1) 56%, transparent 78%),
+    url("./assets/village/login-hero-v3.webp");
+  background-position: center, 36% center;
+  background-repeat: no-repeat;
+  background-size: cover, cover;
 }
 
 .floating-stars {
   position: absolute;
   inset: 0;
+  display: none;
   pointer-events: none;
 }
 
@@ -2619,6 +2627,185 @@ h4 {
   }
 }
 
+.birth-date-selects {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
+  gap: 12px;
+}
+
+.task-page {
+  position: relative;
+}
+
+.task-actions {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  justify-items: center;
+}
+
+.task-actions-left {
+  justify-self: start;
+}
+
+.task-actions-right {
+  justify-self: end;
+}
+
+.confirm-button {
+  justify-self: center;
+}
+
+.task-skip-link {
+  position: absolute;
+  right: clamp(18px, 3vw, 34px);
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 7;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.task-skip-link:hover {
+  color: var(--leaf-dark);
+}
+
+.digit-keypad,
+.serial-keypad,
+.orientation-keypad {
+  grid-template-columns: repeat(3, clamp(88px, 11vw, 122px));
+  gap: 16px;
+}
+
+.digit-keypad button,
+.serial-keypad button,
+.orientation-keypad button {
+  min-height: clamp(70px, 10dvh, 94px);
+  font-size: clamp(30px, 4vw, 40px);
+}
+
+.digit-keypad .keypad-spacer,
+.serial-keypad .keypad-spacer,
+.orientation-keypad .keypad-spacer {
+  min-height: clamp(70px, 10dvh, 94px);
+}
+
+.orientation-number-page {
+  gap: 22px;
+}
+
+.orientation-number-display {
+  display: grid;
+  min-width: min(420px, 88%);
+  min-height: clamp(72px, 12dvh, 104px);
+  place-items: center;
+  border: 3px solid var(--line);
+  border-left: 7px solid var(--leaf);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--leaf-dark);
+  font-size: clamp(42px, 8vw, 68px);
+  font-weight: 1000;
+}
+
+.date-input-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 18px;
+  width: min(520px, 92%);
+}
+
+.date-input-box {
+  display: grid;
+  gap: 8px;
+  min-height: clamp(84px, 13dvh, 118px);
+  place-items: center;
+  border: 3px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 4px 0 #cddbd2;
+}
+
+.date-input-box.active {
+  border-color: var(--leaf);
+  background: var(--mint);
+  color: var(--leaf-dark);
+  box-shadow: 0 4px 0 var(--leaf-dark);
+}
+
+.date-input-box span {
+  color: var(--muted);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.date-input-box strong {
+  min-height: 1em;
+  font-size: clamp(38px, 7vw, 58px);
+  font-weight: 1000;
+  line-height: 1;
+}
+
+.clock-time-reference strong {
+  font-size: clamp(118px, 15vw, 220px);
+}
+
+.result-hero {
+  place-content: center;
+  gap: 18px;
+}
+
+.results-page {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.result-hero > p {
+  color: var(--leaf-dark);
+  font-size: clamp(30px, 5vw, 54px);
+  font-weight: 1000;
+}
+
+@media (max-width: 760px), (max-height: 620px) {
+  .birth-date-selects {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.82fr) minmax(0, 0.82fr);
+    gap: 8px;
+  }
+
+  .task-actions {
+    min-height: clamp(50px, 7svh, 62px);
+    padding-inline: 48px;
+  }
+
+  .task-skip-link {
+    right: 10px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    font-size: 12px;
+  }
+
+  .digit-keypad,
+  .serial-keypad,
+  .orientation-keypad {
+    grid-template-columns: repeat(3, clamp(72px, 22vw, 96px));
+    gap: 12px;
+  }
+
+  .digit-keypad button,
+  .serial-keypad button,
+  .orientation-keypad button,
+  .digit-keypad .keypad-spacer,
+  .serial-keypad .keypad-spacer,
+  .orientation-keypad .keypad-spacer {
+    min-height: clamp(62px, 11svh, 82px);
+  }
+
+  .clock-time-reference strong {
+    font-size: clamp(74px, 18vw, 118px);
+  }
+}
+
 @keyframes popIn {
   from {
     opacity: 0;
@@ -4390,9 +4577,13 @@ body,
   padding: clamp(28px, 5.2dvh, 76px) clamp(44px, 7.2vw, 118px);
   border: 0;
   border-radius: 0;
-  background: rgba(255, 255, 255, 0.93);
+  background: transparent;
   box-shadow: none;
   overflow: hidden;
+}
+
+.setup-panel::after {
+  display: none;
 }
 
 .setup-left {
@@ -4401,6 +4592,11 @@ body,
 
 .setup-play-zone {
   align-self: center;
+  transform: translateX(clamp(-108px, -7vw, -44px));
+}
+
+.play-orbit {
+  display: none;
 }
 
 @media (orientation: portrait), (max-width: 760px) {
@@ -4423,6 +4619,7 @@ body,
 
   .setup-play-zone {
     min-height: auto;
+    transform: none;
   }
 }
 
@@ -4435,5 +4632,88 @@ body,
     align-items: center;
     padding: clamp(10px, 3svh, 18px) clamp(18px, 5vw, 50px);
     overflow-y: auto;
+  }
+}
+
+.task-actions {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  justify-items: center;
+}
+
+.task-actions-left {
+  justify-self: start;
+}
+
+.task-actions-right {
+  justify-self: end;
+}
+
+.task-skip-link {
+  position: absolute;
+  right: clamp(18px, 3vw, 34px);
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 7;
+  padding: 4px 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.digit-keypad,
+.serial-keypad,
+.orientation-keypad {
+  grid-template-columns: repeat(3, clamp(88px, 11vw, 122px));
+  gap: 16px;
+}
+
+.digit-keypad button,
+.serial-keypad button,
+.orientation-keypad button,
+.digit-keypad .keypad-spacer,
+.serial-keypad .keypad-spacer,
+.orientation-keypad .keypad-spacer {
+  min-height: clamp(70px, 10dvh, 94px);
+}
+
+.digit-keypad button,
+.serial-keypad button,
+.orientation-keypad button {
+  font-size: clamp(30px, 4vw, 40px);
+}
+
+.clock-time-reference strong {
+  font-size: clamp(118px, 15vw, 220px);
+}
+
+@media (max-width: 760px), (max-height: 620px) {
+  .task-actions {
+    padding-inline: 48px;
+  }
+
+  .task-skip-link {
+    right: 10px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    font-size: 12px;
+  }
+
+  .digit-keypad,
+  .serial-keypad,
+  .orientation-keypad {
+    grid-template-columns: repeat(3, clamp(72px, 22vw, 96px));
+    gap: 12px;
+  }
+
+  .digit-keypad button,
+  .serial-keypad button,
+  .orientation-keypad button,
+  .digit-keypad .keypad-spacer,
+  .serial-keypad .keypad-spacer,
+  .orientation-keypad .keypad-spacer {
+    min-height: clamp(62px, 11svh, 82px);
+  }
+
+  .clock-time-reference strong {
+    font-size: clamp(74px, 18vw, 118px);
   }
 }
