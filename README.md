@@ -46,34 +46,48 @@ Cloudflare Pages + D1 的部署步骤见 [docs/cloudflare-d1.md](./docs/cloudfla
 
 ## AI 评分接入
 
-默认 `POST /api/ai-score` 是本地演示评分服务，会直接返回分数、置信度和说明。
+默认 `POST /api/ai-score` 是演示评分服务；复制立方体和画钟表没有真实视觉模型时会返回 0 分并提示未配置。
 
-生产环境可设置：
+生产环境推荐直接配置 OpenAI 视觉模型：
 
 ```bash
-AI_SCORE_ENDPOINT=https://your-ai-score-service.example/api/score npm start
+OPENAI_API_KEY=sk-... npm start
 ```
 
-外部服务应接收：
+可选变量：
+
+- `OPENAI_VISION_MODEL`：视觉评分模型，默认 `gpt-4.1-mini`
+- `OPENAI_RESPONSES_ENDPOINT`：Responses API 地址，默认 `https://api.openai.com/v1/responses`
+- `AI_SCORE_ENDPOINT`：保留的外部评分服务兼容入口；通常不需要配置
+
+Cloudflare Pages 上线时，在项目 `Settings` → `Variables and Secrets` 中添加：
+
+- `OPENAI_API_KEY`
+- 可选 `OPENAI_VISION_MODEL`
+
+内置视觉评分会接收：
 
 ```json
 {
   "taskId": "clock",
   "image": "data:image/png;base64,...",
   "rubric": "评分标准文本",
-  "clientAutoScore": null
+  "rubricDetails": {},
+  "clientAutoScore": null,
+  "maxScore": 3
 }
 ```
 
-建议返回：
+评分结果格式：
 
 ```json
 {
   "scoreSuggestion": 2,
   "confidence": 0.82,
-  "requiresHumanReview": true,
+  "requiresHumanReview": false,
   "rubricMatched": true,
-  "comment": "数字完整，指针方向不准确。"
+  "comment": "数字完整，指针方向不准确。",
+  "criteria": []
 }
 ```
 

@@ -6215,7 +6215,7 @@ function localAiScore(payload) {
     requiresHumanReview: false,
     aiImageScoringConfigured: !needsConfiguredAi,
     rubricMatched: !needsConfiguredAi,
-    comment: needsConfiguredAi ? "画图题已关闭人工勾选；本地演示环境未配置 AI_SCORE_ENDPOINT，无法完成图片 AI 评分。" : "本地演示评分已返回结果。"
+    comment: needsConfiguredAi ? "画图题已关闭人工勾选；本地演示环境未配置 OPENAI_API_KEY，无法完成图片 AI 评分。" : "本地演示评分已返回结果。"
   };
 }
 

@@ -5,6 +5,7 @@ import { extname, join, normalize, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import { base64ChunksToUint8Array, serializeTtsError, synthesizeDoubaoSpeech } from "./functions/_lib/doubao-tts.js";
+import { demoScore, scorePayload } from "./functions/_lib/vision-score.js";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const publicRoot = root;
@@ -228,41 +229,16 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/ai-score") {
     const payload = await readJsonBody(req);
 
-    if (process.env.AI_SCORE_ENDPOINT) {
-      const aiResponse = await fetch(process.env.AI_SCORE_ENDPOINT, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload)
+    try {
+      sendJson(res, 200, await scorePayload(payload, process.env, { demoMode: "local-ai-demo" }));
+    } catch (error) {
+      const fallback = demoScore(payload, "local-ai-demo");
+      sendJson(res, 200, {
+        ...fallback,
+        error: "ai_score_failed",
+        comment: error?.message || fallback.comment
       });
-      const result = await aiResponse.json();
-      sendJson(res, aiResponse.ok ? 200 : aiResponse.status, result);
-      return;
     }
-
-    const maxScore = Number.isFinite(Number(payload.maxScore))
-      ? Number(payload.maxScore)
-      : 0;
-    let scoreSuggestion =
-      typeof payload.clientAutoScore === "number"
-        ? payload.clientAutoScore
-        : null;
-    const needsConfiguredAi = ["cube", "clock"].includes(payload.taskId) && payload.image && scoreSuggestion === null;
-
-    if (scoreSuggestion === null) scoreSuggestion = 0;
-    scoreSuggestion = Math.max(0, Math.min(maxScore, Math.round(scoreSuggestion)));
-
-    sendJson(res, 200, {
-      mode: "local-ai-demo",
-      taskId: payload.taskId,
-      scoreSuggestion,
-      confidence: needsConfiguredAi ? 0 : payload.image ? 0.68 : 0.82,
-      requiresHumanReview: needsConfiguredAi,
-      rubricMatched: !needsConfiguredAi,
-      comment:
-        needsConfiguredAi
-          ? "画图题已关闭人工勾选；请设置 AI_SCORE_ENDPOINT 接入图片 AI 评分服务。"
-          : "本地演示环境已直接返回 AI 评分；生产环境请设置 AI_SCORE_ENDPOINT 接入真实模型评分服务。"
-    });
     return;
   }
 
