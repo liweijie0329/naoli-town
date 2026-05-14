@@ -3151,6 +3151,33 @@ h4 {
   font-weight: 1000;
 }
 
+.year-digit-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(72px, 1fr));
+  gap: 14px;
+  width: min(520px, 92%);
+}
+
+.year-digit-box {
+  display: grid;
+  min-height: clamp(84px, 13dvh, 118px);
+  place-items: center;
+  border: 3px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--leaf-dark);
+  box-shadow: 0 4px 0 #cddbd2;
+  font-size: clamp(38px, 7vw, 58px);
+  font-weight: 1000;
+  line-height: 1;
+}
+
+.year-digit-box.active {
+  border-color: var(--leaf);
+  background: var(--mint);
+  box-shadow: 0 4px 0 var(--leaf-dark);
+}
+
 .date-input-pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(120px, 1fr));
@@ -3244,6 +3271,17 @@ h4 {
 
   .clock-time-reference strong {
     font-size: clamp(74px, 18vw, 118px);
+  }
+
+  .year-digit-row {
+    grid-template-columns: repeat(4, minmax(52px, 1fr));
+    gap: 10px;
+    width: min(390px, 94%);
+  }
+
+  .year-digit-box {
+    min-height: clamp(62px, 11svh, 82px);
+    font-size: clamp(30px, 8vw, 44px);
   }
 }
 

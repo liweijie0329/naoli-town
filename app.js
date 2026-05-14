@@ -1876,7 +1876,7 @@ function renderOrientationNumberTask(response, prompt) {
     return html`
       <div class="orientation-page orientation-number-page">
         <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
-        <div class="orientation-number-display">${escapeHtml(value || " ")}</div>
+        ${renderYearDigitBoxes(value)}
         <div class="keypad orientation-keypad">
           ${renderOrientationKeypad("year")}
         </div>
@@ -1904,6 +1904,18 @@ function renderOrientationNumberTask(response, prompt) {
   `;
 }
 
+function renderYearDigitBoxes(value) {
+  const digits = String(value || "").slice(0, 4).split("");
+  const activeIndex = digits.length < 4 ? digits.length : -1;
+  return html`
+    <div class="year-digit-row" aria-label="年份输入">
+      ${Array.from({ length: 4 }, (_, index) => `
+        <span class="year-digit-box ${index === activeIndex ? "active" : ""}">${escapeHtml(digits[index] || " ")}</span>
+      `).join("")}
+    </div>
+  `;
+}
+
 function renderSpeechCard(live) {
   return html`
     <div class="speech-page">
@@ -1927,15 +1939,15 @@ function renderSpeechControls(transcript) {
 function getLiveTranscript(task, response, step = 0) {
   if (task?.type === "sentence") {
     return {
-      finalText: response.answer.transcript?.[step] || "",
-      interimText: response.answer.interimTranscript?.[step] || "",
+      finalText: cleanAsrTranscript(response.answer.transcript?.[step] || ""),
+      interimText: cleanAsrTranscript(response.answer.interimTranscript?.[step] || ""),
       warningText: response.behavior.speechWarning?.[step] || ""
     };
   }
   if (task?.type === "fluency") {
     return {
-      finalText: response.answer.rawTranscript || "",
-      interimText: response.answer.interimTranscript || ""
+      finalText: cleanAsrTranscript(response.answer.rawTranscript || ""),
+      interimText: cleanAsrTranscript(response.answer.interimTranscript || "")
     };
   }
   return { finalText: "", interimText: "" };
@@ -5019,11 +5031,15 @@ function cleanAsrTranscript(text) {
   const normalized = toSimplifiedChinese(String(text || ""))
     .replace(/\s+/g, " ")
     .trim();
-  if (!normalized || isAsrAdLike(normalized)) return "";
-  return normalized
-    .replace(/字幕由[^。]*?(提供|制作)[。.!！]?/g, "")
-    .replace(/本字幕由[^。]*?提供[。.!！]?/g, "")
+  if (!normalized) return "";
+  const cleaned = normalized
+    .replace(/本\s*字幕\s*由[^。！？.!?]*?提供[。.!！]?/g, "")
+    .replace(/字幕\s*由[^。！？.!?]*?(提供|制作)[。.!！]?/g, "")
+    .replace(/字幕\s*(志愿者|校对|翻译|制作|制作者|后期|时间轴|听录|来源)?\s*[：:]?\s*[\u4e00-\u9fa5A-Za-z·]{2,10}(?=$|[\s。！？.!?])/g, "")
+    .replace(/\s+/g, " ")
     .trim();
+  if (!cleaned || isAsrAdLike(cleaned)) return "";
+  return cleaned;
 }
 
 function isAsrAdLike(text) {
@@ -5031,7 +5047,8 @@ function isAsrAdLike(text) {
   if (!compact) return false;
   const adPhrases = [
     "谢谢观看", "感谢观看", "请不吝点赞", "点赞订阅", "订阅转发", "打赏支持",
-    "明镜与点点栏目", "字幕由", "amara", "广告", "下集再见"
+    "明镜与点点栏目", "字幕由", "字幕志愿者", "字幕校对", "字幕翻译", "字幕制作",
+    "amara", "广告", "下集再见"
   ];
   return adPhrases.some((phrase) => compact.toLowerCase().includes(phrase.toLowerCase()));
 }
@@ -5136,7 +5153,7 @@ function recordSpeechRecognitionEvent(eventType, details = {}) {
 }
 
 function applyVoiceText(text) {
-  text = toSimplifiedChinese(text);
+  text = cleanAsrTranscript(text);
   if (!text) return;
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
@@ -5174,7 +5191,8 @@ function applyManualVoiceText(text) {
 }
 
 function applyOrientationText(response, step, text) {
-  text = toSimplifiedChinese(text);
+  text = cleanAsrTranscript(text);
+  if (!text) return;
   const prompt = orientationPrompts[step];
   response.answer.orientationTranscript = response.answer.orientationTranscript || {};
   response.answer.orientationTranscript[prompt.key] = text;
@@ -5465,8 +5483,12 @@ function inputOrientationDigit(field, digit) {
   const maxLength = key === "year" ? 4 : 2;
   response.answer[key] = String(response.answer[key] || "");
   if (response.answer[key].length >= maxLength) return;
+  const previousLength = response.answer[key].length;
   response.answer[key] = `${response.answer[key]}${digit}`;
-  if (key === "month" && response.answer.month.length >= 2) response.answer.orientationDateActiveField = "day";
+  if (key === "month") {
+    const singleDigitMonth = previousLength === 0 && /^[2-9]$/.test(String(digit));
+    if (singleDigitMonth || response.answer.month.length >= 2) response.answer.orientationDateActiveField = "day";
+  }
   saveDraft();
   render();
 }
