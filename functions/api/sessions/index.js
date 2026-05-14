@@ -56,7 +56,17 @@ export async function onRequestGet({ env }) {
 
   const { results } = await env.DB.prepare(`
     SELECT
-      s.*,
+      s.id,
+      s.participant_json,
+      s.participant_age,
+      s.started_at,
+      s.finished_at,
+      s.saved_at,
+      s.total_duration_ms,
+      s.raw_score,
+      s.education_bonus,
+      s.total_score,
+      s.risk_band,
       COUNT(i.id) AS item_count
     FROM sessions s
     LEFT JOIN item_responses i ON i.session_id = s.id

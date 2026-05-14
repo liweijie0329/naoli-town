@@ -57,7 +57,7 @@ async function readSessions() {
 
 async function writeSessions(sessions) {
   await ensureStore();
-  await writeFile(sessionsFile, `${JSON.stringify(sessions, null, 2)}\n`, "utf8");
+  await writeFile(sessionsFile, `${JSON.stringify(sessions)}\n`, "utf8");
 }
 
 function readBody(req) {
@@ -142,6 +142,24 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function slimSession(session) {
+  return {
+    id: session.id,
+    participant: session.participant,
+    participantAge: session.participantAge ?? session.participant?.age ?? null,
+    startedAt: session.startedAt,
+    finishedAt: session.finishedAt,
+    savedAt: session.savedAt,
+    totalDurationMs: session.totalDurationMs,
+    rawScore: session.rawScore,
+    educationBonus: session.educationBonus,
+    totalScore: session.totalScore,
+    riskBand: session.riskBand,
+    itemCount: session.itemResponses?.length || 0,
+    storageMode: session.storageMode
+  };
+}
+
 function notFound(res) {
   sendJson(res, 404, { error: "Not found" });
 }
@@ -168,20 +186,7 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname === "/api/sessions") {
     const sessions = await readSessions();
-    const slim = sessions.map((session) => ({
-      id: session.id,
-      participant: session.participant,
-      participantAge: session.participantAge ?? session.participant?.age ?? null,
-      startedAt: session.startedAt,
-      finishedAt: session.finishedAt,
-      totalDurationMs: session.totalDurationMs,
-      rawScore: session.rawScore,
-      educationBonus: session.educationBonus,
-      totalScore: session.totalScore,
-      riskBand: session.riskBand,
-      itemCount: session.itemResponses?.length || 0
-    }));
-    sendJson(res, 200, slim);
+    sendJson(res, 200, sessions.map(slimSession));
     return;
   }
 
@@ -216,7 +221,7 @@ async function handleApi(req, res, url) {
       sessions.unshift(saved);
     }
     await writeSessions(sessions);
-    sendJson(res, 200, saved);
+    sendJson(res, 200, slimSession(saved));
     return;
   }
 

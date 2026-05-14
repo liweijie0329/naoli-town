@@ -216,9 +216,10 @@ const animalNameBank = [
 const animalAliasPairs = [
   ["小狗", "狗"], ["狗狗", "狗"], ["犬", "狗"],
   ["小猫", "猫"], ["猫咪", "猫"],
-  ["黄牛", "牛"], ["水牛", "牛"], ["奶牛", "牛"],
-  ["山羊", "羊"], ["绵羊", "羊"], ["羊驼", "羊驼"], ["草泥马", "羊驼"],
+  ["黄牛", "牛"], ["水牛", "牛"], ["奶牛", "牛"], ["公牛", "牛"], ["母牛", "牛"], ["小牛", "牛"],
+  ["山羊", "羊"], ["绵羊", "羊"], ["羊驼", "羊驼"], ["草泥马", "羊驼"], ["小羊", "羊"], ["公羊", "羊"], ["母羊", "羊"],
   ["公鸡", "鸡"], ["母鸡", "鸡"],
+  ["小猪", "猪"], ["野猪", "野猪"],
   ["鸭子", "鸭"], ["鹅子", "鹅"],
   ["兔子", "兔"], ["老鼠", "鼠"], ["耗子", "鼠"], ["老虎", "虎"], ["猴子", "猴"],
   ["鲸鱼", "鲸"], ["鱼儿", "鱼"],
@@ -228,8 +229,9 @@ const animalAliasPairs = [
   ["青蛙", "青蛙"], ["蛙", "青蛙"], ["蟒", "蟒蛇"], ["蟒蛇", "蟒蛇"], ["眼镜蛇", "眼镜蛇"],
   ["大象", "大象"], ["长颈鹿", "长颈鹿"], ["猫头鹰", "猫头鹰"], ["小白兔", "兔"],
   ["天鹅", "天鹅"], ["鸵鸟", "鸵鸟"], ["海鸥", "海鸥"], ["乌鸦", "乌鸦"], ["喜鹊", "喜鹊"],
-  ["狐狸", "狐狸"], ["狐", "狐狸"], ["狼", "狼"], ["熊", "熊"], ["鹿", "鹿"], ["驴", "驴"],
+  ["狐狸", "狐狸"], ["狐", "狐狸"], ["狼", "狼"], ["熊", "熊"], ["鹿", "鹿"], ["小鹿", "鹿"], ["梅花鹿", "梅花鹿"], ["驴", "驴"],
   ["蚂蚱", "蚂蚱"], ["蚊", "蚊子"], ["苍蝇", "苍蝇"], ["蜗牛", "蜗牛"], ["螃蟹", "螃蟹"],
+  ["虫子", "虫"], ["昆虫", "虫"],
   ["恐龙", "恐龙"], ["龙", "龙"], ["凤凰", "凤凰"], ["麒麟", "麒麟"],
   ["鹅鹅", "鹅"], ["小鹅", "鹅"],
   ["幺鸡", "鸡"], ["鸡鸡", "鸡"],
@@ -248,7 +250,12 @@ const fluencyAsrAnimalCorrections = [
   ["河嘛", "河马"], ["和马", "河马"],
   ["大想", "大象"], ["大项", "大象"],
   ["毛牛", "牦牛"], ["耗牛", "牦牛"],
-  ["卢鱼", "鲈鱼"], ["归鱼", "鲑鱼"], ["包鱼", "鲍鱼"]
+  ["卢鱼", "鲈鱼"], ["归鱼", "鲑鱼"], ["包鱼", "鲍鱼"],
+  ["猴几", "猴子"], ["猴纸", "猴子"],
+  ["兔纸", "兔子"],
+  ["松数", "松鼠"], ["仓数", "仓鼠"],
+  ["小鸟儿", "鸟"], ["鸟鸟", "鸟"],
+  ["蝴铁", "蝴蝶"], ["虎蝶", "蝴蝶"]
 ];
 
 const fluencyFillerPhrases = [
@@ -504,6 +511,7 @@ const educationLevels = ["", "小学", "初中", "中专", "高中", "大专", "
 localStorage.removeItem("moca-game-draft");
 
 let state = createInitialState();
+const sessionDetailCache = new Map();
 let activeRubricItem = null;
 let activeCanvas = null;
 let activeCtx = null;
@@ -623,7 +631,8 @@ function createInitialState() {
     setupVoiceRecording: false,
     setupVoiceTranscribing: false,
     adminSessions: [],
-    selectedSession: null
+    selectedSession: null,
+    selectedSessionLoading: false
   };
 }
 
@@ -1919,7 +1928,6 @@ function renderFluencyTask() {
       </div>
       <strong class="fluency-count-status">${fluencyStatusText(response, animals)}</strong>
       <div class="animal-count-list">${renderAnimalCountChips(animals)}</div>
-      ${renderTranscriptEditor(live, "fluency")}
     </div>
   `;
 }
@@ -2300,6 +2308,7 @@ function renderSessionDetail(session) {
   const itemResponses = Array.isArray(session.itemResponses) ? session.itemResponses : [];
   const hearing = session.hearingScreening || {};
   const hearingSummary = hearing.summary || null;
+  const loading = state.selectedSessionLoading && state.selectedSession?.id === session.id && !itemResponses.length;
   return html`
     <aside class="admin-detail">
       <div class="detail-header">
@@ -2322,7 +2331,9 @@ function renderSessionDetail(session) {
         ${detailMetric("保存时间", session.savedAt ? new Date(session.savedAt).toLocaleString() : "-")}
       </div>
       <div class="item-detail-list">
-        ${itemResponses.map((item, index) => renderItemDetail(item, index)).join("") || `<p class="empty">这条记录没有题目明细</p>`}
+        ${loading
+          ? `<p class="empty">正在加载题目明细...</p>`
+          : itemResponses.map((item, index) => renderItemDetail(item, index)).join("") || `<p class="empty">这条记录没有题目明细</p>`}
       </div>
     </aside>
   `;
@@ -2343,26 +2354,92 @@ function formatHearingStatus(status) {
 }
 
 function renderItemDetail(item, index) {
+  const answerText = readableItemAnswer(item);
   return html`
-    <details class="item-detail" ${index === 0 ? "open" : ""}>
-      <summary>
+    <article class="item-detail compact-item-detail">
+      <div class="item-detail-row">
         <span>${String(index + 1).padStart(2, "0")}</span>
         <strong>${escapeHtml(item.title || item.taskId || "未命名题目")}</strong>
         <em>${escapeHtml(item.score ?? "-")}/${escapeHtml(item.maxScore ?? "-")}</em>
-      </summary>
-      <div class="item-detail-body">
-        <div class="detail-chips">
-          <span>${escapeHtml(item.domain || "未分类")}</span>
-          <span>${escapeHtml(item.modality || "未记录")}</span>
-          <span>${escapeHtml(item.durationMs ?? "-")} ms</span>
-        </div>
-        ${renderDetailJson("答案 answer_json", item.answer || {})}
-        ${renderDetailJson("行为记录 behavior_json", item.behavior || {})}
-        ${renderDetailJson("AI 评分 ai_json", item.ai || null)}
-        ${renderDrawingPreview(item.drawingImage)}
       </div>
-    </details>
+      <div class="item-answer-summary">
+        <span>回答</span>
+        <p>${escapeHtml(answerText)}</p>
+      </div>
+    </article>
   `;
+}
+
+function readableItemAnswer(item = {}) {
+  const answer = item.answer || {};
+  if (answer.skipped) return "已跳过";
+  const task = tasks.find((entry) => entry.id === item.taskId);
+  if (item.taskId === "trail") return item.drawingImage ? "已完成连线" : "未记录连线";
+  if (item.taskId === "cube" || item.taskId === "clock") return item.drawingImage ? "已提交画图" : "未提交画图";
+  if (task?.type === "naming") return task.items.map((entry) => `${entry.answer}: ${answer[entry.key] || "未答"}`).join("；");
+  if (task?.type === "memory") {
+    const selected = Array.isArray(answer.selectedWords) ? answer.selectedWords : [];
+    return selected.length ? selected.join("、") : "未选择";
+  }
+  if (task?.type === "choice") {
+    const sequence = Array.isArray(answer.sequence) ? answer.sequence : [];
+    return sequence.length ? sequence.join(" ") : "未选择";
+  }
+  if (task?.type === "vigilance") {
+    const taps = Array.isArray(answer.taps) ? answer.taps.length : 0;
+    return `敲击 ${taps} 次`;
+  }
+  if (task?.type === "serial7") {
+    const values = Array.isArray(answer.values) ? answer.values : [];
+    return values.length ? values.map((value) => value || "未答").join("，") : "未答";
+  }
+  if (task?.type === "sentence") return readableSentenceAnswer(task, answer);
+  if (task?.type === "fluency") return readableFluencyAnswer(answer);
+  if (task?.type === "abstractionChoice") return readableAbstractionAnswer(task, answer);
+  if (task?.type === "orientation") return readableOrientationAnswer(answer);
+  return readableGenericAnswer(answer);
+}
+
+function readableSentenceAnswer(task, answer) {
+  const transcript = answer.transcript || {};
+  const parts = task.sentences.map((_, index) => cleanAsrTranscript(transcript[index] || "") || "未答");
+  return parts.map((part, index) => `${index + 1}. ${part}`).join("；");
+}
+
+function readableFluencyAnswer(answer) {
+  const animals = Array.isArray(answer.animals) && answer.animals.length
+    ? answer.animals
+    : extractAnimalNames(answer.rawTranscript || "");
+  return animals.length ? `已识别 ${animals.length} 个：${animals.join("、")}` : "未识别到动物";
+}
+
+function readableAbstractionAnswer(task, answer) {
+  return task.items
+    .filter((entry) => !entry.practice)
+    .map((entry) => `${entry.words.join("和")}: ${answer[entry.key] || "未答"}`)
+    .join("；");
+}
+
+function readableOrientationAnswer(answer) {
+  const date = [answer.year, answer.month, answer.day].filter(Boolean).join("-");
+  const parts = [
+    date ? `日期: ${date}` : "",
+    answer.weekday ? `星期: ${answer.weekday}` : "",
+    answer.city ? `城市: ${answer.city}` : "",
+    answer.place ? `地点: ${answer.place}` : ""
+  ].filter(Boolean);
+  return parts.length ? parts.join("；") : "未答";
+}
+
+function readableGenericAnswer(answer) {
+  const hiddenKeys = new Set([
+    "audioRecordings", "interimTranscript", "rawTranscript", "timerStartedAt",
+    "running", "remaining", "audioReady", "wordsPlaybackStarted", "orientationDateActiveField"
+  ]);
+  const parts = Object.entries(answer || {})
+    .filter(([key, value]) => !hiddenKeys.has(key) && value !== "" && value !== null && value !== undefined)
+    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join("、") : String(value)}`);
+  return parts.length ? parts.join("；") : "未答";
 }
 
 function renderDetailJson(label, value) {
@@ -2407,7 +2484,10 @@ function prettyJson(value) {
 function renderDesign() {
   return html`
     <section class="single-page design-page">
-      <iframe class="moca-pdf-frame" src="${MOCA_SCALE_PDF}#toolbar=1&navpanes=0" title="蒙特利尔认知评估量表MoCA"></iframe>
+      <img class="moca-pdf-fallback-image" src="${MOCA_SHEET_IMAGE}" alt="蒙特利尔认知评估量表MoCA 评分标准" />
+      <object class="moca-pdf-frame" data="${MOCA_SCALE_PDF}#toolbar=1&navpanes=0" type="application/pdf" aria-label="蒙特利尔认知评估量表MoCA">
+        <iframe src="${MOCA_SCALE_PDF}#toolbar=1&navpanes=0" title="蒙特利尔认知评估量表MoCA"></iframe>
+      </object>
     </section>
   `;
 }
@@ -2615,7 +2695,7 @@ function setupTrailCanvas() {
     trailDragPoint = null;
     canvas.releasePointerCapture(event.pointerId);
     drawTrailCanvas(canvas);
-    state.drawings.trail = canvas.toDataURL("image/png");
+    state.drawings.trail = canvasToCompactDataUrl(canvas);
     saveDraft();
     render();
   };
@@ -2651,7 +2731,7 @@ function commitTrailDrag(startNode, endNode, canvas) {
     to: endNode?.label || "",
     at: new Date().toISOString()
   };
-  if (canvas) response.drawingImage = canvas.toDataURL("image/png");
+  if (canvas) response.drawingImage = canvasToCompactDataUrl(canvas);
   maybeOpenTrailCompletionPrompt(response);
 }
 
@@ -3538,14 +3618,17 @@ async function startNewSession(participant) {
   state.view = "hearing";
   cognitionMenuOpen = false;
   render();
+  void requestStartupPermissions();
   queueHearingPrompt();
 }
 
-async function requestStartupPermissions() {
+async function requestStartupPermissions(options = {}) {
+  const { rerender = true } = options;
   await Promise.allSettled([
-    primeMicrophonePermission(),
-    primeLocationPermission()
+    primeMicrophonePermission({ keepStream: true }),
+    primeLocationPermission({ rerender: false, resolveAddress: false, timeout: 6500 })
   ]);
+  if (rerender) render();
 }
 
 async function nextTask() {
@@ -4384,10 +4467,8 @@ function beginAudioPlayback() {
 
 function prepareAudioOutputMode() {
   if (recordingAudio || recognizing || speechRecognitionStartPending || speechRecognitionWanted) {
-    stopVoiceInput({ releaseMic: true, shouldRender: false });
-    return;
+    stopVoiceInput({ releaseMic: false, shouldRender: false });
   }
-  releaseMicStream();
 }
 
 function stopAudioPlayback() {
@@ -4621,7 +4702,7 @@ async function fallbackToAudioRecording(reason) {
 }
 
 function stopVoiceInput(options = {}) {
-  const { releaseMic = true, shouldRender = true } = options;
+  const { releaseMic = false, shouldRender = true } = options;
   clearSpeechRecognitionRestartTimer();
   const wasRecognitionPending = speechRecognitionStartPending;
   const wasRecording = mediaRecorder && mediaRecorder.state === "recording";
@@ -4676,6 +4757,11 @@ async function startAudioRecording(options = {}) {
   }
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
     voiceState = "当前浏览器不能录音";
+    render();
+    return false;
+  }
+  if (state.permissions.microphone === "denied") {
+    voiceState = "请允许麦克风权限";
     render();
     return false;
   }
@@ -4749,7 +4835,9 @@ async function startAudioRecording(options = {}) {
     recordingAudio = false;
     releaseMicAfterRecordingStop = false;
     recordingWillTranscribe = false;
+    state.permissions.microphone = "denied";
     voiceState = "请允许麦克风权限";
+    saveDraft();
     render();
     return false;
   }
@@ -4760,6 +4848,11 @@ async function startPcmAudioRecording(options = {}) {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!navigator.mediaDevices?.getUserMedia || !AudioContextClass) return null;
   if (!AudioContextClass.prototype?.createScriptProcessor) return null;
+  if (state.permissions.microphone === "denied") {
+    voiceState = "请允许麦克风权限";
+    render();
+    return false;
+  }
   if (pcmRecorder) return true;
   try {
     micStream = await getReusableMicStream();
@@ -4809,7 +4902,9 @@ async function startPcmAudioRecording(options = {}) {
     recordingAudio = false;
     recordingWillTranscribe = false;
     if (["NotAllowedError", "PermissionDeniedError", "NotFoundError", "NotReadableError"].includes(error?.name)) {
+      state.permissions.microphone = error?.name === "NotFoundError" ? "unsupported" : "denied";
       voiceState = error?.name === "NotFoundError" ? "没有找到麦克风" : "请允许麦克风权限";
+      saveDraft();
       render();
       return false;
     }
@@ -5207,21 +5302,26 @@ function speechMicrophoneUnavailableText() {
   return "请允许麦克风权限";
 }
 
-async function primeMicrophonePermission() {
-  if (micPermissionReady) return true;
+async function primeMicrophonePermission(options = {}) {
+  const { keepStream = true } = options;
+  const hasLiveStream = micStream && micStream.getAudioTracks().some((track) => track.readyState === "live");
+  if (micPermissionReady && (!keepStream || hasLiveStream)) return true;
+  if (state.permissions.microphone === "denied") return false;
   if (!navigator.mediaDevices?.getUserMedia) {
     state.permissions.microphone = "unsupported";
     return false;
   }
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach((track) => track.stop());
+    const stream = keepStream ? await getReusableMicStream() : await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (!keepStream) stream.getTracks().forEach((track) => track.stop());
     micPermissionReady = true;
     state.permissions.microphone = "granted";
+    saveDraft();
     return true;
   } catch {
     micPermissionReady = false;
     state.permissions.microphone = "denied";
+    saveDraft();
     return false;
   }
 }
@@ -5860,21 +5960,30 @@ function memoryWaitRemaining() {
 
 function prepareLocationAnswer() {
   const response = getResponse("orientation");
-  if (response.behavior.location) return;
+  const location = response.behavior.location;
+  if (location?.error) return;
+  if (location && !location.error) {
+    if (!location.city && !location.place) void reverseGeocodeLocation(response).then(() => {
+      saveDraft();
+      render();
+    });
+    return;
+  }
   primeLocationPermission({ rerender: true });
 }
 
 async function primeLocationPermission(options = {}) {
-  const { rerender = false } = options;
+  const { rerender = false, resolveAddress = true, timeout = 10000 } = options;
   const response = getResponse("orientation");
   if (!navigator.geolocation) {
     state.permissions.location = "unsupported";
     response.behavior.location = { error: "当前设备不支持定位", at: new Date().toISOString() };
+    saveDraft();
     if (rerender) render();
     return false;
   }
   try {
-    const position = await getCurrentPosition({ enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+    const position = await getCurrentPosition({ enableHighAccuracy: true, timeout, maximumAge: 60000 });
     state.permissions.location = "granted";
     response.behavior.location = {
       latitude: position.coords.latitude,
@@ -5882,7 +5991,7 @@ async function primeLocationPermission(options = {}) {
       accuracy: position.coords.accuracy,
       at: new Date().toISOString()
     };
-    await reverseGeocodeLocation(response);
+    if (resolveAddress) await reverseGeocodeLocation(response);
     saveDraft();
     if (rerender) render();
     return true;
@@ -5990,9 +6099,10 @@ function localAiScore(payload) {
     taskId: payload.taskId,
     scoreSuggestion,
     confidence: needsConfiguredAi ? 0 : payload.image ? 0.68 : 0.82,
-    requiresHumanReview: needsConfiguredAi,
+    requiresHumanReview: false,
+    aiImageScoringConfigured: !needsConfiguredAi,
     rubricMatched: !needsConfiguredAi,
-    comment: needsConfiguredAi ? "画图题已关闭人工勾选，本地演示环境未配置 AI_SCORE_ENDPOINT，无法完成图片 AI 评分。" : "本地演示评分已返回结果。"
+    comment: needsConfiguredAi ? "画图题已关闭人工勾选；本地演示环境未配置 AI_SCORE_ENDPOINT，无法完成图片 AI 评分。" : "本地演示评分已返回结果。"
   };
 }
 
@@ -6019,13 +6129,12 @@ async function scoreTaskWithAi(task) {
 }
 
 function needsAiScore(task) {
-  return ["trail", "drawing", "sentence", "fluency"].includes(task.type);
+  return ["trail", "drawing", "fluency"].includes(task.type);
 }
 
 function clientAutoScoreForAi(task, response) {
   if (task.type === "trail") return scoreTrail().score;
   if (task.id === "cube" || task.id === "clock") return null;
-  if (task.type === "sentence") return scoreSentenceTranscript(task, response);
   if (task.type === "fluency") return fluencyAnimalCount(response) >= 11 ? 1 : 0;
   if (task.type === "orientation") return scoreOrientationByInputs(response);
   return null;
@@ -6035,7 +6144,29 @@ function drawingAiRubric(task) {
   if (!task || task.type !== "drawing") return null;
   return {
     scoringMode: "ai_image_only",
-    instruction: "请只根据用户画布图片，严格按照 MoCA 评分标准给出 scoreSuggestion；不要使用人工勾选或客户端预评分。",
+    taskTitle: task.title,
+    drawingKind: task.drawingKind,
+    maxScore: task.maxScore,
+    instruction: "请只根据用户画布图片评分，严格按照 MoCA 中文量表标准给出 scoreSuggestion；不要使用人工勾选、客户端预评分或宽松印象分。",
+    outputContract: {
+      scoreSuggestion: "整数，范围 0 到 maxScore",
+      criteria: "逐项给 true/false，并说明图片中能直接观察到的证据",
+      confidence: "0 到 1",
+      rubricMatched: "所有给分条件都来自本 rubric 时为 true"
+    },
+    scoreRules: task.drawingKind === "cube"
+      ? [
+        "立方体总分只有 0 或 1 分。",
+        "必须同时满足三维结构、所有必要线条存在、没有明显多余线条、相对边基本平行且长度基本一致，才给 1 分。",
+        "任一条件不满足、画成平面图形、结构无法辨认为立方体、线条缺失或明显多余，均给 0 分。"
+      ]
+      : [
+        "钟表总分 0-3 分，每项 1 分。",
+        "轮廓：表盘必须近似圆形，只允许轻微变形，满足给 1 分。",
+        "数字：1-12 必须完整、无重复或多余、顺序正确，并位于大致正确象限，满足给 1 分。",
+        "指针：必须有两根指针，表示 11 点 10 分，分针指向 2、时针指向 11 附近且短于分针，交点接近中心，满足给 1 分。",
+        "每个分项只按图片证据给分，缺失、位置明显错误或无法辨认即该项 0 分。"
+      ],
     criteria: DRAWING_AI_RUBRICS[task.drawingKind] || []
   };
 }
@@ -6049,7 +6180,7 @@ function computeTaskScore(task, response = getResponse(task.id)) {
   if (task.type === "choice") return (response.answer?.sequence || []).join("") === activeDigitItem(task).answer ? 1 : 0;
   if (task.type === "vigilance") return scoreVigilance(response);
   if (task.type === "serial7") return scoreSerial7(response).score;
-  if (task.type === "sentence") return aiScore ?? 0;
+  if (task.type === "sentence") return scoreSentenceTranscript(task, response);
   if (task.type === "fluency") return aiScore ?? (fluencyAnimalCount(response) >= 11 ? 1 : 0);
   if (task.type === "abstractionChoice") return scoreAbstractionChoice(task, response);
   if (task.type === "orientation") return aiScore ?? scoreOrientationByInputs(response);
@@ -6146,7 +6277,36 @@ function scoreSerial7(response) {
 
 function scoreSentenceTranscript(task, response) {
   const transcript = response.answer?.transcript || {};
-  return task.sentences.reduce((sum, sentence, index) => sum + (normalizeText(transcript[index]) === normalizeText(sentence) ? 1 : 0), 0);
+  let score = 0;
+  const details = task.sentences.map((sentence, index) => {
+    const expected = sentenceMoCaNormalize(sentence);
+    const answer = sentenceMoCaNormalize(transcript[index]);
+    const correct = Boolean(answer) && answer === expected;
+    if (correct) score += 1;
+    return {
+      step: index,
+      expected: sentence,
+      transcript: cleanAsrTranscript(transcript[index] || ""),
+      expectedNormalized: expected,
+      transcriptNormalized: answer,
+      correct,
+      rule: "MoCA 句子复述：每句话完全准确复述给 1 分；省略、替换、增加或语序变化均为 0 分。"
+    };
+  });
+  response.behavior.sentenceScoring = {
+    score,
+    maxScore: task.sentences.length,
+    details,
+    scoredAt: new Date().toISOString()
+  };
+  return score;
+}
+
+function sentenceMoCaNormalize(text) {
+  return toSimplifiedChinese(text)
+    .replace(/[“”"'‘’`´＂＇]/g, "")
+    .replace(/[，,、；;：:。.!！?？（）()\[\]【】{}《》〈〉…·—\-_/\\\s]/g, "")
+    .trim();
 }
 
 function scoreAbstractionChoice(task, response) {
@@ -6431,8 +6591,10 @@ async function saveSession(options = {}) {
   const savedDetail = { ...payload, ...saved, itemResponses: payload.itemResponses };
   state.sessionId = savedDetail.id;
   state.selectedSession = savedDetail;
+  state.selectedSessionLoading = false;
   state.sessionSaveStatus = "saved";
   state.sessionSavedAt = savedDetail.savedAt || new Date().toISOString();
+  cacheSessionDetail(savedDetail);
   upsertAdminSessionSummary(savedDetail);
   state.view = stayOnResults ? "results" : "admin";
   render();
@@ -6463,18 +6625,38 @@ async function loadSessions(shouldRender = false) {
   state.adminSessions = sessions;
   const selectedId = state.selectedSession?.id;
   const next = sessions.find((session) => session.id === selectedId) || sessions[0] || null;
-  state.selectedSession = next ? await loadSessionDetail(next.id) : null;
+  state.selectedSession = next ? (sessionDetailCache.get(next.id) || next) : null;
+  state.selectedSessionLoading = false;
   if (shouldRender) render();
 }
 
-function loadSessionDetail(id) {
-  return requestJson(`/api/sessions/${encodeURIComponent(id)}`, undefined, () => readLocalSessions().find((entry) => entry.id === id) || null);
+function cacheSessionDetail(session) {
+  if (session?.id && Array.isArray(session.itemResponses)) sessionDetailCache.set(session.id, session);
+  return session;
+}
+
+function sessionSummaryById(id) {
+  return (state.adminSessions || []).find((session) => session.id === id) || null;
+}
+
+async function loadSessionDetail(id, options = {}) {
+  const { force = false } = options;
+  if (!force && sessionDetailCache.has(id)) return sessionDetailCache.get(id);
+  const detail = await requestJson(`/api/sessions/${encodeURIComponent(id)}`, undefined, () => readLocalSessions().find((entry) => entry.id === id) || null);
+  return cacheSessionDetail(detail);
 }
 
 async function selectSavedSession(id, shouldRender = true) {
-  state.selectedSession = await loadSessionDetail(id);
-  if (!shouldRender) return;
-  render();
+  const cached = sessionDetailCache.get(id);
+  state.selectedSession = cached || sessionSummaryById(id) || { id };
+  state.selectedSessionLoading = !cached;
+  if (shouldRender) render();
+  if (cached) return;
+  const detail = await loadSessionDetail(id);
+  if (state.selectedSession?.id !== id) return;
+  state.selectedSession = detail || state.selectedSession;
+  state.selectedSessionLoading = false;
+  if (shouldRender) render();
 }
 
 async function exportSessionsCsv() {

@@ -31,7 +31,8 @@ export async function onRequestPost({ request, env }) {
     taskId: payload.taskId,
     scoreSuggestion: clampScore(scoreSuggestion, maxScore),
     confidence: needsConfiguredAi ? 0 : payload.image ? 0.68 : 0.82,
-    requiresHumanReview: needsConfiguredAi,
+    requiresHumanReview: false,
+    aiImageScoringConfigured: !needsConfiguredAi,
     rubricMatched: !needsConfiguredAi,
     comment: needsConfiguredAi
       ? "画图题已关闭人工勾选；请绑定 AI_SCORE_ENDPOINT 进行图片 AI 评分。"

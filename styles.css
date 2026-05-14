@@ -2828,7 +2828,8 @@ h4 {
   background: #ffffff;
 }
 
-.item-detail summary {
+.item-detail summary,
+.item-detail-row {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr) auto;
   gap: 10px;
@@ -2843,7 +2844,8 @@ h4 {
   display: none;
 }
 
-.item-detail summary span {
+.item-detail summary span,
+.item-detail-row span {
   display: grid;
   width: 32px;
   height: 32px;
@@ -2867,6 +2869,51 @@ h4 {
   color: var(--leaf-dark);
   font-style: normal;
   font-weight: 950;
+}
+
+.item-detail-row strong {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-detail-row em {
+  color: var(--leaf-dark);
+  font-style: normal;
+  font-weight: 950;
+}
+
+.item-detail-row {
+  cursor: default;
+}
+
+.item-answer-summary {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 0 12px 12px 64px;
+}
+
+.item-answer-summary span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.item-answer-summary p {
+  min-height: 34px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f7faf7;
+  color: #263a32;
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.45;
+  word-break: break-word;
 }
 
 .item-detail-body {
@@ -2950,8 +2997,10 @@ h4 {
 
 .design-page {
   display: grid;
+  gap: 12px;
+  grid-template-rows: auto minmax(260px, 1fr);
   padding: 12px;
-  overflow: hidden;
+  overflow: auto;
   background: #f5f8f6;
 }
 
@@ -2962,6 +3011,21 @@ h4 {
   border: 0;
   border-radius: 8px;
   background: #fff;
+}
+
+.moca-pdf-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.moca-pdf-fallback-image {
+  display: block;
+  width: min(100%, 980px);
+  margin: 0 auto;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(23, 63, 52, 0.12);
 }
 
 .rubric-page-head {
@@ -4259,7 +4323,7 @@ h4 {
   }
 
   .design-page {
-    overflow: hidden;
+    overflow: auto;
   }
 
   .result-hero {
