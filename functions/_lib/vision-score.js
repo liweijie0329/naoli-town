@@ -182,13 +182,40 @@ function parseModelJson(result) {
 }
 
 function parseJsonText(text) {
+  const cleaned = String(text || "").trim();
   try {
-    return JSON.parse(text);
+    return JSON.parse(cleaned);
   } catch {
-    const match = text.match(/```json\s*([\s\S]*?)```/i) || text.match(/({[\s\S]*})/);
-    if (match) return JSON.parse(match[1]);
+    const fenced = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fenced) return JSON.parse(fenced[1].trim());
+    const objectText = firstBalancedJsonObject(cleaned);
+    if (objectText) return JSON.parse(objectText);
     throw new Error("AI response was not valid JSON");
   }
+}
+
+function firstBalancedJsonObject(text) {
+  for (let start = text.indexOf("{"); start >= 0; start = text.indexOf("{", start + 1)) {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = start; index < text.length; index += 1) {
+      const char = text[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === "\\") escaped = true;
+        else if (char === "\"") inString = false;
+        continue;
+      }
+      if (char === "\"") inString = true;
+      else if (char === "{") depth += 1;
+      else if (char === "}") {
+        depth -= 1;
+        if (depth === 0) return text.slice(start, index + 1);
+      }
+    }
+  }
+  return "";
 }
 
 function workersAiPrompt(payload) {
