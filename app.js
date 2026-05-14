@@ -76,6 +76,7 @@ const HEARING_TEST_FREQUENCIES = [1000, 2000, 4000, 500, 8000];
 const HEARING_LEVELS_DB_HL = [35, 45, 55, 65];
 const HEARING_TONE_DURATION_MS = 1000;
 const HEARING_FADE_SECONDS = 0.035;
+const HEARING_NO_RESPONSE_DELAY_MS = 2600;
 const HEARING_MAX_NO_RESPONSE_DB_HL = 70;
 const HEARING_PASS_PTA_DB_HL = 35;
 const HEARING_PRACTICE_STEPS = [
@@ -474,6 +475,7 @@ let speechTextFallbackTimer = null;
 let speechRecognitionRestartTimer = null;
 let activeSpeechAudio = null;
 let activeHearingTone = null;
+let hearingNoResponseTimer = null;
 let staticTtsManifest = null;
 let staticTtsManifestPromise = null;
 let instructionTimer = null;
@@ -1263,7 +1265,7 @@ function renderMainView(current) {
 function hearingHeaderPrompt() {
   const screening = state.hearingScreening || createHearingScreeningState();
   if (screening.phase === "summary") return "完成后进入正式测试";
-  if (screening.phase === "test") return "听到就点听见";
+  if (screening.phase === "practice" || screening.phase === "test") return "听到按一下";
   return "戴好耳机，保持安静";
 }
 
@@ -1300,15 +1302,16 @@ function renderHearingIntro(screening) {
       <div class="hearing-hero-icon"><span class="headphone-icon"></span></div>
       <div class="hearing-copy">
         <h3>听力校准</h3>
-        <p>戴好耳机，保持安静。</p>
       </div>
       <div class="hearing-check-row">
         <button class="utility-button hearing-check-button" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
           ${screening.environment.status === "checking" ? "检测中..." : "环境检测"}
         </button>
-        <span class="hearing-env-status ${screening.environment.status}">
-          ${hearingEnvironmentText(screening.environment)}
-        </span>
+        ${screening.environment.status === "not_checked" ? "" : `
+          <span class="hearing-env-status ${screening.environment.status}">
+            ${hearingEnvironmentText(screening.environment)}
+          </span>
+        `}
       </div>
       <div class="hearing-actions">
         <button class="primary big-button" data-action="startHearingCalibration">开始</button>
@@ -1327,8 +1330,8 @@ function renderHearingChannelCheck(screening) {
       <p class="hearing-instruction">声音应来自${escapeHtml(side.label)}</p>
       ${renderHearingPlayButton({ ear: side.key, frequencyHz: 1000, levelDbHl: 55, context: "channel" }, screening)}
       <div class="hearing-response-grid">
-        <button class="option" data-action="confirmHearingChannel" data-value="correct" ${screening.currentTonePlayed ? "" : "disabled"}>正确</button>
-        <button class="option" data-action="confirmHearingChannel" data-value="wrong" ${screening.currentTonePlayed ? "" : "disabled"}>不对</button>
+        <button class="option" data-action="confirmHearingChannel" data-value="correct" ${screening.currentTonePlayed ? "" : "disabled"}>是</button>
+        <button class="option" data-action="confirmHearingChannel" data-value="wrong" ${screening.currentTonePlayed ? "" : "disabled"}>不是</button>
       </div>
       ${screening.message ? `<p class="task-warning">${escapeHtml(screening.message)}</p>` : ""}
     </div>
@@ -1342,12 +1345,9 @@ function renderHearingPractice(screening) {
     <div class="hearing-card">
       <div class="hearing-stage-label">练习 ${screening.practiceIndex + 1}/${HEARING_PRACTICE_STEPS.length}</div>
       ${renderHearingEarTarget(side)}
-      <p class="hearing-instruction">听到就点</p>
+      <p class="hearing-instruction">听到按一下</p>
       ${renderHearingPlayButton({ ...step, context: "practice" }, screening)}
-      <div class="hearing-response-grid">
-        <button class="option" data-action="answerHearingPractice" data-heard="true" ${screening.currentTonePlayed ? "" : "disabled"}>听见了</button>
-        <button class="option" data-action="answerHearingPractice" data-heard="false" ${screening.currentTonePlayed ? "" : "disabled"}>没听见</button>
-      </div>
+      ${renderHearingSingleResponseButton("answerHearingPractice", screening)}
       ${screening.message ? `<p class="task-warning">${escapeHtml(screening.message)}</p>` : ""}
     </div>
   `;
@@ -1373,11 +1373,16 @@ function renderHearingTest(screening) {
         </div>
       </div>
       ${renderHearingPlayButton({ ear: trial.ear, frequencyHz: trial.frequencyHz, levelDbHl, context: "test" }, screening)}
-      <div class="hearing-response-grid">
-        <button class="option hearing-heard" data-action="answerHearingTrial" data-heard="true" ${screening.currentTonePlayed ? "" : "disabled"}>听见了</button>
-        <button class="option hearing-missed" data-action="answerHearingTrial" data-heard="false" ${screening.currentTonePlayed ? "" : "disabled"}>没听见</button>
-      </div>
-      ${screening.message ? `<p class="${screening.message.includes("下一档") ? "task-ok" : "task-warning"}">${escapeHtml(screening.message)}</p>` : ""}
+      ${renderHearingSingleResponseButton("answerHearingTrial", screening)}
+      ${screening.message ? `<p class="${screening.message.includes("再大") ? "task-ok" : "task-warning"}">${escapeHtml(screening.message)}</p>` : ""}
+    </div>
+  `;
+}
+
+function renderHearingSingleResponseButton(action, screening) {
+  return html`
+    <div class="hearing-single-response">
+      <button class="option hearing-heard hearing-heard-button" data-action="${action}" data-heard="true" ${screening.currentTonePlayed ? "" : "disabled"}>听到了</button>
     </div>
   `;
 }
@@ -1394,15 +1399,8 @@ function renderHearingPlayButton(stimulus, screening) {
 function renderHearingSummary(screening) {
   const summary = screening.summary || summarizeHearingScreening(screening);
   const ears = summary.ears || {};
-  const pass = summary.status === "pass";
-  const skipped = summary.status === "skipped";
   return html`
-    <div class="hearing-card hearing-summary-card ${pass ? "pass" : skipped ? "skipped" : "refer"}">
-      <div class="result-hero ${pass ? "celebrate" : "soft-alert"} hearing-result-panel">
-        ${pass ? renderConfetti() : ""}
-        <strong>${pass ? "通过" : skipped ? "已跳过" : "需复查"}</strong>
-        <p>${pass ? "听力校准已完成" : skipped ? "未记录听力初筛结果" : "听力初筛未通过，建议进一步专业检查"}</p>
-      </div>
+    <div class="hearing-card hearing-summary-card">
       <div class="hearing-summary-grid">
         ${HEARING_SIDES.map((side) => `
           <div class="hearing-summary-item">
@@ -1410,16 +1408,11 @@ function renderHearingSummary(screening) {
             <strong>${formatThreshold(ears[side.key]?.pta4)}</strong>
           </div>
         `).join("")}
-        <div class="hearing-summary-item">
-          <span>较差耳</span>
-          <strong>${escapeHtml(formatWorseEarLabel(summary.worseEar))}</strong>
-        </div>
       </div>
-      <p class="hearing-summary-note">仅作初筛，不替代临床诊断。</p>
-      <div class="hearing-actions">
-        <button class="primary big-button" data-action="enterCognitionTest">进入测试</button>
-        <button class="ghost big-button" data-action="restartHearingCalibration">重测</button>
+      <div class="hearing-summary-actions">
+        <button class="primary big-button hearing-continue-button" data-action="enterCognitionTest">继续</button>
       </div>
+      <button class="hearing-retest-link" data-action="restartHearingCalibration">重测</button>
     </div>
   `;
 }
@@ -1429,7 +1422,7 @@ function hearingEnvironmentText(environment = {}) {
   if (environment.status === "quiet") return "环境较安静";
   if (environment.status === "noisy") return "环境偏吵";
   if (environment.status === "unavailable") return "未检测";
-  return "可选检测";
+  return "";
 }
 
 function hearingSide(key) {
@@ -2734,6 +2727,7 @@ function cubeReferenceSvg() {
 }
 
 function startHearingCalibration() {
+  clearHearingNoResponseTimer();
   state.hearingScreening = createHearingScreeningState({
     environment: state.hearingScreening?.environment || { status: "not_checked", relativeDb: null, checkedAt: null },
     phase: "channel",
@@ -2761,6 +2755,7 @@ function skipHearingCalibration() {
 }
 
 function restartHearingCalibration() {
+  clearHearingNoResponseTimer();
   const environment = state.hearingScreening?.environment || { status: "not_checked", relativeDb: null, checkedAt: null };
   state.hearingScreening = createHearingScreeningState({ environment });
   saveDraft();
@@ -2768,6 +2763,7 @@ function restartHearingCalibration() {
 }
 
 function enterCognitionTest() {
+  clearHearingNoResponseTimer();
   stopHearingTone();
   state.view = "test";
   state.activeTaskIndex = 0;
@@ -2850,6 +2846,7 @@ function sampleRelativeEnvironmentDb(analyser, durationMs) {
 }
 
 function confirmHearingChannel(value) {
+  clearHearingNoResponseTimer();
   const screening = normalizeHearingScreening(state.hearingScreening);
   const side = HEARING_SIDES[screening.channelCheckIndex] || HEARING_SIDES[0];
   screening.channelChecks.push({
@@ -2874,12 +2871,14 @@ function confirmHearingChannel(value) {
   render();
 }
 
-function answerHearingPractice(heard) {
+function answerHearingPractice(heard, { source = "button" } = {}) {
+  clearHearingNoResponseTimer();
   const screening = normalizeHearingScreening(state.hearingScreening);
   const step = HEARING_PRACTICE_STEPS[screening.practiceIndex] || HEARING_PRACTICE_STEPS[0];
   screening.practiceResponses.push({
     ...step,
     heard,
+    source,
     at: new Date().toISOString(),
     reactionMs: hearingReactionMs(screening)
   });
@@ -2898,7 +2897,8 @@ function answerHearingPractice(heard) {
   render();
 }
 
-function answerHearingTrial(heard) {
+function answerHearingTrial(heard, { source = "button" } = {}) {
+  clearHearingNoResponseTimer();
   const screening = normalizeHearingScreening(state.hearingScreening);
   const trial = screening.trials[screening.trialIndex] || screening.trials[0];
   const levelDbHl = HEARING_LEVELS_DB_HL[screening.levelIndex] || HEARING_LEVELS_DB_HL[0];
@@ -2908,6 +2908,7 @@ function answerHearingTrial(heard) {
     primary: trial.primary,
     levelDbHl,
     heard,
+    source,
     at: new Date().toISOString(),
     reactionMs: hearingReactionMs(screening)
   };
@@ -2920,7 +2921,7 @@ function answerHearingTrial(heard) {
     advanceHearingTrial(screening);
   } else if (screening.levelIndex < HEARING_LEVELS_DB_HL.length - 1) {
     screening.levelIndex += 1;
-    screening.message = "没关系，下一档会稍大一些，请再听一遍。";
+    screening.message = "再大一点。";
   } else {
     recordHearingThreshold(screening, trial, { thresholdDbHl: null, noResponseAtMax: true });
     response.finalForFrequency = true;
@@ -2962,6 +2963,7 @@ function hearingReactionMs(screening) {
 }
 
 async function playHearingTone(stimulus) {
+  clearHearingNoResponseTimer();
   const screening = normalizeHearingScreening(state.hearingScreening);
   const frequencyHz = Number(stimulus.frequencyHz);
   const levelDbHl = Number(stimulus.levelDbHl);
@@ -3017,6 +3019,7 @@ async function playHearingTone(stimulus) {
     playState = "开始";
     saveDraft();
     render();
+    scheduleHearingNoResponse();
   };
   oscillator.start(now);
   oscillator.stop(endAt + 0.02);
@@ -3029,6 +3032,7 @@ function hearingGainForLevel(levelDbHl, frequencyHz) {
 }
 
 function stopHearingTone({ markPlayed = false } = {}) {
+  clearHearingNoResponseTimer();
   if (!activeHearingTone) return false;
   const tone = activeHearingTone;
   activeHearingTone = null;
@@ -3042,6 +3046,28 @@ function stopHearingTone({ markPlayed = false } = {}) {
     if (!markPlayed) state.hearingScreening.currentTonePlayed = false;
   }
   return true;
+}
+
+function scheduleHearingNoResponse() {
+  clearHearingNoResponseTimer();
+  const screening = normalizeHearingScreening(state.hearingScreening);
+  if (!screening.currentTonePlayed || screening.currentTonePlaying) return;
+  if (!["practice", "test"].includes(screening.phase)) return;
+  hearingNoResponseTimer = window.setTimeout(() => {
+    const current = normalizeHearingScreening(state.hearingScreening);
+    if (!current.currentTonePlayed || current.currentTonePlaying) return;
+    if (current.phase === "practice") {
+      answerHearingPractice(false, { source: "timeout" });
+    } else if (current.phase === "test") {
+      answerHearingTrial(false, { source: "timeout" });
+    }
+  }, HEARING_NO_RESPONSE_DELAY_MS);
+}
+
+function clearHearingNoResponseTimer() {
+  if (!hearingNoResponseTimer) return;
+  window.clearTimeout(hearingNoResponseTimer);
+  hearingNoResponseTimer = null;
 }
 
 function cleanupHearingToneNodes(tone) {

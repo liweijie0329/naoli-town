@@ -925,13 +925,11 @@ h4 {
 }
 
 .hearing-copy h3 {
-  margin-bottom: 14px;
   color: var(--ink);
   font-size: clamp(38px, 5vw, 58px);
   line-height: 1.05;
 }
 
-.hearing-copy p,
 .hearing-instruction,
 .hearing-summary-note {
   margin: 0;
@@ -940,10 +938,6 @@ h4 {
   font-weight: 900;
   line-height: 1.45;
   text-align: center;
-}
-
-.hearing-copy p {
-  text-align: left;
 }
 
 .hearing-check-row {
@@ -1004,6 +998,7 @@ h4 {
 }
 
 .hearing-ear-target {
+  position: relative;
   display: grid;
   place-items: center;
   gap: 8px;
@@ -1013,16 +1008,39 @@ h4 {
   border: 3px solid #d8e9ff;
   border-radius: 8px;
   background: #f5fbff;
+  overflow: hidden;
 }
 
 .hearing-ear-target.left {
   border-color: #d8e9ff;
-  background: #f4f9ff;
+  background: linear-gradient(90deg, #e8f3ff 0 34%, #f8fcff 34% 100%);
 }
 
 .hearing-ear-target.right {
   border-color: #cdebd8;
-  background: #f2fff7;
+  background: linear-gradient(90deg, #f8fff9 0 66%, #e9f9f0 66% 100%);
+}
+
+.hearing-ear-target::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  width: 18px;
+  border-radius: 999px;
+  opacity: 0.95;
+}
+
+.hearing-ear-target.left::before {
+  left: 14px;
+  background: var(--sky);
+  box-shadow: 20px 22px 0 rgba(63, 141, 243, 0.18), 20px -22px 0 rgba(63, 141, 243, 0.18);
+}
+
+.hearing-ear-target.right::before {
+  right: 14px;
+  background: var(--leaf);
+  box-shadow: -20px 22px 0 rgba(41, 171, 110, 0.18), -20px -22px 0 rgba(41, 171, 110, 0.18);
 }
 
 .hearing-ear-target.compact {
@@ -1039,6 +1057,12 @@ h4 {
   width: min(150px, 78%);
   max-height: 72%;
   overflow: visible;
+  z-index: 1;
+}
+
+.hearing-ear-target.right .ear-illustration {
+  justify-self: end;
+  margin-right: 26px;
 }
 
 .hearing-ear-target.compact .ear-illustration {
@@ -1046,6 +1070,8 @@ h4 {
 }
 
 .hearing-ear-target.left .ear-illustration {
+  justify-self: start;
+  margin-left: 26px;
   transform: scaleX(-1);
 }
 
@@ -1096,6 +1122,16 @@ h4 {
   font-size: clamp(24px, 3vw, 32px);
 }
 
+.hearing-single-response {
+  display: grid;
+  width: min(460px, 100%);
+}
+
+.hearing-heard-button {
+  min-height: clamp(86px, 12dvh, 112px);
+  font-size: clamp(28px, 3.5vw, 38px);
+}
+
 .hearing-heard {
   border-color: #cdebd8;
   background: #f2fff7;
@@ -1144,7 +1180,9 @@ h4 {
 }
 
 .hearing-summary-card {
-  align-content: start;
+  position: relative;
+  align-content: center;
+  padding-bottom: clamp(54px, 8dvh, 78px);
 }
 
 .hearing-result-panel {
@@ -1158,17 +1196,17 @@ h4 {
 
 .hearing-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  width: min(760px, 100%);
 }
 
 .hearing-summary-item {
   display: grid;
   place-items: center;
   gap: 8px;
-  min-height: 112px;
-  padding: 14px;
+  min-height: clamp(146px, 20dvh, 190px);
+  padding: 18px;
   border: 2px solid #d9e6de;
   border-radius: 8px;
   background: #fff;
@@ -1177,14 +1215,34 @@ h4 {
 
 .hearing-summary-item strong {
   color: var(--leaf-dark);
-  font-size: clamp(24px, 3.2vw, 34px);
+  font-size: clamp(34px, 5vw, 54px);
   font-weight: 1000;
   line-height: 1.05;
 }
 
-.hearing-summary-note {
-  max-width: 780px;
-  font-size: clamp(18px, 2.2vw, 24px);
+.hearing-summary-actions {
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+
+.hearing-continue-button {
+  min-width: min(360px, 82vw);
+  min-height: 92px;
+  font-size: clamp(32px, 4vw, 44px);
+}
+
+.hearing-retest-link {
+  position: absolute;
+  right: 22px;
+  bottom: 18px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 900;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .task-page {
@@ -5907,10 +5965,6 @@ body,
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .hearing-copy p {
-    text-align: center;
-  }
-
   .hearing-hero-icon {
     width: min(180px, 58vw);
   }
@@ -5929,11 +5983,19 @@ body,
     min-height: 70px;
   }
 
+  .hearing-heard-button {
+    min-height: 78px;
+  }
+
   .hearing-play-button {
     width: clamp(132px, 36vw, 160px);
     min-width: clamp(132px, 36vw, 160px);
     height: clamp(132px, 36vw, 160px);
     min-height: clamp(132px, 36vw, 160px);
+  }
+
+  .hearing-continue-button {
+    min-height: 78px;
   }
 }
 
@@ -5961,7 +6023,6 @@ body,
     font-size: clamp(28px, 7svh, 42px);
   }
 
-  .hearing-copy p,
   .hearing-instruction,
   .hearing-summary-note {
     font-size: clamp(16px, 4svh, 20px);
@@ -5983,12 +6044,25 @@ body,
     width: min(82px, 70%);
   }
 
+  .hearing-ear-target.right .ear-illustration {
+    margin-right: 16px;
+  }
+
+  .hearing-ear-target.left .ear-illustration {
+    margin-left: 16px;
+  }
+
   .hearing-stimulus-panel {
     min-height: 104px;
   }
 
   .hearing-response-grid .option {
     min-height: 58px;
+  }
+
+  .hearing-heard-button {
+    min-height: 58px;
+    font-size: 24px;
   }
 
   .hearing-play-button {
