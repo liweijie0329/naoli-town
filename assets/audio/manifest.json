@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-14T04:57:40.273Z",
+  "generatedAt": "2026-05-14T13:01:29.835Z",
   "provider": "doubao",
   "source": "data/tts-texts.json",
   "entries": {
@@ -2752,6 +2752,141 @@
     "text:ra1s7y": {
       "src": "assets/audio/text-ra1s7y.mp3",
       "text": "博物馆",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "setup:intro": {
+      "src": "assets/audio/setup-intro.mp3",
+      "text": "请填写姓名、出生日期、性别和教育水平。也可以点击语音智能填表，说出这些信息。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "setup:option:e0japi": {
+      "src": "assets/audio/setup-option-e0japi.mp3",
+      "text": "男",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "setup:option:1wc3laa": {
+      "src": "assets/audio/setup-option-1wc3laa.mp3",
+      "text": "女",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "setup:option:1i4nq6g": {
+      "src": "assets/audio/setup-option-1i4nq6g.mp3",
+      "text": "小学",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "setup:option:yoy3pb": {
+      "src": "assets/audio/setup-option-yoy3pb.mp3",
+      "text": "初中",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "setup:option:1gg5i9d": {
+      "src": "assets/audio/setup-option-1gg5i9d.mp3",
+      "text": "中专",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "setup:option:13u1oou": {
+      "src": "assets/audio/setup-option-13u1oou.mp3",
+      "text": "高中",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "setup:option:1lespjj": {
+      "src": "assets/audio/setup-option-1lespjj.mp3",
+      "text": "大专",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "setup:option:gjr037": {
+      "src": "assets/audio/setup-option-gjr037.mp3",
+      "text": "本科及以上",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "hearing:intro": {
+      "src": "assets/audio/hearing-intro.mp3",
+      "text": "请戴好耳机，保持安静。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "hearing:channel:right": {
+      "src": "assets/audio/hearing-channel-right.mp3",
+      "text": "请点击播放，确认声音来自右耳。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "hearing:channel:left": {
+      "src": "assets/audio/hearing-channel-left.mp3",
+      "text": "请点击播放，确认声音来自左耳。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "hearing:practice": {
+      "src": "assets/audio/hearing-practice.mp3",
+      "text": "现在是练习。听到声音请选择听到了，没听到请选择没听到。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "hearing:test": {
+      "src": "assets/audio/hearing-test.mp3",
+      "text": "正式听力测试开始。每次播放后，请选择听到了或没听到。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "hearing:summary": {
+      "src": "assets/audio/hearing-summary.mp3",
+      "text": "听力测试完成。请点击继续，进入认知测试。",
       "profile": "gentle",
       "speedRatio": 1,
       "provider": "doubao-v3",

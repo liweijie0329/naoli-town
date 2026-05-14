@@ -1393,6 +1393,66 @@
     {
       "key": "text:ra1s7y",
       "text": "博物馆"
+    },
+    {
+      "key": "setup:intro",
+      "text": "请填写姓名、出生日期、性别和教育水平。也可以点击语音智能填表，说出这些信息。"
+    },
+    {
+      "key": "setup:option:e0japi",
+      "text": "男"
+    },
+    {
+      "key": "setup:option:1wc3laa",
+      "text": "女"
+    },
+    {
+      "key": "setup:option:1i4nq6g",
+      "text": "小学"
+    },
+    {
+      "key": "setup:option:yoy3pb",
+      "text": "初中"
+    },
+    {
+      "key": "setup:option:1gg5i9d",
+      "text": "中专"
+    },
+    {
+      "key": "setup:option:13u1oou",
+      "text": "高中"
+    },
+    {
+      "key": "setup:option:1lespjj",
+      "text": "大专"
+    },
+    {
+      "key": "setup:option:gjr037",
+      "text": "本科及以上"
+    },
+    {
+      "key": "hearing:intro",
+      "text": "请戴好耳机，保持安静。"
+    },
+    {
+      "key": "hearing:channel:right",
+      "text": "请点击播放，确认声音来自右耳。"
+    },
+    {
+      "key": "hearing:channel:left",
+      "text": "请点击播放，确认声音来自左耳。"
+    },
+    {
+      "key": "hearing:practice",
+      "text": "现在是练习。听到声音请选择听到了，没听到请选择没听到。"
+    },
+    {
+      "key": "hearing:test",
+      "text": "正式听力测试开始。每次播放后，请选择听到了或没听到。"
+    },
+    {
+      "key": "hearing:summary",
+      "text": "听力测试完成。请点击继续，进入认知测试。"
     }
   ]
 }

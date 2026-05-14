@@ -28,7 +28,11 @@ const MEMORY_WAIT_MS = 5 * 60 * 1000;
 const LOCAL_SESSIONS_KEY = "moca-game-local-sessions";
 const LOGO_SRC = "./assets/logo.svg";
 const MOCA_SHEET_IMAGE = "./assets/moca/moca-page.png";
+const MOCA_SCALE_PDF = "./assets/moca/moca-scale.pdf";
+const GRANDMA_AVATAR_SRC = "./assets/avatar-grandma.svg";
+const GRANDPA_AVATAR_SRC = "./assets/avatar-grandpa.svg";
 const NATURAL_VOICE_HINTS = ["xiaoxiao", "xiaoyi", "xiaobei", "ting-ting", "tingting", "mei-jia", "meijia", "google 普通话", "google 國語", "mandarin", "普通话", "美佳", "sin-ji"];
+const SETUP_PROMPT_AUDIO_KEY = "setup:intro";
 const ABSTRACTION_DISTRACTORS_BY_SUFFIX = {
   工具: ["劳动工具", "清洁工具", "厨房工具", "修理工具", "园艺工具", "写字工具", "绘画工具", "计算工具"],
   用的: ["吃饭用的", "写字用的", "做饭用的", "清洁用的", "照明用的", "穿戴用的", "娱乐用的", "装东西用的"],
@@ -98,6 +102,16 @@ const HEARING_FREQUENCY_GAIN_SCALE = {
   2000: 0.95,
   4000: 0.88,
   8000: 0.78
+};
+const HEARING_PROMPT_AUDIO_KEYS = {
+  intro: "hearing:intro",
+  practice: "hearing:practice",
+  test: "hearing:test",
+  summary: "hearing:summary",
+  channel: {
+    right: "hearing:channel:right",
+    left: "hearing:channel:left"
+  }
 };
 
 const TRADITIONAL_PHRASE_REPLACEMENTS = [
@@ -457,6 +471,10 @@ let activeCanvas = null;
 let activeCtx = null;
 let drawing = false;
 let menuOpen = false;
+let cognitionMenuOpen = false;
+let setupPromptAttempted = false;
+let setupPromptPlayed = false;
+let setupPromptRetryPending = false;
 let playState = "开始";
 let voiceState = "待说";
 let speechRecognition = null;
@@ -777,6 +795,8 @@ function resetState() {
   localStorage.removeItem("moca-game-draft");
   state = createInitialState();
   menuOpen = false;
+  cognitionMenuOpen = false;
+  resetSetupPromptPlayback();
   playState = "开始";
   voiceState = "待说";
   speechTranscribing = false;
@@ -941,6 +961,7 @@ function render() {
   stopDrawingIdleTimers();
   if (state.view === "setup") {
     root.innerHTML = renderSetup();
+    queueSetupPrompt();
     return;
   }
 
@@ -1185,7 +1206,7 @@ function segmentedField(key, label, value, options, invalid = false) {
     <div class="field segmented-field ${invalid ? "invalid" : ""}">
       <span>${label}</span>
       <div class="segmented-options ${extraClass}">
-        ${options.map((option) => `<button type="button" class="segment-option ${value === option ? "picked" : ""}" data-action="chooseParticipant" data-key="${key}" data-value="${escapeHtml(option)}"${speechAttrs(option, audioKeyForText(option))}>${escapeHtml(option)}</button>`).join("")}
+        ${options.map((option) => `<button type="button" class="segment-option ${value === option ? "picked" : ""}" data-action="chooseParticipant" data-key="${key}" data-value="${escapeHtml(option)}"${speechAttrs(option, setupAudioKeyForText(option))}>${escapeHtml(option)}</button>`).join("")}
       </div>
     </div>
   `;
@@ -1194,30 +1215,34 @@ function segmentedField(key, label, value, options, invalid = false) {
 function renderShell(current) {
   const totals = computeTotals();
   const hearingView = state.view === "hearing";
-  const progressLabel = hearingView ? "校准" : `${state.activeTaskIndex + 1}/${tasks.length}`;
+  const progressLabel = hearingView ? "听力" : `${state.activeTaskIndex + 1}/${tasks.length}`;
   const progressWidth = hearingView ? hearingProgressPercent() : ((state.activeTaskIndex + 1) / tasks.length) * 100;
+  const drawerAvatar = participantAvatarSrc();
   return html`
     <div class="app-shell">
       <aside class="hidden-drawer ${menuOpen ? "open" : ""}">
         <button class="drawer-mask" data-action="closeMenu" aria-label="关闭菜单"></button>
         <div class="drawer-panel">
           <div class="drawer-brand">
-            <img class="drawer-logo" src="${LOGO_SRC}" alt="" />
+            <img class="drawer-logo" src="${drawerAvatar}" alt="" />
             <div>
-              <strong>MoCA Quest</strong>
+              <strong>脑力闯关</strong>
               <span>${escapeHtml(state.participant.name || "未填写姓名")}</span>
             </div>
           </div>
-          <button class="drawer-item" data-action="navView" data-view="test">当前任务</button>
-          ${state.startedAt ? `<button class="drawer-item" data-action="navView" data-view="hearing">听力校准</button>` : ""}
+          <button class="drawer-hearing-link ${hearingView ? "active" : ""}" data-action="navView" data-view="hearing">听力测试</button>
+          <button class="drawer-section-toggle ${cognitionMenuOpen ? "open" : ""}" data-action="toggleCognitionMenu" aria-expanded="${cognitionMenuOpen ? "true" : "false"}">
+            <span>认知测试</span>
+            <em>${state.view === "test" ? `${state.activeTaskIndex + 1}/${tasks.length}` : `${totals.totalScore}/30`}</em>
+          </button>
+          <nav class="drawer-task-list ${cognitionMenuOpen ? "open" : ""}">
+            ${tasks.map((task, index) => renderTaskNav(task, index)).join("")}
+          </nav>
           <button class="drawer-item" data-action="navView" data-view="results">本次结果</button>
           <button class="drawer-item" data-action="navView" data-view="design">评分标准</button>
           <button class="drawer-item" data-action="navView" data-view="admin">后台</button>
+          <div class="drawer-spacer"></div>
           <button class="drawer-item" data-action="goHome">返回首页</button>
-          <div class="drawer-score"><span>${hearingView ? "听力" : state.view === "test" ? `${state.activeTaskIndex + 1}/${tasks.length}` : `${totals.totalScore}/30`}</span></div>
-          <nav class="drawer-task-list">
-            ${tasks.map((task, index) => renderTaskNav(task, index)).join("")}
-          </nav>
         </div>
       </aside>
       <main class="page-shell">
@@ -1225,7 +1250,7 @@ function renderShell(current) {
           <button class="icon-button" data-action="openMenu" aria-label="打开菜单">≡</button>
           <div class="header-title">
             <h2>${state.view === "test" ? escapeHtml(current.title) : viewTitle()}</h2>
-            ${state.view === "test" ? `<p class="header-prompt">${escapeHtml(current.prompt)}</p>` : hearingView ? `<p class="header-prompt">${hearingHeaderPrompt()}</p>` : ""}
+            ${state.view === "test" ? `<p class="header-prompt">${escapeHtml(current.prompt)}</p>` : ""}
           </div>
           <div class="header-progress">
             <span>${progressLabel}</span>
@@ -1236,6 +1261,10 @@ function renderShell(current) {
       </main>
     </div>
   `;
+}
+
+function participantAvatarSrc() {
+  return state.participant?.sex === "男" ? GRANDPA_AVATAR_SRC : GRANDMA_AVATAR_SRC;
 }
 
 function renderTaskNav(task, index) {
@@ -1250,7 +1279,7 @@ function renderTaskNav(task, index) {
 }
 
 function viewTitle() {
-  if (state.view === "hearing") return "听力校准";
+  if (state.view === "hearing") return "听力测试";
   if (state.view === "results") return "闯关结果";
   if (state.view === "admin") return "后台数据库";
   if (state.view === "design") return "评分标准";
@@ -1269,7 +1298,7 @@ function hearingHeaderPrompt() {
   const screening = state.hearingScreening || createHearingScreeningState();
   if (screening.phase === "summary") return "完成后进入正式测试";
   if (screening.phase === "practice" || screening.phase === "test") return "播放后选择";
-  return "戴好耳机，保持安静";
+  return "请戴好耳机，保持安静";
 }
 
 function hearingProgressPercent() {
@@ -1311,7 +1340,7 @@ function renderHearingIntro(screening) {
         <div class="hearing-hero-icon"><span class="headphone-icon"></span></div>
         <div class="hearing-intro-main">
           <div class="hearing-copy">
-            <h3>听力校准</h3>
+            <h3>请戴好耳机，保持安静</h3>
           </div>
           <div class="hearing-check-row">
             <button class="utility-button hearing-check-button" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
@@ -2050,6 +2079,10 @@ function audioKeyForText(text) {
   return `text:${textKey(text)}`;
 }
 
+function setupAudioKeyForText(text) {
+  return `setup:option:${textKey(text)}`;
+}
+
 function textKey(text) {
   let hash = 2166136261;
   Array.from(String(text || "")).forEach((char) => {
@@ -2132,6 +2165,7 @@ function shortDomainName(name) {
 }
 
 function renderAdmin() {
+  const selectedId = state.selectedSession?.id || "";
   return html`
     <section class="single-page admin-page">
       <div class="admin-toolbar">
@@ -2139,18 +2173,29 @@ function renderAdmin() {
         <button class="secondary" data-action="saveSession">保存当前测评</button>
         <button class="secondary" data-action="exportCsv">导出 CSV</button>
       </div>
-      <div class="admin-table">
-        <div class="admin-head"><span>参加者</span><span>年龄</span><span>总分</span><span>原始分</span><span>教育加分</span><span>保存时间</span></div>
-        ${(state.adminSessions || []).map((session) => `
-          <div class="admin-row">
-            <span>${escapeHtml(session.participant?.name || session.id.slice(0, 8))}</span>
-            <span>${formatParticipantAge(session.participant)}</span>
-            <strong>${session.totalScore ?? "-"}/30</strong>
-            <span>${session.rawScore ?? "-"}</span>
-            <span>${session.educationBonus ?? 0}</span>
-            <span>${formatSavedTime(session)}</span>
-          </div>
-        `).join("") || `<p class="empty">暂无保存记录</p>`}
+      <div class="admin-layout">
+        <div class="admin-table">
+          <div class="admin-head"><span>参加者</span><span>年龄</span><span>总分</span><span>原始分</span><span>教育加分</span><span>保存时间</span></div>
+          ${(state.adminSessions || []).map((session) => `
+            <button type="button" class="admin-row ${session.id === selectedId ? "active" : ""}" data-action="selectSavedSession" data-id="${escapeHtml(session.id)}">
+              <span>${escapeHtml(session.participant?.name || session.id.slice(0, 8))}</span>
+              <span>${formatParticipantAge(session.participant)}</span>
+              <strong>${session.totalScore ?? "-"}/30</strong>
+              <span>${session.rawScore ?? "-"}</span>
+              <span>${session.educationBonus ?? 0}</span>
+              <span>${formatSavedTime(session)}</span>
+            </button>
+          `).join("") || `<p class="empty">暂无保存记录</p>`}
+        </div>
+        ${state.selectedSession ? renderSessionDetail(state.selectedSession) : `
+          <aside class="admin-detail empty-detail">
+            <div class="detail-header">
+              <span>测评详情</span>
+              <strong>暂无记录</strong>
+            </div>
+            <p class="empty">保存或刷新后，可在这里查看每道题得分。</p>
+          </aside>
+        `}
       </div>
     </section>
   `;
@@ -2296,14 +2341,7 @@ function prettyJson(value) {
 function renderDesign() {
   return html`
     <section class="single-page design-page">
-      <div class="rubric-page-head">
-        <h3>评分标准</h3>
-        <p>点击查看MoCA量表</p>
-      </div>
-      <div class="rubric-layout">
-        ${rubricGroups.map((group, groupIndex) => renderRubricGroup(group, groupIndex)).join("")}
-      </div>
-      ${activeRubricItem ? renderRubricModal(activeRubricItem) : ""}
+      <iframe class="moca-pdf-frame" src="${MOCA_SCALE_PDF}#toolbar=1&navpanes=0" title="蒙特利尔认知评估量表MoCA"></iframe>
     </section>
   `;
 }
@@ -2783,6 +2821,7 @@ function startHearingCalibration() {
   });
   saveDraft();
   render();
+  queueHearingPrompt();
 }
 
 function skipHearingCalibration() {
@@ -2795,7 +2834,7 @@ function skipHearingCalibration() {
       protocolVersion: HEARING_PROTOCOL_VERSION,
       status: "skipped",
       pass: null,
-      note: "用户跳过听力校准"
+      note: "用户跳过听力测试"
     }
   };
   enterCognitionTest();
@@ -2806,6 +2845,7 @@ function restartHearingCalibration() {
   state.hearingScreening = createHearingScreeningState({ environment });
   saveDraft();
   render();
+  queueHearingPrompt();
 }
 
 function enterCognitionTest() {
@@ -2891,6 +2931,8 @@ function sampleRelativeEnvironmentDb(analyser, durationMs) {
 
 function confirmHearingChannel(value) {
   const screening = normalizeHearingScreening(state.hearingScreening);
+  const previousPhase = screening.phase;
+  const previousChannelIndex = screening.channelCheckIndex;
   const side = HEARING_SIDES[screening.channelCheckIndex] || HEARING_SIDES[0];
   screening.channelChecks.push({
     ear: side.key,
@@ -2915,10 +2957,12 @@ function confirmHearingChannel(value) {
   state.hearingScreening = screening;
   saveDraft();
   render();
+  if (screening.phase !== previousPhase || screening.channelCheckIndex !== previousChannelIndex) queueHearingPrompt();
 }
 
 function answerHearingPractice(heard, { source = "button" } = {}) {
   const screening = normalizeHearingScreening(state.hearingScreening);
+  const previousPhase = screening.phase;
   const step = HEARING_PRACTICE_STEPS[screening.practiceIndex] || HEARING_PRACTICE_STEPS[0];
   screening.practiceResponses.push({
     ...step,
@@ -2940,10 +2984,12 @@ function answerHearingPractice(heard, { source = "button" } = {}) {
   state.hearingScreening = screening;
   saveDraft();
   render();
+  if (screening.phase !== previousPhase) queueHearingPrompt();
 }
 
 function answerHearingTrial(heard, { source = "button" } = {}) {
   const screening = normalizeHearingScreening(state.hearingScreening);
+  const previousPhase = screening.phase;
   const trial = screening.trials[screening.trialIndex] || screening.trials[0];
   const levelDbHl = HEARING_LEVELS_DB_HL[screening.levelIndex] || HEARING_LEVELS_DB_HL[0];
   const response = {
@@ -2974,6 +3020,7 @@ function answerHearingTrial(heard, { source = "button" } = {}) {
   state.hearingScreening = screening;
   saveDraft();
   render();
+  if (screening.phase !== previousPhase) queueHearingPrompt();
 }
 
 function recordHearingThreshold(screening, trial, result) {
@@ -3015,7 +3062,7 @@ async function playHearingTone(stimulus) {
   const playbackId = beginAudioPlayback();
   const context = await resumeSpeechAudioContext();
   if (!context || playbackId !== speechPlaybackId) {
-    screening.message = "当前浏览器无法播放校准音，请检查声音设置后重试。";
+    screening.message = "当前浏览器无法播放测试音，请检查声音设置后重试。";
     state.hearingScreening = screening;
     render();
     return;
@@ -3110,11 +3157,16 @@ root.addEventListener("click", async (event) => {
   const buttonSpeech = buttonSpeechData(target);
   if (action === "startSession") playSfx("start");
   else if (["skipTask", "nextTask", "skipLogin", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
-  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment"].includes(action)) playSfx("pick");
+  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu"].includes(action)) playSfx("pick");
 
   if (action !== "tapVigilance") stopAudioPlayback();
   if (buttonSpeech) speakButtonSelection(buttonSpeech);
 
+  if (action === "toggleCognitionMenu") {
+    cognitionMenuOpen = !cognitionMenuOpen;
+    render();
+    return;
+  }
   if (action === "toggleSetupVoice") {
     await toggleSetupVoiceRegistration();
     return;
@@ -3198,6 +3250,7 @@ root.addEventListener("click", async (event) => {
     resetState();
     state.view = "setup";
     menuOpen = false;
+    cognitionMenuOpen = false;
     render();
   }
   if (action === "chooseParticipant") {
@@ -3216,6 +3269,7 @@ root.addEventListener("click", async (event) => {
     state.activeTaskIndex = nextIndex;
     state.view = "test";
     menuOpen = false;
+    cognitionMenuOpen = false;
     requestImmediateInstructionPlayback(tasks[nextIndex]);
     render();
   }
@@ -3313,6 +3367,15 @@ root.addEventListener("click", async (event) => {
   if (action === "selectSavedSession") await selectSavedSession(target.dataset.id);
 });
 
+document.addEventListener("click", () => {
+  if (state.view !== "setup" || !setupPromptRetryPending || setupPromptPlayed) return;
+  void playSetupPrompt().then((started) => {
+    if (!started) return;
+    setupPromptPlayed = true;
+    setupPromptRetryPending = false;
+  });
+});
+
 function buttonSpeechData(target) {
   const text = target?.dataset?.speech;
   if (!text) return null;
@@ -3324,6 +3387,10 @@ function buttonSpeechData(target) {
 }
 
 function speakButtonSelection({ text, audioKey, action }) {
+  if (state.view === "setup" || state.view === "hearing") {
+    speakText(text, { audioKey, rate: 0.82, pitch: 1.1, purpose: "option", staticOnly: true });
+    return;
+  }
   const task = tasks[state.activeTaskIndex];
   if (!task || ["playCurrentAudio", "toggleVoiceInput", "tapVigilance"].includes(action)) return;
   const response = getResponse(task.id);
@@ -3385,7 +3452,9 @@ async function startNewSession(participant) {
   state.activeTaskIndex = 0;
   state.hearingScreening = createHearingScreeningState();
   state.view = "hearing";
+  cognitionMenuOpen = false;
   render();
+  queueHearingPrompt();
 }
 
 async function requestStartupPermissions() {
@@ -3758,8 +3827,74 @@ function sentencePlaybackFallbackMs(text) {
   return Math.max(3600, Math.min(10000, String(text || "").length * 360 + 1600));
 }
 
+function queueSetupPrompt(delayMs = 420) {
+  if (setupPromptAttempted || setupPromptPlayed) return;
+  setupPromptAttempted = true;
+  window.setTimeout(async () => {
+    if (state.view !== "setup" || setupPromptPlayed) return;
+    const started = await playSetupPrompt();
+    if (started) {
+      setupPromptPlayed = true;
+      setupPromptRetryPending = false;
+    } else {
+      setupPromptRetryPending = true;
+    }
+  }, delayMs);
+}
+
+function resetSetupPromptPlayback() {
+  setupPromptAttempted = false;
+  setupPromptPlayed = false;
+  setupPromptRetryPending = false;
+}
+
+function playSetupPrompt() {
+  return playStaticPrompt(SETUP_PROMPT_AUDIO_KEY, "instruction");
+}
+
+function playHearingPrompt() {
+  const key = hearingPromptAudioKey();
+  if (key) return playStaticPrompt(key, "instruction");
+  return Promise.resolve(false);
+}
+
+function hearingPromptAudioKey(screening = state.hearingScreening) {
+  const normalized = normalizeHearingScreening(screening);
+  if (normalized.phase === "channel") {
+    const side = HEARING_SIDES[normalized.channelCheckIndex] || HEARING_SIDES[0];
+    return HEARING_PROMPT_AUDIO_KEYS.channel[side.key];
+  }
+  return HEARING_PROMPT_AUDIO_KEYS[normalized.phase] || "";
+}
+
+function queueHearingPrompt(delayMs = 180) {
+  window.setTimeout(() => {
+    if (state.view === "hearing") playHearingPrompt();
+  }, delayMs);
+}
+
+async function playStaticPrompt(audioKey, purpose = "speech") {
+  const playbackId = beginAudioPlayback();
+  startPlaybackUi(playbackId, purpose);
+  let finished = false;
+  const finish = () => {
+    if (playbackId !== speechPlaybackId || finished) return;
+    finished = true;
+    playState = "开始";
+    speechPlaybackPurpose = null;
+    render();
+  };
+  const started = await playStaticTtsAudio(audioKey, {
+    playbackId,
+    onStart: null,
+    done: finish
+  });
+  if (!started) finish();
+  return started;
+}
+
 async function speakText(text, options = {}) {
-  const { rate = 0.82, pitch = 1.18, done, onStart, fallbackMs = 0, purpose = "speech", audioKey = null } = options;
+  const { rate = 0.82, pitch = 1.18, done, onStart, fallbackMs = 0, purpose = "speech", audioKey = null, staticOnly = false } = options;
   const playbackId = beginAudioPlayback();
   const speechParams = speechParamsFor(rate, pitch);
   startPlaybackUi(playbackId, purpose);
@@ -3782,6 +3917,10 @@ async function speakText(text, options = {}) {
   });
   if (staticAudioStarted) return;
   if (playbackId !== speechPlaybackId || finished) return;
+  if (staticOnly) {
+    finish();
+    return;
+  }
   if (!("speechSynthesis" in window)) {
     finish();
     return;
@@ -6153,12 +6292,21 @@ async function saveSession(options = {}) {
 }
 
 async function loadSessions(shouldRender = false) {
-  state.adminSessions = await requestJson("/api/sessions", undefined, () => localListSessions());
+  const sessions = await requestJson("/api/sessions", undefined, () => localListSessions());
+  state.adminSessions = sessions;
+  const selectedId = state.selectedSession?.id;
+  const next = sessions.find((session) => session.id === selectedId) || sessions[0] || null;
+  state.selectedSession = next ? await loadSessionDetail(next.id) : null;
   if (shouldRender) render();
 }
 
-async function selectSavedSession(id) {
-  state.selectedSession = await requestJson(`/api/sessions/${encodeURIComponent(id)}`, undefined, () => readLocalSessions().find((entry) => entry.id === id) || null);
+function loadSessionDetail(id) {
+  return requestJson(`/api/sessions/${encodeURIComponent(id)}`, undefined, () => readLocalSessions().find((entry) => entry.id === id) || null);
+}
+
+async function selectSavedSession(id, shouldRender = true) {
+  state.selectedSession = await loadSessionDetail(id);
+  if (!shouldRender) return;
   render();
 }
 

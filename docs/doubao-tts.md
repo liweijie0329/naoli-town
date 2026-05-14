@@ -65,6 +65,8 @@ npm run generate:audio -- --dry-run
 - `stimulus:digitBackward:bank:01`: 数字倒背 50 道题本中的第 1 道，固定 3 位
 - `instruction:serialSubtraction:3:0`: 随机减数为 3 时第一步题干，“100 减 3 等于多少？”
 - `stimulus:sentence:0`: 句子复述材料
+- `setup:intro` / `setup:option:*`: 登录页提示语和性别、教育水平选项语音
+- `hearing:intro` / `hearing:channel:*` / `hearing:practice` / `hearing:test` / `hearing:summary`: 听力测试流程提示语
 
 改完文本后重新运行 `npm run generate:audio -- --force`。
 
@@ -100,7 +102,7 @@ DOUBAO_TTS_ACCESS_TOKEN=你的AccessToken
 
 ## 运行时回退
 
-如果某个 key 没有生成音频，网页会自动回退到浏览器自带 `speechSynthesis`。这方便开发时先跑页面，再逐步补齐语音包。
+如果认知测试题干的某个 key 没有生成音频，网页会自动回退到浏览器自带 `speechSynthesis`。登录页和听力测试提示语只播放本地语音包；缺少对应 MP3 时会静默，不再使用 macOS/浏览器系统朗读。
 
 ## 参考文档
 

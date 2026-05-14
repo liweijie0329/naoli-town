@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Grandpa avatar">
+  <rect width="128" height="128" rx="32" fill="#e9f6ef"/>
+  <circle cx="64" cy="64" r="50" fill="#78c7a0"/>
+  <path d="M32 63c0-23 13-38 32-38s32 15 32 38v26H32Z" fill="#d9e2e8"/>
+  <path d="M34 58c6-20 19-31 30-31s24 11 30 31c-9-6-19-9-30-9s-21 3-30 9Z" fill="#eef3f1"/>
+  <circle cx="64" cy="68" r="31" fill="#ffd7b7"/>
+  <path d="M38 63c6-12 17-19 26-19s20 7 26 19c-8-4-17-6-26-6s-18 2-26 6Z" fill="#eef3f1"/>
+  <circle cx="51" cy="70" r="4" fill="#243447"/>
+  <circle cx="77" cy="70" r="4" fill="#243447"/>
+  <path d="M55 90c6 5 12 5 18 0" fill="none" stroke="#8e4636" stroke-width="5" stroke-linecap="round"/>
+  <path d="M52 82c8 6 16 6 24 0" fill="none" stroke="#eef3f1" stroke-width="7" stroke-linecap="round"/>
+  <path d="M44 61h18m4 0h18" fill="none" stroke="#59717d" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="53" cy="68" r="12" fill="none" stroke="#59717d" stroke-width="4"/>
+  <circle cx="75" cy="68" r="12" fill="none" stroke="#59717d" stroke-width="4"/>
+  <path d="M60 68h8" stroke="#59717d" stroke-width="4" stroke-linecap="round"/>
+  <path d="M29 72c0 5 4 10 9 10h4V61h-4c-5 0-9 5-9 11Z" fill="#ffd7b7"/>
+  <path d="M99 72c0 5-4 10-9 10h-4V61h4c5 0 9 5 9 11Z" fill="#ffd7b7"/>
+</svg>

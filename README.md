@@ -26,7 +26,7 @@ npm start
 
 Cloudflare Pages + D1 的部署步骤见 [docs/cloudflare-d1.md](./docs/cloudflare-d1.md)。
 
-豆包预生成语音包接入见 [docs/doubao-tts.md](./docs/doubao-tts.md)。Web 端读题优先播放 `assets/audio/manifest.json` 中登记的本地音频，缺失时自动回退到浏览器自带语音。
+豆包预生成语音包接入见 [docs/doubao-tts.md](./docs/doubao-tts.md)。Web 端读题优先播放 `assets/audio/manifest.json` 中登记的本地音频；认知测试题干缺失时会回退到浏览器自带语音，登录页和听力测试提示语缺失时会静默，不再使用 macOS/浏览器系统朗读。
 
 如果云平台要求绑定付费信息，可以先走免费路线：
 
