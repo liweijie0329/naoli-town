@@ -907,16 +907,33 @@ h4 {
 }
 
 .hearing-intro-card {
-  grid-template-columns: minmax(160px, 0.55fr) minmax(0, 1fr);
-  justify-items: stretch;
+  place-items: center;
   align-items: center;
   min-height: 0;
+}
+
+.hearing-intro-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(280px, 1fr);
+  align-items: center;
+  justify-content: center;
+  gap: clamp(34px, 5vw, 86px);
+  width: min(920px, 100%);
+}
+
+.hearing-intro-main {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: clamp(18px, 2.6dvh, 30px);
+  min-width: 0;
+  text-align: center;
 }
 
 .hearing-hero-icon {
   display: grid;
   place-items: center;
-  width: min(240px, 100%);
+  width: clamp(210px, 20vw, 280px);
   aspect-ratio: 1;
   justify-self: center;
   border: 2px solid #d8e9ff;
@@ -930,6 +947,7 @@ h4 {
 }
 
 .hearing-copy h3 {
+  margin: 0;
   color: var(--ink);
   font-size: clamp(38px, 5vw, 58px);
   line-height: 1.05;
@@ -956,7 +974,7 @@ h4 {
 }
 
 .hearing-check-button {
-  min-width: 150px;
+  min-width: clamp(150px, 14vw, 190px);
 }
 
 .hearing-env-status {
@@ -988,6 +1006,10 @@ h4 {
   gap: 14px;
   flex-wrap: wrap;
   width: 100%;
+}
+
+.hearing-start-button {
+  min-width: clamp(210px, 18vw, 260px);
 }
 
 .hearing-stage-label {
@@ -6074,6 +6096,16 @@ body,
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .hearing-intro-card {
+    align-content: center;
+  }
+
+  .hearing-intro-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(16px, 2.5svh, 24px);
+    width: min(560px, 100%);
+  }
+
   .hearing-hero-icon {
     width: min(180px, 58vw);
   }
@@ -6133,8 +6165,10 @@ body,
     grid-template-rows: auto minmax(0, 1fr) auto minmax(66px, auto) minmax(24px, auto);
   }
 
-  .hearing-intro-card {
-    grid-template-columns: 150px minmax(0, 1fr);
+  .hearing-intro-layout {
+    grid-template-columns: 140px minmax(0, 1fr);
+    gap: 24px;
+    width: min(620px, 100%);
   }
 
   .hearing-hero-icon {

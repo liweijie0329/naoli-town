@@ -1307,23 +1307,27 @@ function renderHearingIntro(screening) {
     : checked ? "重新检测" : "环境检测";
   return html`
     <div class="hearing-card hearing-intro-card">
-      <div class="hearing-hero-icon"><span class="headphone-icon"></span></div>
-      <div class="hearing-copy">
-        <h3>听力校准</h3>
+      <div class="hearing-intro-layout">
+        <div class="hearing-hero-icon"><span class="headphone-icon"></span></div>
+        <div class="hearing-intro-main">
+          <div class="hearing-copy">
+            <h3>听力校准</h3>
+          </div>
+          <div class="hearing-check-row">
+            <button class="utility-button hearing-check-button" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
+              ${checkLabel}
+            </button>
+            ${screening.environment.status === "not_checked" ? "" : `
+              <span class="hearing-env-status ${screening.environment.status}">
+                ${hearingEnvironmentText(screening.environment)}
+              </span>
+            `}
+          </div>
+          ${canStart ? `<div class="hearing-actions">
+            <button class="primary big-button hearing-start-button" data-action="startHearingCalibration">开始</button>
+          </div>` : ""}
+        </div>
       </div>
-      <div class="hearing-check-row">
-        <button class="utility-button hearing-check-button" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
-          ${checkLabel}
-        </button>
-        ${screening.environment.status === "not_checked" ? "" : `
-          <span class="hearing-env-status ${screening.environment.status}">
-            ${hearingEnvironmentText(screening.environment)}
-          </span>
-        `}
-      </div>
-      ${canStart ? `<div class="hearing-actions">
-        <button class="primary big-button" data-action="startHearingCalibration">开始</button>
-      </div>` : ""}
     </div>
   `;
 }
