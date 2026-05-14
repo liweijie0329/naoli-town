@@ -1,6 +1,5 @@
 import { json, missingDatabase, readJson } from "../../_lib/http.js";
 import {
-  fullSessionFromRows,
   itemRowParams,
   normalizeSessionPayload,
   sessionRowParams,
@@ -88,9 +87,8 @@ export async function onRequestPost({ request, env }) {
   const { results } = await env.DB.prepare("SELECT * FROM sessions WHERE id = ?")
     .bind(session.id)
     .all();
-  const itemRows = await env.DB.prepare("SELECT * FROM item_responses WHERE session_id = ? ORDER BY rowid")
-    .bind(session.id)
-    .all();
-
-  return json(fullSessionFromRows(results[0], itemRows.results || []));
+  return json(slimSessionFromRow({
+    ...results[0],
+    item_count: session.itemResponses.length
+  }));
 }

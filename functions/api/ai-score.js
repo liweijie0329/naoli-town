@@ -23,9 +23,6 @@ export async function onRequestPost({ request, env }) {
     ? payload.clientAutoScore
     : null;
 
-  if (scoreSuggestion === null && payload.image && ["cube", "clock"].includes(payload.taskId)) {
-    scoreSuggestion = maxScore;
-  }
   if (scoreSuggestion === null) scoreSuggestion = 0;
 
   return json({

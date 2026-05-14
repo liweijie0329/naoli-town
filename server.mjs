@@ -242,10 +242,6 @@ async function handleApi(req, res, url) {
         ? payload.clientAutoScore
         : null;
 
-    if (scoreSuggestion === null && payload.image && ["cube", "clock"].includes(payload.taskId)) {
-      scoreSuggestion = maxScore;
-    }
-
     if (scoreSuggestion === null) scoreSuggestion = 0;
     scoreSuggestion = Math.max(0, Math.min(maxScore, Math.round(scoreSuggestion)));
 

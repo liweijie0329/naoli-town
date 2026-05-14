@@ -217,7 +217,7 @@ const animalAliasPairs = [
   ["小狗", "狗"], ["狗狗", "狗"], ["犬", "狗"],
   ["小猫", "猫"], ["猫咪", "猫"],
   ["黄牛", "牛"], ["水牛", "牛"], ["奶牛", "牛"],
-  ["山羊", "羊"], ["绵羊", "羊"],
+  ["山羊", "羊"], ["绵羊", "羊"], ["羊驼", "羊驼"], ["草泥马", "羊驼"],
   ["公鸡", "鸡"], ["母鸡", "鸡"],
   ["鸭子", "鸭"], ["鹅子", "鹅"],
   ["兔子", "兔"], ["老鼠", "鼠"], ["耗子", "鼠"], ["老虎", "虎"], ["猴子", "猴"],
@@ -230,8 +230,46 @@ const animalAliasPairs = [
   ["天鹅", "天鹅"], ["鸵鸟", "鸵鸟"], ["海鸥", "海鸥"], ["乌鸦", "乌鸦"], ["喜鹊", "喜鹊"],
   ["狐狸", "狐狸"], ["狐", "狐狸"], ["狼", "狼"], ["熊", "熊"], ["鹿", "鹿"], ["驴", "驴"],
   ["蚂蚱", "蚂蚱"], ["蚊", "蚊子"], ["苍蝇", "苍蝇"], ["蜗牛", "蜗牛"], ["螃蟹", "螃蟹"],
-  ["龙", "龙"], ["凤凰", "凤凰"], ["麒麟", "麒麟"]
+  ["恐龙", "恐龙"], ["龙", "龙"], ["凤凰", "凤凰"], ["麒麟", "麒麟"],
+  ["鹅鹅", "鹅"], ["小鹅", "鹅"],
+  ["幺鸡", "鸡"], ["鸡鸡", "鸡"],
+  ["鱼鱼", "鱼"], ["小鱼", "鱼"],
+  ["鸟儿", "鸟"], ["小鸟", "鸟"],
+  ["耗牛", "牦牛"], ["毛牛", "牦牛"],
+  ["卢鱼", "鲈鱼"], ["归鱼", "鲑鱼"], ["包鱼", "鲍鱼"]
 ];
+
+const fluencyAsrAnimalCorrections = [
+  ["老胡", "老虎"], ["脑虎", "老虎"],
+  ["西牛", "犀牛"], ["洗牛", "犀牛"],
+  ["骆坨", "骆驼"], ["落驼", "骆驼"],
+  ["长劲鹿", "长颈鹿"], ["长颈路", "长颈鹿"], ["长景鹿", "长颈鹿"],
+  ["斑妈", "斑马"], ["班马", "斑马"],
+  ["河嘛", "河马"], ["和马", "河马"],
+  ["大想", "大象"], ["大项", "大象"],
+  ["毛牛", "牦牛"], ["耗牛", "牦牛"],
+  ["卢鱼", "鲈鱼"], ["归鱼", "鲑鱼"], ["包鱼", "鲍鱼"]
+];
+
+const fluencyFillerPhrases = [
+  "还有", "然后", "再来", "一个", "一种", "动物", "名字", "名称", "我知道", "想到",
+  "比如", "例如", "尽可能", "说出", "说一下", "先说", "最后", "马上", "这个", "那个",
+  "嗯", "啊", "呃", "额"
+];
+
+const DRAWING_RUBRICS = {
+  cube: [
+    { key: "threeDimensional", label: "三维结构", detail: "图形必须表现为三维立方体。" },
+    { key: "allLinesPresent", label: "线条完整", detail: "所有必要线条都存在。" },
+    { key: "noExtraLines", label: "无多余线", detail: "不能有明显多余线条。" },
+    { key: "parallelAndSimilar", label: "平行等长", detail: "相对边基本平行，长度基本一致。" }
+  ],
+  clock: [
+    { key: "contour", label: "轮廓", detail: "表盘必须近似圆形，只允许轻微变形。" },
+    { key: "numbers", label: "数字", detail: "数字完整、无多余、顺序正确，并位于大致正确象限。" },
+    { key: "hands", label: "指针", detail: "两根指针指向 11 点 10 分，时针短于分针，交点接近中心。" }
+  ]
+};
 
 const orientationPrompts = [
   { key: "year", label: "今年是哪一年？", fields: ["year"] },
@@ -263,7 +301,7 @@ const tasks = [
     modality: "画图",
     prompt: "请照着左侧图形，在空白区域尽可能精确地画一遍。",
     instruction: "请您照着这幅图在下面的空白处再画一遍，并尽可能精确。",
-    scoring: "图形为三维结构、所有线存在、无多余线、相对边基本平行且长度基本一致，全部满足给 1 分；任一标准不满足给 0 分。"
+    scoring: "严格按 MoCA 标准：图形为三维结构、所有线存在、无多余线、相对边基本平行且长度基本一致；四项全部满足给 1 分，任一项不满足给 0 分。"
   },
   {
     id: "clock",
@@ -275,7 +313,7 @@ const tasks = [
     modality: "画图",
     prompt: "请画一个钟表，填上所有数字，并指示出 11 点过 10 分。",
     instruction: "请您在此处画一个钟表，填上所有的数字并指示出 11 点 10 分。",
-    scoring: "轮廓 1 分；数字 1 分；指针 1 分。"
+    scoring: "严格按 MoCA 标准：轮廓 1 分；数字 1 分；指针 1 分。轮廓需近似圆形；数字需完整、无多余、顺序正确并在正确象限；指针需正确表示 11 点 10 分且时针短于分针。"
   },
   {
     id: "naming",
@@ -839,10 +877,12 @@ function getResponse(taskId) {
 function createTaskRuntime() {
   const memoryCandidates = shuffle(MEMORY_WORD_BANK).slice(0, MEMORY_CANDIDATE_COUNT);
   const memoryTargets = shuffle(memoryCandidates).slice(0, MEMORY_TARGET_COUNT);
+  const memoryRecallCandidates = shuffledRecallWords(memoryCandidates);
   const digitForward = randomBankItem(DIGIT_FORWARD_BANK);
   const digitBackward = randomBankItem(DIGIT_BACKWARD_BANK);
   return {
     memoryCandidateWords: memoryCandidates,
+    memoryRecallCandidateWords: memoryRecallCandidates,
     memoryTargetWords: memoryTargets,
     digitForwardBankId: digitForward.id,
     digitForwardStimulus: digitForward.stimulus,
@@ -865,7 +905,14 @@ function normalizeTaskRuntime(runtime = {}) {
   if (candidates.length !== MEMORY_CANDIDATE_COUNT || targets.length !== MEMORY_TARGET_COUNT) {
     const fresh = createTaskRuntime();
     base.memoryCandidateWords = fresh.memoryCandidateWords;
+    base.memoryRecallCandidateWords = fresh.memoryRecallCandidateWords;
     base.memoryTargetWords = fresh.memoryTargetWords;
+  }
+  const recallCandidates = Array.isArray(base.memoryRecallCandidateWords)
+    ? base.memoryRecallCandidateWords.filter((word) => base.memoryCandidateWords.includes(word))
+    : [];
+  if (recallCandidates.length !== MEMORY_CANDIDATE_COUNT) {
+    base.memoryRecallCandidateWords = shuffledRecallWords(base.memoryCandidateWords);
   }
   const forward = DIGIT_FORWARD_BANK.find((entry) => entry.id === base.digitForwardBankId)
     || DIGIT_FORWARD_BANK.find((entry) => entry.stimulus === base.digitForwardStimulus)
@@ -901,8 +948,17 @@ function randomInteger(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function memoryCandidateWords() {
-  return ensureTaskRuntime().memoryCandidateWords;
+function shuffledRecallWords(words) {
+  const shuffled = shuffle(words);
+  if (shuffled.length > 1 && shuffled.every((word, index) => word === words[index])) {
+    [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
+  }
+  return shuffled;
+}
+
+function memoryCandidateWords(taskId = "") {
+  const runtime = ensureTaskRuntime();
+  return taskId === "memory2" ? runtime.memoryRecallCandidateWords : runtime.memoryCandidateWords;
 }
 
 function memoryTargetWords() {
@@ -1717,7 +1773,34 @@ function renderDrawingTask(task) {
           <canvas id="taskCanvas" class="task-canvas ${task.drawingKind === "cube" ? "cube-canvas" : ""}" aria-label="${escapeHtml(task.title)}画图区域"></canvas>
         </div>
       </div>
+      ${renderDrawingRubric(task)}
     </div>
+  `;
+}
+
+function renderDrawingRubric(task) {
+  const items = DRAWING_RUBRICS[task.drawingKind] || [];
+  if (!items.length) return "";
+  const response = getResponse(task.id);
+  const values = response.answer?.drawingRubric || {};
+  const score = drawingRubricScore(task, response);
+  return html`
+    <section class="drawing-rubric-panel" aria-label="${escapeHtml(task.title)}评分标准">
+      <div class="drawing-rubric-head">
+        <span>评分员勾选</span>
+        <strong>${score}/${task.maxScore}</strong>
+      </div>
+      <p>${task.drawingKind === "cube" ? "四项全部满足才给 1 分。" : "每项满足给 1 分，最多 3 分。"}</p>
+      <div class="drawing-rubric-list">
+        ${items.map((item) => `
+          <button type="button" class="drawing-rubric-item ${values[item.key] ? "picked" : ""}" data-action="toggleDrawingRubric" data-key="${item.key}">
+            <span>${values[item.key] ? "✓" : ""}</span>
+            <strong>${escapeHtml(item.label)}</strong>
+            <em>${escapeHtml(item.detail)}</em>
+          </button>
+        `).join("")}
+      </div>
+    </section>
   `;
 }
 
@@ -1757,7 +1840,7 @@ function renderNamingTask(task, step) {
 function renderMemoryTask(task) {
   const response = getResponse(task.id);
   const selected = response.answer.selectedWords || [];
-  const options = memoryCandidateWords();
+  const options = memoryCandidateWords(task.id);
   const ready = task.trial === 2 || Boolean(response.answer.audioReady);
   return html`
     <div class="memory-page ${ready ? "ready" : ""}">
@@ -1854,17 +1937,27 @@ function renderFluencyTask() {
   const running = Boolean(response.answer.running);
   const waiting = speechTranscribing && tasks[state.activeTaskIndex]?.id === "fluency";
   const live = getLiveTranscript(tasks.find((task) => task.id === "fluency"), response, 0);
-  const animals = uniqueWords(extractAnimalNames(`${live.finalText} ${live.interimText}`));
+  const animals = fluencyAnimalNamesFromResponse(response, live);
   return html`
     <div class="fluency-page">
       ${renderAudioWave()}
       <div class="speech-controls">
         <button class="timer-button ${running ? "running" : waiting ? "" : "pulse"}" ${waiting ? "disabled" : `data-action="${running ? "stopFluency" : "startFluency"}"`}>${waiting ? "请稍等" : running ? "停止" : "开始"}</button>
       </div>
-      <strong>${running ? `剩余 ${remaining} 秒` : `已识别 ${animals.length} 个`}</strong>
+      <strong class="fluency-count-status">${fluencyStatusText(response, animals)}</strong>
+      <div class="animal-count-list">${renderAnimalCountChips(animals)}</div>
       ${renderTranscriptEditor(live, "fluency")}
     </div>
   `;
+}
+
+function fluencyStatusText(response, animals) {
+  const countText = `已识别 ${animals.length} 个`;
+  return response.answer?.running ? `剩余 ${response.answer.remaining ?? 60} 秒 · ${countText}` : countText;
+}
+
+function renderAnimalCountChips(animals) {
+  return animals.map((name) => `<span>${escapeHtml(name)}</span>`).join("");
 }
 
 function renderAbstractionTask(task, step) {
@@ -2473,7 +2566,7 @@ function setupFreeCanvas(task) {
   canvas.onpointerup = (event) => {
     drawing = false;
     canvas.releasePointerCapture(event.pointerId);
-    state.drawings[task.id] = canvas.toDataURL("image/png");
+    state.drawings[task.id] = canvasToCompactDataUrl(canvas);
     saveDraft();
   };
   startDrawingIdleHints(task);
@@ -2797,9 +2890,25 @@ function canvasPoint(event, canvas) {
 function captureCanvas(taskId) {
   const canvas = document.querySelector("#taskCanvas");
   if (!canvas) return state.drawings[taskId] || null;
-  const image = canvas.toDataURL("image/png");
+  const image = canvasToCompactDataUrl(canvas);
   state.drawings[taskId] = image;
   return image;
+}
+
+function canvasToCompactDataUrl(canvas, { maxLongSide = 960, quality = 0.72 } = {}) {
+  if (!canvas) return null;
+  const sourceWidth = canvas.width || 0;
+  const sourceHeight = canvas.height || 0;
+  if (!sourceWidth || !sourceHeight) return null;
+  const scale = Math.min(1, maxLongSide / Math.max(sourceWidth, sourceHeight));
+  const output = document.createElement("canvas");
+  output.width = Math.max(1, Math.round(sourceWidth * scale));
+  output.height = Math.max(1, Math.round(sourceHeight * scale));
+  const context = output.getContext("2d");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, output.width, output.height);
+  context.drawImage(canvas, 0, 0, output.width, output.height);
+  return output.toDataURL("image/jpeg", quality);
 }
 
 function cubeReferenceSvg() {
@@ -3157,7 +3266,7 @@ root.addEventListener("click", async (event) => {
   const buttonSpeech = buttonSpeechData(target);
   if (action === "startSession") playSfx("start");
   else if (["skipTask", "nextTask", "skipLogin", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
-  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu"].includes(action)) playSfx("pick");
+  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "toggleDrawingRubric", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu"].includes(action)) playSfx("pick");
 
   if (action !== "tapVigilance") stopAudioPlayback();
   if (buttonSpeech) speakButtonSelection(buttonSpeech);
@@ -3283,6 +3392,7 @@ root.addEventListener("click", async (event) => {
     render();
   }
   if (action === "toggleMemoryWord") toggleMemoryWord(target.dataset.word);
+  if (action === "toggleDrawingRubric") toggleDrawingRubric(current, target.dataset.key);
   if (action === "chooseAbstraction") {
     const response = getResponse("abstraction");
     response.answer[target.dataset.key] = target.dataset.value;
@@ -3320,7 +3430,9 @@ root.addEventListener("click", async (event) => {
     delete state.drawings[current.id];
     const response = getResponse(current.id);
     delete response.drawingImage;
+    delete response.answer.drawingRubric;
     response.behavior.strokes = 0;
+    delete response.behavior.drawingRubricScore;
     delete response.behavior.confirmNudge;
     delete response.behavior.firstInteractionAt;
     render();
@@ -3423,6 +3535,7 @@ root.addEventListener("input", (event) => {
     response.answer.rawTranscript = toSimplifiedChinese(target.value);
     response.answer.interimTranscript = "";
     response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
+    refreshFluencyCountUi(response);
     saveDraft();
   }
 });
@@ -3534,7 +3647,8 @@ function canConfirmTask(task, response) {
   if (task.type === "memory") {
     const selected = response.answer.selectedWords || [];
     const targets = memoryTargetWords();
-    response.behavior.memoryCandidateWords = [...memoryCandidateWords()];
+    response.behavior.memoryCandidateWords = [...memoryCandidateWords("memory1")];
+    response.behavior.memoryRecallCandidateWords = [...memoryCandidateWords("memory2")];
     response.behavior.memoryTargetWords = [...targets];
     response.behavior.memorySelectedCorrectCount = selected.filter((word) => targets.includes(word)).length;
     delete response.behavior.selectionWarning;
@@ -3756,7 +3870,8 @@ function playMemoryWords(response) {
   response.answer.audioReady = false;
   response.answer.wordsPlaybackStarted = true;
   response.behavior.memoryTargetWords = [...targets];
-  response.behavior.memoryCandidateWords = [...memoryCandidateWords()];
+  response.behavior.memoryCandidateWords = [...memoryCandidateWords("memory1")];
+  response.behavior.memoryRecallCandidateWords = [...memoryCandidateWords("memory2")];
   response.behavior.memoryPlaybackCount = Number(response.behavior.memoryPlaybackCount || 0) + 1;
   if (wasStarted) response.behavior.replayCount = Number(response.behavior.replayCount || 0) + 1;
   return speakItemsSlow(targets, {
@@ -5249,9 +5364,10 @@ function setLiveVoiceText(task, response, step, { finalText = "", interimText = 
   }
   if (task.type === "fluency") {
     const transcript = joinTranscriptText(finalText, interimText);
-    response.answer.rawTranscript = fluencyTranscriptFromAsrText(transcript);
+    response.answer.rawTranscript = fluencyTranscriptFromAsrText(transcript, response.answer.rawTranscript);
     response.answer.interimTranscript = "";
     response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
+    refreshFluencyCountUi(response);
   }
   response.behavior.liveTranscript = response.behavior.liveTranscript || {};
   response.behavior.liveTranscript[step] = {
@@ -5311,6 +5427,7 @@ function applyVoiceText(text) {
   if (task.type === "fluency") {
     response.answer.rawTranscript = fluencyTranscriptFromAsrText(text, response.answer.rawTranscript);
     response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
+    refreshFluencyCountUi(response);
   }
   if (task.type === "orientation") applyOrientationText(response, step, text);
   response.behavior.voiceEvents = response.behavior.voiceEvents || [];
@@ -5727,6 +5844,35 @@ function tapVigilance(at = Date.now()) {
   render();
 }
 
+function toggleDrawingRubric(task, key) {
+  if (!task || task.type !== "drawing" || !key) return;
+  const items = DRAWING_RUBRICS[task.drawingKind] || [];
+  if (!items.some((item) => item.key === key)) return;
+  const response = getResponse(task.id);
+  response.answer.drawingRubric = response.answer.drawingRubric || {};
+  response.answer.drawingRubric[key] = !response.answer.drawingRubric[key];
+  response.behavior.drawingRubric = { ...response.answer.drawingRubric };
+  response.behavior.drawingRubricScore = drawingRubricScore(task, response);
+  response.behavior.drawingRubricUpdatedAt = new Date().toISOString();
+  saveDraft();
+  render();
+}
+
+function drawingRubricScore(task, response = getResponse(task.id)) {
+  const items = DRAWING_RUBRICS[task?.drawingKind] || [];
+  if (!items.length) return 0;
+  const values = response.answer?.drawingRubric || {};
+  const passed = items.filter((item) => values[item.key]).length;
+  const score = task.drawingKind === "cube" ? (passed === items.length ? 1 : 0) : passed;
+  const clamped = Math.max(0, Math.min(task.maxScore, score));
+  response.behavior.drawingRubric = { ...values };
+  response.behavior.drawingRubricScore = clamped;
+  response.behavior.drawingRubricPassed = items
+    .filter((item) => values[item.key])
+    .map((item) => item.key);
+  return clamped;
+}
+
 async function startFluency() {
   const response = getResponse("fluency");
   if (response.answer.running) return;
@@ -5894,7 +6040,6 @@ function localListSessions() {
 function localAiScore(payload) {
   const maxScore = Number.isFinite(Number(payload.maxScore)) ? Number(payload.maxScore) : 0;
   let scoreSuggestion = typeof payload.clientAutoScore === "number" ? payload.clientAutoScore : null;
-  if (scoreSuggestion === null && payload.image && ["cube", "clock"].includes(payload.taskId) && payload.clientAutoScore !== 0) scoreSuggestion = maxScore;
   if (scoreSuggestion === null) scoreSuggestion = 0;
   scoreSuggestion = Math.max(0, Math.min(maxScore, Math.round(scoreSuggestion)));
   return { mode: "browser-local-demo", taskId: payload.taskId, scoreSuggestion, confidence: payload.image ? 0.68 : 0.82, requiresHumanReview: false, rubricMatched: true };
@@ -5927,8 +6072,9 @@ function needsAiScore(task) {
 
 function clientAutoScoreForAi(task, response) {
   if (task.type === "trail") return scoreTrail().score;
+  if (task.id === "cube" || task.id === "clock") return drawingRubricScore(task, response);
   if (task.type === "sentence") return scoreSentenceTranscript(task, response);
-  if (task.type === "fluency") return uniqueWords(response.answer?.animals || []).length >= 11 ? 1 : 0;
+  if (task.type === "fluency") return fluencyAnimalCount(response) >= 11 ? 1 : 0;
   if (task.type === "orientation") return scoreOrientationByInputs(response);
   return null;
 }
@@ -5936,14 +6082,14 @@ function clientAutoScoreForAi(task, response) {
 function computeTaskScore(task, response = getResponse(task.id)) {
   const aiScore = aiScoreValue(task, response);
   if (task.type === "trail") return scoreTrail().score;
-  if (task.id === "cube" || task.id === "clock") return aiScore ?? 0;
+  if (task.id === "cube" || task.id === "clock") return drawingRubricScore(task, response);
   if (task.type === "naming") return task.items.reduce((sum, item) => sum + (response.answer?.[item.key] === item.answer ? 1 : 0), 0);
   if (task.type === "memory") return task.trial === 2 ? scoreMemoryChoices(response) : 0;
   if (task.type === "choice") return (response.answer?.sequence || []).join("") === activeDigitItem(task).answer ? 1 : 0;
   if (task.type === "vigilance") return scoreVigilance(response);
   if (task.type === "serial7") return scoreSerial7(response).score;
   if (task.type === "sentence") return aiScore ?? 0;
-  if (task.type === "fluency") return aiScore ?? (uniqueWords(response.answer?.animals || []).length >= 11 ? 1 : 0);
+  if (task.type === "fluency") return aiScore ?? (fluencyAnimalCount(response) >= 11 ? 1 : 0);
   if (task.type === "abstractionChoice") return scoreAbstractionChoice(task, response);
   if (task.type === "orientation") return aiScore ?? scoreOrientationByInputs(response);
   return 0;
@@ -6054,7 +6200,8 @@ function scoreAbstractionChoice(task, response) {
 function scoreMemoryChoices(response) {
   const selected = response.answer?.selectedWords || [];
   const targets = memoryTargetWords();
-  response.behavior.memoryCandidateWords = [...memoryCandidateWords()];
+  response.behavior.memoryCandidateWords = [...memoryCandidateWords("memory1")];
+  response.behavior.memoryRecallCandidateWords = [...memoryCandidateWords("memory2")];
   response.behavior.memoryTargetWords = [...targets];
   return selected.reduce((sum, word) => sum + (targets.includes(word) ? 1 : 0), 0);
 }
@@ -6090,6 +6237,33 @@ function uniqueWords(words) {
   return [...new Set((words || []).map((word) => normalizeText(word)).filter(Boolean))];
 }
 
+function fluencyAnimalNamesFromResponse(response, live = {}) {
+  const text = joinTranscriptText(
+    response.answer?.rawTranscript,
+    response.answer?.interimTranscript,
+    live.finalText,
+    live.interimText
+  );
+  const animals = extractAnimalNames(text);
+  response.answer.animals = animals;
+  return animals;
+}
+
+function fluencyAnimalCount(response) {
+  const animals = extractAnimalNames(joinTranscriptText(response.answer?.rawTranscript, response.answer?.interimTranscript));
+  response.answer.animals = animals;
+  return animals.length;
+}
+
+function refreshFluencyCountUi(response) {
+  if (tasks[state.activeTaskIndex]?.id !== "fluency") return;
+  const animals = fluencyAnimalNamesFromResponse(response);
+  const status = document.querySelector(".fluency-count-status");
+  if (status) status.textContent = fluencyStatusText(response, animals);
+  const list = document.querySelector(".animal-count-list");
+  if (list) list.innerHTML = renderAnimalCountChips(animals);
+}
+
 function extractAnimalNames(text) {
   return uniqueWords(animalMatchesFromText(text).map((match) => match.canonical));
 }
@@ -6120,7 +6294,7 @@ function fluencyTranscriptKey(text) {
 }
 
 function animalMatchesFromText(text) {
-  const normalized = normalizeText(text);
+  const normalized = normalizeAnimalTranscriptForMatching(text);
   const aliases = animalAliasEntries();
   const matches = [];
   aliases.forEach(({ alias, canonical }) => {
@@ -6133,6 +6307,17 @@ function animalMatchesFromText(text) {
     }
   });
   return matches.sort((a, b) => a.start - b.start);
+}
+
+function normalizeAnimalTranscriptForMatching(text) {
+  let normalized = normalizeText(text);
+  fluencyAsrAnimalCorrections.forEach(([from, to]) => {
+    normalized = normalized.split(normalizeText(from)).join(normalizeText(to));
+  });
+  fluencyFillerPhrases.forEach((phrase) => {
+    normalized = normalized.split(normalizeText(phrase)).join("");
+  });
+  return normalized;
 }
 
 function animalAliasEntries() {
@@ -6282,13 +6467,34 @@ async function saveSession(options = {}) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload)
   }, () => localSaveSession(payload));
-  state.sessionId = saved.id;
-  state.selectedSession = saved;
+  const savedDetail = { ...payload, ...saved, itemResponses: payload.itemResponses };
+  state.sessionId = savedDetail.id;
+  state.selectedSession = savedDetail;
   state.sessionSaveStatus = "saved";
-  state.sessionSavedAt = saved.savedAt || new Date().toISOString();
-  await loadSessions(false);
+  state.sessionSavedAt = savedDetail.savedAt || new Date().toISOString();
+  upsertAdminSessionSummary(savedDetail);
   state.view = stayOnResults ? "results" : "admin";
   render();
+}
+
+function upsertAdminSessionSummary(session) {
+  const summary = {
+    id: session.id,
+    participant: session.participant,
+    participantAge: session.participantAge ?? session.participant?.age ?? null,
+    startedAt: session.startedAt,
+    finishedAt: session.finishedAt,
+    savedAt: session.savedAt,
+    totalDurationMs: session.totalDurationMs,
+    rawScore: session.rawScore,
+    educationBonus: session.educationBonus,
+    totalScore: session.totalScore,
+    riskBand: session.riskBand,
+    itemCount: session.itemResponses?.length || 0,
+    storageMode: session.storageMode
+  };
+  const existing = Array.isArray(state.adminSessions) ? state.adminSessions : [];
+  state.adminSessions = [summary, ...existing.filter((entry) => entry.id !== summary.id)];
 }
 
 async function loadSessions(shouldRender = false) {
