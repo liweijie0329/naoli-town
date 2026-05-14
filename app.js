@@ -525,6 +525,8 @@ function createInitialState() {
     playedInstructionKeys: {},
     permissions: { microphone: "unknown", location: "unknown" },
     voiceProfile: "cartoon",
+    sessionSaveStatus: "idle",
+    sessionSavedAt: null,
     setupAttempted: false,
     setupVoiceRecording: false,
     setupVoiceTranscribing: false,
@@ -1366,11 +1368,15 @@ function renderVigilanceTask() {
   const response = getResponse("vigilance");
   const started = Boolean(response.answer.startedAt);
   const running = Boolean(response.answer.running);
+  const tapCount = (response.answer.taps || []).length;
   return html`
     <div class="vigilance-page">
       <strong class="tap-instruction">听到 1 敲一下</strong>
       ${started ? renderAudioWave() : ""}
-      ${!started ? `<button class="primary circle-button pulse" data-action="playCurrentAudio">开始</button>` : running ? `<p class="vigilance-listening">请仔细听完数字</p>` : `<p class="task-ok">听力反应完成，请点确定。</p>`}
+      ${!started ? `<button class="primary circle-button pulse" data-action="playCurrentAudio">开始</button>` : ""}
+      ${started ? `<button class="tap-button ${running ? "pulse" : ""}" data-action="tapVigilance" ${running ? "" : "disabled"}>敲一下</button>` : ""}
+      ${running ? `<p class="vigilance-listening">请仔细听完数字</p>` : started ? `<p class="task-ok">听力反应完成，请点确定。</p>` : ""}
+      ${started ? `<span class="tap-count">已敲 ${tapCount} 下</span>` : ""}
     </div>
   `;
 }
@@ -1628,6 +1634,8 @@ function textKey(text) {
 
 function renderResults() {
   const totals = computeTotals();
+  const saving = state.sessionSaveStatus === "saving";
+  const saved = state.sessionSaveStatus === "saved";
   return html`
     <section class="single-page results-page">
       <div class="result-hero celebrate final-celebration">
@@ -1639,8 +1647,10 @@ function renderResults() {
         <p>谢谢您的参与！</p>
       </div>
       <div class="control-row results-actions final-results-actions">
-        <button class="primary big-button" data-action="goHome">退出</button>
+        <button class="primary big-button" data-action="saveSessionFromResults" ${saving || saved ? "disabled" : ""}>${saving ? "正在保存..." : saved ? "已保存" : "保存本次数据"}</button>
+        <button class="secondary big-button" data-action="goHome">退出</button>
       </div>
+      ${saved ? `<p class="save-status">数据已保存到后台${state.sessionSavedAt ? `：${escapeHtml(new Date(state.sessionSavedAt).toLocaleString())}` : ""}</p>` : ""}
     </section>
   `;
 }
@@ -2481,6 +2491,7 @@ root.addEventListener("click", async (event) => {
     render();
   }
   if (action === "saveSession") await saveSession();
+  if (action === "saveSessionFromResults") await saveSession({ stayOnResults: true });
   if (action === "newSession") {
     resetState();
     render();
@@ -3038,14 +3049,11 @@ function speakItemsWithBrowser(items, { gapMs, rate, done, onItemStart, audioKey
       if (onItemStart) onItemStart(value, index);
     };
     const audioKey = audioKeys[index] || (audioKeyPrefix ? `${audioKeyPrefix}:${index}` : null);
-    const useStaticAudio = !audioKeyPrefix.includes(":digit");
-    const staticAudioStarted = useStaticAudio
-      ? await playStaticTtsAudio(audioKey, {
-        playbackId,
-        onStart: itemStart,
-        done: queueNext
-      })
-      : false;
+    const staticAudioStarted = await playStaticTtsAudio(audioKey, {
+      playbackId,
+      onStart: itemStart,
+      done: queueNext
+    });
     if (staticAudioStarted) return;
     if (playbackId !== speechPlaybackId) return;
     if (!("speechSynthesis" in window)) {
@@ -3355,15 +3363,16 @@ function clampSpeech(value, min, max) {
 function playDigitStimulus(task) {
   const response = getResponse(task.id);
   const digitItem = activeDigitItem(task);
+  const digits = digitItem.stimulus.split("");
   response.answer.sequence = [];
   response.answer.audioReady = false;
-  response.behavior.digitPlayback = [{ stimulus: digitItem.stimulus, bankId: digitItem.bankId, at: Date.now() }];
+  response.behavior.digitPlayback = [{ stimulus: digitItem.stimulus, digits, bankId: digitItem.bankId, gapMs: 1000, audioMode: "per-digit", at: Date.now() }];
   response.behavior[`${task.id}BankId`] = digitItem.bankId;
   response.behavior[`${task.id}Stimulus`] = digitItem.stimulus;
-  speakText(digitItem.stimulus.split("").join(" "), {
-    audioKey: digitItem.audioKey,
+  speakItemsSlow(digits, {
+    audioKeys: digits.map((digit) => `digit:${digit}`),
+    gapMs: 1000,
     rate: 0.66,
-    purpose: "instruction",
     done: () => {
       response.answer.audioReady = true;
       saveDraft();
@@ -5254,8 +5263,11 @@ function buildSessionPayload({ includeAudioBlobs = false } = {}) {
   };
 }
 
-async function saveSession() {
+async function saveSession(options = {}) {
+  const { stayOnResults = false } = options;
   state.finishedAt = state.finishedAt || new Date().toISOString();
+  state.sessionSaveStatus = "saving";
+  if (stayOnResults) render();
   const payload = buildSessionPayload();
   const saved = await requestJson("/api/sessions", {
     method: "POST",
@@ -5264,8 +5276,10 @@ async function saveSession() {
   }, () => localSaveSession(payload));
   state.sessionId = saved.id;
   state.selectedSession = saved;
+  state.sessionSaveStatus = "saved";
+  state.sessionSavedAt = saved.savedAt || new Date().toISOString();
   await loadSessions(false);
-  state.view = "admin";
+  state.view = stayOnResults ? "results" : "admin";
   render();
 }
 

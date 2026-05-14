@@ -5229,6 +5229,26 @@ body,
   font-size: clamp(24px, 3vw, 32px);
 }
 
+.final-results-actions {
+  gap: clamp(12px, 2vw, 22px);
+  flex-wrap: wrap;
+}
+
+.final-results-actions .big-button {
+  min-width: min(300px, 42vw);
+  min-height: clamp(58px, 7.2dvh, 76px);
+  border-radius: 999px;
+  font-size: clamp(22px, 2.6vw, 30px);
+}
+
+.save-status {
+  margin: 0;
+  color: var(--leaf-dark);
+  font-size: clamp(16px, 2vw, 20px);
+  font-weight: 900;
+  text-align: center;
+}
+
 @keyframes fireworkBurst {
   0% {
     transform: scale(0.15) rotate(0deg);
@@ -5501,5 +5521,61 @@ body,
 
   .task-page {
     padding: clamp(4px, 0.7svh, 8px) clamp(6px, 1.8vw, 10px) clamp(4px, 0.7svh, 8px);
+  }
+}
+
+/* Final device-safe task header pass. Keep titles clear of tablet/browser edges. */
+:root {
+  --screen-edge-top: max(22px, env(safe-area-inset-top));
+  --screen-edge-bottom: max(14px, env(safe-area-inset-bottom));
+  --task-header-height: clamp(78px, 10.5svh, 108px);
+}
+
+.app-shell {
+  padding: var(--screen-edge-top) var(--screen-edge-x) var(--screen-edge-bottom);
+}
+
+.page-shell {
+  grid-template-rows: var(--task-header-height) minmax(0, 1fr);
+}
+
+.page-header {
+  min-height: var(--task-header-height);
+  padding-block: clamp(10px, 1.4svh, 16px);
+}
+
+.header-title h2 {
+  font-size: clamp(26px, 3.3svh, 38px);
+}
+
+.task-page {
+  padding-top: clamp(8px, 1.1svh, 14px);
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  :root {
+    --screen-edge-top: max(14px, env(safe-area-inset-top));
+    --screen-edge-bottom: max(8px, env(safe-area-inset-bottom));
+    --task-header-height: clamp(60px, 15svh, 76px);
+  }
+
+  .page-header {
+    padding-block: clamp(6px, 1.4svh, 10px);
+  }
+
+  .header-title h2 {
+    font-size: clamp(20px, 4svh, 28px);
+  }
+}
+
+@media (orientation: portrait), (max-width: 760px) {
+  :root {
+    --screen-edge-top: max(20px, env(safe-area-inset-top));
+    --screen-edge-bottom: max(12px, env(safe-area-inset-bottom));
+    --task-header-height: clamp(72px, 8.8svh, 96px);
+  }
+
+  .final-results-actions .big-button {
+    min-width: min(320px, 78vw);
   }
 }
