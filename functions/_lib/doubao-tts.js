@@ -115,7 +115,8 @@ async function synthesizeV3(text, input, env) {
   const response = await fetch(endpoint, {
     method: "POST",
     headers,
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    signal: input.signal
   });
   const responseText = await response.text();
   const parsed = parseV3Response(responseText);
@@ -191,7 +192,8 @@ async function synthesizeV1(text, input, env) {
       "content-type": "application/json",
       authorization: `Bearer;${accessToken}`
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    signal: input.signal
   });
   const responseText = await response.text();
   let parsed;

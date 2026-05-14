@@ -14,6 +14,8 @@ const dryRun = args.includes("--dry-run");
 const manifestOnly = args.includes("--manifest-only");
 const changedOnly = args.includes("--changed-only");
 const verbose = args.includes("--verbose");
+const continueOnError = args.includes("--continue-on-error");
+const timeoutMs = numberArg("--timeout-ms", Number(process.env.DOUBAO_TTS_TIMEOUT_MS) || 60000);
 const keyPrefix = argValue("--key-prefix");
 const partialRun = manifestOnly || changedOnly || Boolean(keyPrefix);
 
@@ -40,6 +42,7 @@ let skippedCount = 0;
 let changedTextCount = 0;
 let missingFileCount = 0;
 let manifestOnlyCount = 0;
+let failedCount = 0;
 
 for (const entry of entries) {
   validateEntry(entry);
@@ -97,14 +100,22 @@ for (const entry of entries) {
   }
 
   console.log(`generate ${entry.key} -> ${src} (${reasons.join(", ")})`);
-  const result = await synthesizeDoubaoSpeech({
-    text: entry.text,
-    profile: manifestEntry.profile,
-    speedRatio: manifestEntry.speedRatio,
-    pitchRatio: entry.pitchRatio || 1,
-    volumeRatio: entry.volumeRatio || 1,
-    format
-  }, process.env);
+  let result;
+  try {
+    result = await synthesizeWithTimeout({
+      text: entry.text,
+      profile: manifestEntry.profile,
+      speedRatio: manifestEntry.speedRatio,
+      pitchRatio: entry.pitchRatio || 1,
+      volumeRatio: entry.volumeRatio || 1,
+      format
+    });
+  } catch (error) {
+    failedCount += 1;
+    console.error(`failed ${entry.key}: ${formatError(error)}`);
+    if (!continueOnError) throw error;
+    continue;
+  }
 
   const bytes = base64ChunksToUint8Array(result.audioBase64Chunks);
   await writeFile(outputFile, Buffer.from(bytes));
@@ -123,8 +134,9 @@ if (!dryRun) {
   await writeFile(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 }
 
-console.log(`Audio generation done. generated=${generatedCount}, skipped=${skippedCount}, missingFiles=${missingFileCount}, changedText=${changedTextCount}, manifestOnly=${manifestOnlyCount}, total=${entries.length}`);
+console.log(`Audio generation done. generated=${generatedCount}, skipped=${skippedCount}, failed=${failedCount}, missingFiles=${missingFileCount}, changedText=${changedTextCount}, manifestOnly=${manifestOnlyCount}, total=${entries.length}`);
 if (dryRun) console.log("Dry run only. No audio files or manifest were written.");
+if (failedCount) process.exitCode = 1;
 
 function validateEntry(entry) {
   if (!entry || typeof entry !== "object") throw new Error("音频条目必须是对象。");
@@ -168,6 +180,29 @@ function sameNumber(left, right) {
 function argValue(name) {
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] || "" : "";
+}
+
+function numberArg(name, fallback) {
+  const value = Number(argValue(name));
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
+}
+
+async function synthesizeWithTimeout(input) {
+  if (!timeoutMs) return synthesizeDoubaoSpeech(input, process.env);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await synthesizeDoubaoSpeech({ ...input, signal: controller.signal }, process.env);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function formatError(error) {
+  if (error?.name === "AbortError") return `请求超过 ${timeoutMs}ms 未返回，已中止`;
+  const upstream = error?.details?.upstream;
+  const upstreamText = upstream ? ` upstream=${typeof upstream === "string" ? upstream : JSON.stringify(upstream)}` : "";
+  return `${error?.message || error}${upstreamText}`;
 }
 
 async function readJsonIfExists(path) {

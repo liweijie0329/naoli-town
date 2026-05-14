@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-14T03:20:24.385Z",
+  "generatedAt": "2026-05-14T04:57:40.273Z",
   "provider": "doubao",
   "source": "data/tts-texts.json",
   "entries": {
@@ -97,51 +97,6 @@
     "instruction:vigilance:0": {
       "src": "assets/audio/instruction-vigilance-0.mp3",
       "text": "下面我要读出一系列数字，请注意听。每当我读到 1 的时候，您就敲一下按钮。当我读其他的数字时不要敲。",
-      "profile": "gentle",
-      "speedRatio": 1,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "instruction:serial7:0": {
-      "src": "assets/audio/instruction-serial7-0.mp3",
-      "text": "100 减 7 等于多少？",
-      "profile": "gentle",
-      "speedRatio": 1,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "instruction:serial7:1": {
-      "src": "assets/audio/instruction-serial7-1.mp3",
-      "text": "再减 7，等于多少？",
-      "profile": "gentle",
-      "speedRatio": 1,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "instruction:serial7:2": {
-      "src": "assets/audio/instruction-serial7-2.mp3",
-      "text": "再减 7，等于多少？",
-      "profile": "gentle",
-      "speedRatio": 1,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "instruction:serial7:3": {
-      "src": "assets/audio/instruction-serial7-3.mp3",
-      "text": "再减 7，等于多少？",
-      "profile": "gentle",
-      "speedRatio": 1,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "instruction:serial7:4": {
-      "src": "assets/audio/instruction-serial7-4.mp3",
-      "text": "再减 7，等于多少？",
       "profile": "gentle",
       "speedRatio": 1,
       "provider": "doubao-v3",
@@ -247,123 +202,6 @@
       "voiceType": "zh_female_peiqi_uranus_bigtts",
       "format": "mp3"
     },
-    "stimulus:memory1:word:0": {
-      "src": "assets/audio/stimulus-memory1-word-0.mp3",
-      "text": "面孔",
-      "profile": "gentle",
-      "speedRatio": 0.82,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "stimulus:memory1:word:1": {
-      "src": "assets/audio/stimulus-memory1-word-1.mp3",
-      "text": "天鹅绒",
-      "profile": "gentle",
-      "speedRatio": 0.82,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "stimulus:memory1:word:2": {
-      "src": "assets/audio/stimulus-memory1-word-2.mp3",
-      "text": "教堂",
-      "profile": "gentle",
-      "speedRatio": 0.82,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "stimulus:memory1:word:3": {
-      "src": "assets/audio/stimulus-memory1-word-3.mp3",
-      "text": "菊花",
-      "profile": "gentle",
-      "speedRatio": 0.82,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "stimulus:memory1:word:4": {
-      "src": "assets/audio/stimulus-memory1-word-4.mp3",
-      "text": "红色",
-      "profile": "gentle",
-      "speedRatio": 0.82,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "stimulus:digitForward:digit:0": {
-      "src": "assets/audio/stimulus-digitforward-digit-0.mp3",
-      "text": "2",
-      "profile": "gentle",
-      "speedRatio": 0.78,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "stimulus:digitForward:digit:1": {
-      "src": "assets/audio/stimulus-digitforward-digit-1.mp3",
-      "text": "1",
-      "profile": "gentle",
-      "speedRatio": 0.78,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "stimulus:digitForward:digit:2": {
-      "src": "assets/audio/stimulus-digitforward-digit-2.mp3",
-      "text": "8",
-      "profile": "gentle",
-      "speedRatio": 0.78,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "stimulus:digitForward:digit:3": {
-      "src": "assets/audio/stimulus-digitforward-digit-3.mp3",
-      "text": "5",
-      "profile": "gentle",
-      "speedRatio": 0.78,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "stimulus:digitForward:digit:4": {
-      "src": "assets/audio/stimulus-digitforward-digit-4.mp3",
-      "text": "4",
-      "profile": "gentle",
-      "speedRatio": 0.78,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "stimulus:digitBackward:digit:0": {
-      "src": "assets/audio/stimulus-digitbackward-digit-0.mp3",
-      "text": "7",
-      "profile": "gentle",
-      "speedRatio": 0.78,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "stimulus:digitBackward:digit:1": {
-      "src": "assets/audio/stimulus-digitbackward-digit-1.mp3",
-      "text": "4",
-      "profile": "gentle",
-      "speedRatio": 0.78,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "stimulus:digitBackward:digit:2": {
-      "src": "assets/audio/stimulus-digitbackward-digit-2.mp3",
-      "text": "2",
-      "profile": "gentle",
-      "speedRatio": 0.78,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
     "stimulus:vigilance:digit:0": {
       "src": "assets/audio/stimulus-vigilance-digit-0.mp3",
       "text": "5",
@@ -423,6 +261,2499 @@
       "text": "当狗在房间里的时候，猫总是藏在沙发下",
       "profile": "gentle",
       "speedRatio": 0.86,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:01": {
+      "src": "assets/audio/word-memory-01.mp3",
+      "text": "面孔",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:02": {
+      "src": "assets/audio/word-memory-02.mp3",
+      "text": "天鹅绒",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:03": {
+      "src": "assets/audio/word-memory-03.mp3",
+      "text": "教堂",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:04": {
+      "src": "assets/audio/word-memory-04.mp3",
+      "text": "菊花",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:05": {
+      "src": "assets/audio/word-memory-05.mp3",
+      "text": "红色",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:06": {
+      "src": "assets/audio/word-memory-06.mp3",
+      "text": "学校",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:07": {
+      "src": "assets/audio/word-memory-07.mp3",
+      "text": "苹果",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:08": {
+      "src": "assets/audio/word-memory-08.mp3",
+      "text": "火车",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:09": {
+      "src": "assets/audio/word-memory-09.mp3",
+      "text": "尺子",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:10": {
+      "src": "assets/audio/word-memory-10.mp3",
+      "text": "蓝色",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:11": {
+      "src": "assets/audio/word-memory-11.mp3",
+      "text": "鼻子",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:12": {
+      "src": "assets/audio/word-memory-12.mp3",
+      "text": "医院",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:13": {
+      "src": "assets/audio/word-memory-13.mp3",
+      "text": "绿色",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:14": {
+      "src": "assets/audio/word-memory-14.mp3",
+      "text": "自行车",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:15": {
+      "src": "assets/audio/word-memory-15.mp3",
+      "text": "手掌",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:16": {
+      "src": "assets/audio/word-memory-16.mp3",
+      "text": "杯子",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:17": {
+      "src": "assets/audio/word-memory-17.mp3",
+      "text": "钥匙",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:18": {
+      "src": "assets/audio/word-memory-18.mp3",
+      "text": "窗户",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:19": {
+      "src": "assets/audio/word-memory-19.mp3",
+      "text": "河流",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:20": {
+      "src": "assets/audio/word-memory-20.mp3",
+      "text": "花园",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:21": {
+      "src": "assets/audio/word-memory-21.mp3",
+      "text": "书包",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:22": {
+      "src": "assets/audio/word-memory-22.mp3",
+      "text": "茶叶",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:23": {
+      "src": "assets/audio/word-memory-23.mp3",
+      "text": "雨伞",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:24": {
+      "src": "assets/audio/word-memory-24.mp3",
+      "text": "月亮",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:25": {
+      "src": "assets/audio/word-memory-25.mp3",
+      "text": "桌子",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:26": {
+      "src": "assets/audio/word-memory-26.mp3",
+      "text": "椅子",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:27": {
+      "src": "assets/audio/word-memory-27.mp3",
+      "text": "电话",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:28": {
+      "src": "assets/audio/word-memory-28.mp3",
+      "text": "鞋子",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:29": {
+      "src": "assets/audio/word-memory-29.mp3",
+      "text": "衣服",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:30": {
+      "src": "assets/audio/word-memory-30.mp3",
+      "text": "香蕉",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:31": {
+      "src": "assets/audio/word-memory-31.mp3",
+      "text": "橙子",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:32": {
+      "src": "assets/audio/word-memory-32.mp3",
+      "text": "报纸",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:33": {
+      "src": "assets/audio/word-memory-33.mp3",
+      "text": "钱包",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:34": {
+      "src": "assets/audio/word-memory-34.mp3",
+      "text": "门票",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:35": {
+      "src": "assets/audio/word-memory-35.mp3",
+      "text": "铅笔",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:36": {
+      "src": "assets/audio/word-memory-36.mp3",
+      "text": "毛巾",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:37": {
+      "src": "assets/audio/word-memory-37.mp3",
+      "text": "手表",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:38": {
+      "src": "assets/audio/word-memory-38.mp3",
+      "text": "灯泡",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:39": {
+      "src": "assets/audio/word-memory-39.mp3",
+      "text": "桥梁",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:40": {
+      "src": "assets/audio/word-memory-40.mp3",
+      "text": "森林",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:41": {
+      "src": "assets/audio/word-memory-41.mp3",
+      "text": "面包",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:42": {
+      "src": "assets/audio/word-memory-42.mp3",
+      "text": "牛奶",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:43": {
+      "src": "assets/audio/word-memory-43.mp3",
+      "text": "剪刀",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:44": {
+      "src": "assets/audio/word-memory-44.mp3",
+      "text": "枕头",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:45": {
+      "src": "assets/audio/word-memory-45.mp3",
+      "text": "邮票",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:46": {
+      "src": "assets/audio/word-memory-46.mp3",
+      "text": "照片",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:47": {
+      "src": "assets/audio/word-memory-47.mp3",
+      "text": "草地",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:48": {
+      "src": "assets/audio/word-memory-48.mp3",
+      "text": "石头",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:49": {
+      "src": "assets/audio/word-memory-49.mp3",
+      "text": "海洋",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "word:memory:50": {
+      "src": "assets/audio/word-memory-50.mp3",
+      "text": "音乐",
+      "profile": "gentle",
+      "speedRatio": 0.82,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:01": {
+      "src": "assets/audio/stimulus-digitforward-bank-01.mp3",
+      "text": "2 1 8 5 4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:02": {
+      "src": "assets/audio/stimulus-digitforward-bank-02.mp3",
+      "text": "4 9 3 1 7",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:03": {
+      "src": "assets/audio/stimulus-digitforward-bank-03.mp3",
+      "text": "7 2 6 0 5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:04": {
+      "src": "assets/audio/stimulus-digitforward-bank-04.mp3",
+      "text": "5 8 4 2 9",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:05": {
+      "src": "assets/audio/stimulus-digitforward-bank-05.mp3",
+      "text": "1 3 7 8 6",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:06": {
+      "src": "assets/audio/stimulus-digitforward-bank-06.mp3",
+      "text": "9 0 5 2 4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:07": {
+      "src": "assets/audio/stimulus-digitforward-bank-07.mp3",
+      "text": "6 4 1 3 9",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:08": {
+      "src": "assets/audio/stimulus-digitforward-bank-08.mp3",
+      "text": "3 7 2 8 1",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:09": {
+      "src": "assets/audio/stimulus-digitforward-bank-09.mp3",
+      "text": "8 5 0 7 3",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:10": {
+      "src": "assets/audio/stimulus-digitforward-bank-10.mp3",
+      "text": "2 9 6 1 4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:11": {
+      "src": "assets/audio/stimulus-digitforward-bank-11.mp3",
+      "text": "7 1 9 4 2",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:12": {
+      "src": "assets/audio/stimulus-digitforward-bank-12.mp3",
+      "text": "4 6 3 8 0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:13": {
+      "src": "assets/audio/stimulus-digitforward-bank-13.mp3",
+      "text": "5 2 8 1 6",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:14": {
+      "src": "assets/audio/stimulus-digitforward-bank-14.mp3",
+      "text": "9 7 0 3 5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:15": {
+      "src": "assets/audio/stimulus-digitforward-bank-15.mp3",
+      "text": "3 1 4 6 9",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:16": {
+      "src": "assets/audio/stimulus-digitforward-bank-16.mp3",
+      "text": "6 8 2 0 7",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:17": {
+      "src": "assets/audio/stimulus-digitforward-bank-17.mp3",
+      "text": "1 5 9 3 8",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:18": {
+      "src": "assets/audio/stimulus-digitforward-bank-18.mp3",
+      "text": "7 4 6 2 1",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:19": {
+      "src": "assets/audio/stimulus-digitforward-bank-19.mp3",
+      "text": "8 3 0 5 6",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:20": {
+      "src": "assets/audio/stimulus-digitforward-bank-20.mp3",
+      "text": "2 9 1 7 5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:21": {
+      "src": "assets/audio/stimulus-digitforward-bank-21.mp3",
+      "text": "6 0 8 2 4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:22": {
+      "src": "assets/audio/stimulus-digitforward-bank-22.mp3",
+      "text": "4 7 5 9 0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:23": {
+      "src": "assets/audio/stimulus-digitforward-bank-23.mp3",
+      "text": "1 3 2 5 8",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:24": {
+      "src": "assets/audio/stimulus-digitforward-bank-24.mp3",
+      "text": "8 6 4 1 3",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:25": {
+      "src": "assets/audio/stimulus-digitforward-bank-25.mp3",
+      "text": "5 2 0 9 7",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:26": {
+      "src": "assets/audio/stimulus-digitforward-bank-26.mp3",
+      "text": "3 8 9 6 1",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:27": {
+      "src": "assets/audio/stimulus-digitforward-bank-27.mp3",
+      "text": "7 4 1 0 5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:28": {
+      "src": "assets/audio/stimulus-digitforward-bank-28.mp3",
+      "text": "9 2 6 4 8",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:29": {
+      "src": "assets/audio/stimulus-digitforward-bank-29.mp3",
+      "text": "7 0 5 3 2",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:30": {
+      "src": "assets/audio/stimulus-digitforward-bank-30.mp3",
+      "text": "6 1 4 8 2",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:31": {
+      "src": "assets/audio/stimulus-digitforward-bank-31.mp3",
+      "text": "2 7 9 5 0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:32": {
+      "src": "assets/audio/stimulus-digitforward-bank-32.mp3",
+      "text": "8 3 6 1 4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:33": {
+      "src": "assets/audio/stimulus-digitforward-bank-33.mp3",
+      "text": "1 5 2 7 9",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:34": {
+      "src": "assets/audio/stimulus-digitforward-bank-34.mp3",
+      "text": "4 9 7 2 0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:35": {
+      "src": "assets/audio/stimulus-digitforward-bank-35.mp3",
+      "text": "3 6 0 8 1",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:36": {
+      "src": "assets/audio/stimulus-digitforward-bank-36.mp3",
+      "text": "7 8 5 2 4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:37": {
+      "src": "assets/audio/stimulus-digitforward-bank-37.mp3",
+      "text": "2 4 1 9 6",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:38": {
+      "src": "assets/audio/stimulus-digitforward-bank-38.mp3",
+      "text": "9 0 8 5 3",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:39": {
+      "src": "assets/audio/stimulus-digitforward-bank-39.mp3",
+      "text": "6 7 4 2 0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:40": {
+      "src": "assets/audio/stimulus-digitforward-bank-40.mp3",
+      "text": "3 1 9 8 5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:41": {
+      "src": "assets/audio/stimulus-digitforward-bank-41.mp3",
+      "text": "5 6 2 9 0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:42": {
+      "src": "assets/audio/stimulus-digitforward-bank-42.mp3",
+      "text": "8 4 7 1 3",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:43": {
+      "src": "assets/audio/stimulus-digitforward-bank-43.mp3",
+      "text": "2 9 5 0 6",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:44": {
+      "src": "assets/audio/stimulus-digitforward-bank-44.mp3",
+      "text": "7 3 0 4 8",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:45": {
+      "src": "assets/audio/stimulus-digitforward-bank-45.mp3",
+      "text": "4 1 8 6 2",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:46": {
+      "src": "assets/audio/stimulus-digitforward-bank-46.mp3",
+      "text": "9 6 3 1 5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:47": {
+      "src": "assets/audio/stimulus-digitforward-bank-47.mp3",
+      "text": "5 0 7 2 9",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:48": {
+      "src": "assets/audio/stimulus-digitforward-bank-48.mp3",
+      "text": "6 8 1 4 3",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:49": {
+      "src": "assets/audio/stimulus-digitforward-bank-49.mp3",
+      "text": "2 5 4 8 7",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitForward:bank:50": {
+      "src": "assets/audio/stimulus-digitforward-bank-50.mp3",
+      "text": "7 9 0 1 6",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:01": {
+      "src": "assets/audio/stimulus-digitbackward-bank-01.mp3",
+      "text": "7 4 2",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:02": {
+      "src": "assets/audio/stimulus-digitbackward-bank-02.mp3",
+      "text": "3 1 8",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:03": {
+      "src": "assets/audio/stimulus-digitbackward-bank-03.mp3",
+      "text": "9 6 5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:04": {
+      "src": "assets/audio/stimulus-digitbackward-bank-04.mp3",
+      "text": "2 0 4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:05": {
+      "src": "assets/audio/stimulus-digitbackward-bank-05.mp3",
+      "text": "5 7 1",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:06": {
+      "src": "assets/audio/stimulus-digitbackward-bank-06.mp3",
+      "text": "8 3 6",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:07": {
+      "src": "assets/audio/stimulus-digitbackward-bank-07.mp3",
+      "text": "4 2 9",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:08": {
+      "src": "assets/audio/stimulus-digitbackward-bank-08.mp3",
+      "text": "7 5 0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:09": {
+      "src": "assets/audio/stimulus-digitbackward-bank-09.mp3",
+      "text": "1 6 3",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:10": {
+      "src": "assets/audio/stimulus-digitbackward-bank-10.mp3",
+      "text": "5 9 2",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:11": {
+      "src": "assets/audio/stimulus-digitbackward-bank-11.mp3",
+      "text": "8 4 7",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:12": {
+      "src": "assets/audio/stimulus-digitbackward-bank-12.mp3",
+      "text": "3 0 6",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:13": {
+      "src": "assets/audio/stimulus-digitbackward-bank-13.mp3",
+      "text": "9 1 8",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:14": {
+      "src": "assets/audio/stimulus-digitbackward-bank-14.mp3",
+      "text": "2 7 5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:15": {
+      "src": "assets/audio/stimulus-digitbackward-bank-15.mp3",
+      "text": "6 4 0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:16": {
+      "src": "assets/audio/stimulus-digitbackward-bank-16.mp3",
+      "text": "3 8 1",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:17": {
+      "src": "assets/audio/stimulus-digitbackward-bank-17.mp3",
+      "text": "7 2 9",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:18": {
+      "src": "assets/audio/stimulus-digitbackward-bank-18.mp3",
+      "text": "5 0 4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:19": {
+      "src": "assets/audio/stimulus-digitbackward-bank-19.mp3",
+      "text": "1 9 6",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:20": {
+      "src": "assets/audio/stimulus-digitbackward-bank-20.mp3",
+      "text": "8 5 2",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:21": {
+      "src": "assets/audio/stimulus-digitbackward-bank-21.mp3",
+      "text": "4 1 7",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:22": {
+      "src": "assets/audio/stimulus-digitbackward-bank-22.mp3",
+      "text": "6 3 0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:23": {
+      "src": "assets/audio/stimulus-digitbackward-bank-23.mp3",
+      "text": "2 8 4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:24": {
+      "src": "assets/audio/stimulus-digitbackward-bank-24.mp3",
+      "text": "7 5 9",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:25": {
+      "src": "assets/audio/stimulus-digitbackward-bank-25.mp3",
+      "text": "3 2 1",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:26": {
+      "src": "assets/audio/stimulus-digitbackward-bank-26.mp3",
+      "text": "9 0 7",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:27": {
+      "src": "assets/audio/stimulus-digitbackward-bank-27.mp3",
+      "text": "5 6 8",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:28": {
+      "src": "assets/audio/stimulus-digitbackward-bank-28.mp3",
+      "text": "1 4 3",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:29": {
+      "src": "assets/audio/stimulus-digitbackward-bank-29.mp3",
+      "text": "6 9 0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:30": {
+      "src": "assets/audio/stimulus-digitbackward-bank-30.mp3",
+      "text": "2 3 5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:31": {
+      "src": "assets/audio/stimulus-digitbackward-bank-31.mp3",
+      "text": "8 1 4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:32": {
+      "src": "assets/audio/stimulus-digitbackward-bank-32.mp3",
+      "text": "3 7 6",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:33": {
+      "src": "assets/audio/stimulus-digitbackward-bank-33.mp3",
+      "text": "9 2 0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:34": {
+      "src": "assets/audio/stimulus-digitbackward-bank-34.mp3",
+      "text": "4 8 5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:35": {
+      "src": "assets/audio/stimulus-digitbackward-bank-35.mp3",
+      "text": "1 3 7",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:36": {
+      "src": "assets/audio/stimulus-digitbackward-bank-36.mp3",
+      "text": "6 0 2",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:37": {
+      "src": "assets/audio/stimulus-digitbackward-bank-37.mp3",
+      "text": "9 5 1",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:38": {
+      "src": "assets/audio/stimulus-digitbackward-bank-38.mp3",
+      "text": "7 2 4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:39": {
+      "src": "assets/audio/stimulus-digitbackward-bank-39.mp3",
+      "text": "5 8 0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:40": {
+      "src": "assets/audio/stimulus-digitbackward-bank-40.mp3",
+      "text": "3 6 9",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:41": {
+      "src": "assets/audio/stimulus-digitbackward-bank-41.mp3",
+      "text": "2 4 8",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:42": {
+      "src": "assets/audio/stimulus-digitbackward-bank-42.mp3",
+      "text": "7 9 1",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:43": {
+      "src": "assets/audio/stimulus-digitbackward-bank-43.mp3",
+      "text": "4 3 0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:44": {
+      "src": "assets/audio/stimulus-digitbackward-bank-44.mp3",
+      "text": "8 6 5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:45": {
+      "src": "assets/audio/stimulus-digitbackward-bank-45.mp3",
+      "text": "1 2 9",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:46": {
+      "src": "assets/audio/stimulus-digitbackward-bank-46.mp3",
+      "text": "7 0 4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:47": {
+      "src": "assets/audio/stimulus-digitbackward-bank-47.mp3",
+      "text": "5 8 6",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:48": {
+      "src": "assets/audio/stimulus-digitbackward-bank-48.mp3",
+      "text": "3 1 2",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:49": {
+      "src": "assets/audio/stimulus-digitbackward-bank-49.mp3",
+      "text": "9 4 7",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "stimulus:digitBackward:bank:50": {
+      "src": "assets/audio/stimulus-digitbackward-bank-50.mp3",
+      "text": "2 6 0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "digit:0": {
+      "src": "assets/audio/digit-0.mp3",
+      "text": "0",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "digit:1": {
+      "src": "assets/audio/digit-1.mp3",
+      "text": "1",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "digit:2": {
+      "src": "assets/audio/digit-2.mp3",
+      "text": "2",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "digit:3": {
+      "src": "assets/audio/digit-3.mp3",
+      "text": "3",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "digit:4": {
+      "src": "assets/audio/digit-4.mp3",
+      "text": "4",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "digit:5": {
+      "src": "assets/audio/digit-5.mp3",
+      "text": "5",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "digit:6": {
+      "src": "assets/audio/digit-6.mp3",
+      "text": "6",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "digit:7": {
+      "src": "assets/audio/digit-7.mp3",
+      "text": "7",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "digit:8": {
+      "src": "assets/audio/digit-8.mp3",
+      "text": "8",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "digit:9": {
+      "src": "assets/audio/digit-9.mp3",
+      "text": "9",
+      "profile": "gentle",
+      "speedRatio": 0.78,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:1:0": {
+      "src": "assets/audio/instruction-serialsubtraction-1-0.mp3",
+      "text": "100 减 1 等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:1:1": {
+      "src": "assets/audio/instruction-serialsubtraction-1-1.mp3",
+      "text": "再减 1，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:1:2": {
+      "src": "assets/audio/instruction-serialsubtraction-1-2.mp3",
+      "text": "再减 1，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:1:3": {
+      "src": "assets/audio/instruction-serialsubtraction-1-3.mp3",
+      "text": "再减 1，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:1:4": {
+      "src": "assets/audio/instruction-serialsubtraction-1-4.mp3",
+      "text": "再减 1，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:2:0": {
+      "src": "assets/audio/instruction-serialsubtraction-2-0.mp3",
+      "text": "100 减 2 等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:2:1": {
+      "src": "assets/audio/instruction-serialsubtraction-2-1.mp3",
+      "text": "再减 2，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:2:2": {
+      "src": "assets/audio/instruction-serialsubtraction-2-2.mp3",
+      "text": "再减 2，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:2:3": {
+      "src": "assets/audio/instruction-serialsubtraction-2-3.mp3",
+      "text": "再减 2，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:2:4": {
+      "src": "assets/audio/instruction-serialsubtraction-2-4.mp3",
+      "text": "再减 2，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:3:0": {
+      "src": "assets/audio/instruction-serialsubtraction-3-0.mp3",
+      "text": "100 减 3 等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:3:1": {
+      "src": "assets/audio/instruction-serialsubtraction-3-1.mp3",
+      "text": "再减 3，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:3:2": {
+      "src": "assets/audio/instruction-serialsubtraction-3-2.mp3",
+      "text": "再减 3，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:3:3": {
+      "src": "assets/audio/instruction-serialsubtraction-3-3.mp3",
+      "text": "再减 3，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:3:4": {
+      "src": "assets/audio/instruction-serialsubtraction-3-4.mp3",
+      "text": "再减 3，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:4:0": {
+      "src": "assets/audio/instruction-serialsubtraction-4-0.mp3",
+      "text": "100 减 4 等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:4:1": {
+      "src": "assets/audio/instruction-serialsubtraction-4-1.mp3",
+      "text": "再减 4，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:4:2": {
+      "src": "assets/audio/instruction-serialsubtraction-4-2.mp3",
+      "text": "再减 4，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:4:3": {
+      "src": "assets/audio/instruction-serialsubtraction-4-3.mp3",
+      "text": "再减 4，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:4:4": {
+      "src": "assets/audio/instruction-serialsubtraction-4-4.mp3",
+      "text": "再减 4，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:5:0": {
+      "src": "assets/audio/instruction-serialsubtraction-5-0.mp3",
+      "text": "100 减 5 等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:5:1": {
+      "src": "assets/audio/instruction-serialsubtraction-5-1.mp3",
+      "text": "再减 5，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:5:2": {
+      "src": "assets/audio/instruction-serialsubtraction-5-2.mp3",
+      "text": "再减 5，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:5:3": {
+      "src": "assets/audio/instruction-serialsubtraction-5-3.mp3",
+      "text": "再减 5，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:5:4": {
+      "src": "assets/audio/instruction-serialsubtraction-5-4.mp3",
+      "text": "再减 5，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:6:0": {
+      "src": "assets/audio/instruction-serialsubtraction-6-0.mp3",
+      "text": "100 减 6 等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:6:1": {
+      "src": "assets/audio/instruction-serialsubtraction-6-1.mp3",
+      "text": "再减 6，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:6:2": {
+      "src": "assets/audio/instruction-serialsubtraction-6-2.mp3",
+      "text": "再减 6，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:6:3": {
+      "src": "assets/audio/instruction-serialsubtraction-6-3.mp3",
+      "text": "再减 6，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:6:4": {
+      "src": "assets/audio/instruction-serialsubtraction-6-4.mp3",
+      "text": "再减 6，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:7:0": {
+      "src": "assets/audio/instruction-serialsubtraction-7-0.mp3",
+      "text": "100 减 7 等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:7:1": {
+      "src": "assets/audio/instruction-serialsubtraction-7-1.mp3",
+      "text": "再减 7，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:7:2": {
+      "src": "assets/audio/instruction-serialsubtraction-7-2.mp3",
+      "text": "再减 7，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:7:3": {
+      "src": "assets/audio/instruction-serialsubtraction-7-3.mp3",
+      "text": "再减 7，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:7:4": {
+      "src": "assets/audio/instruction-serialsubtraction-7-4.mp3",
+      "text": "再减 7，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:8:0": {
+      "src": "assets/audio/instruction-serialsubtraction-8-0.mp3",
+      "text": "100 减 8 等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:8:1": {
+      "src": "assets/audio/instruction-serialsubtraction-8-1.mp3",
+      "text": "再减 8，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:8:2": {
+      "src": "assets/audio/instruction-serialsubtraction-8-2.mp3",
+      "text": "再减 8，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:8:3": {
+      "src": "assets/audio/instruction-serialsubtraction-8-3.mp3",
+      "text": "再减 8，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:8:4": {
+      "src": "assets/audio/instruction-serialsubtraction-8-4.mp3",
+      "text": "再减 8，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:9:0": {
+      "src": "assets/audio/instruction-serialsubtraction-9-0.mp3",
+      "text": "100 减 9 等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:9:1": {
+      "src": "assets/audio/instruction-serialsubtraction-9-1.mp3",
+      "text": "再减 9，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:9:2": {
+      "src": "assets/audio/instruction-serialsubtraction-9-2.mp3",
+      "text": "再减 9，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:9:3": {
+      "src": "assets/audio/instruction-serialsubtraction-9-3.mp3",
+      "text": "再减 9，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "instruction:serialSubtraction:9:4": {
+      "src": "assets/audio/instruction-serialsubtraction-9-4.mp3",
+      "text": "再减 9，等于多少？",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:d8vzub": {
+      "src": "assets/audio/text-d8vzub.mp3",
+      "text": "狮子",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1r46mp2": {
+      "src": "assets/audio/text-1r46mp2.mp3",
+      "text": "老虎",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:4gmi3w": {
+      "src": "assets/audio/text-4gmi3w.mp3",
+      "text": "豹子",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:194u47p": {
+      "src": "assets/audio/text-194u47p.mp3",
+      "text": "狐狸",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:5exq0a": {
+      "src": "assets/audio/text-5exq0a.mp3",
+      "text": "河马",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:7etu4": {
+      "src": "assets/audio/text-7etu4.mp3",
+      "text": "犀牛",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:her9rc": {
+      "src": "assets/audio/text-her9rc.mp3",
+      "text": "水牛",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:evv8gx": {
+      "src": "assets/audio/text-evv8gx.mp3",
+      "text": "野猪",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1hulp9z": {
+      "src": "assets/audio/text-1hulp9z.mp3",
+      "text": "长颈鹿",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1semtxn": {
+      "src": "assets/audio/text-1semtxn.mp3",
+      "text": "马",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1peime7": {
+      "src": "assets/audio/text-1peime7.mp3",
+      "text": "骆驼",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1xziacz": {
+      "src": "assets/audio/text-1xziacz.mp3",
+      "text": "羊驼",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1m8vot": {
+      "src": "assets/audio/text-1m8vot.mp3",
+      "text": "水果",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:19qaby4": {
+      "src": "assets/audio/text-19qaby4.mp3",
+      "text": "运输工具",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:xlmlt3": {
+      "src": "assets/audio/text-xlmlt3.mp3",
+      "text": "交通工具",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1k5zy5c": {
+      "src": "assets/audio/text-1k5zy5c.mp3",
+      "text": "旅行用的",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:8w1fdu": {
+      "src": "assets/audio/text-8w1fdu.mp3",
+      "text": "劳动工具",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:32zmb3": {
+      "src": "assets/audio/text-32zmb3.mp3",
+      "text": "清洁工具",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1b990j4": {
+      "src": "assets/audio/text-1b990j4.mp3",
+      "text": "厨房工具",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1ay5fqd": {
+      "src": "assets/audio/text-1ay5fqd.mp3",
+      "text": "修理工具",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1dah0qy": {
+      "src": "assets/audio/text-1dah0qy.mp3",
+      "text": "园艺工具",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:12b9w61": {
+      "src": "assets/audio/text-12b9w61.mp3",
+      "text": "写字工具",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1t84jy4": {
+      "src": "assets/audio/text-1t84jy4.mp3",
+      "text": "绘画工具",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:paz8kh": {
+      "src": "assets/audio/text-paz8kh.mp3",
+      "text": "计算工具",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:92j45h": {
+      "src": "assets/audio/text-92j45h.mp3",
+      "text": "测量仪器",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1g4syf7": {
+      "src": "assets/audio/text-1g4syf7.mp3",
+      "text": "测量用的",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:ru2uzl": {
+      "src": "assets/audio/text-ru2uzl.mp3",
+      "text": "吃饭用的",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:195g47o": {
+      "src": "assets/audio/text-195g47o.mp3",
+      "text": "做饭用的",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1xyh3wc": {
+      "src": "assets/audio/text-1xyh3wc.mp3",
+      "text": "照明用的",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1dhikf6": {
+      "src": "assets/audio/text-1dhikf6.mp3",
+      "text": "穿戴用的",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:17hgfj4": {
+      "src": "assets/audio/text-17hgfj4.mp3",
+      "text": "娱乐用的",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:61ffwt": {
+      "src": "assets/audio/text-61ffwt.mp3",
+      "text": "装东西用的",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:h7r3tp": {
+      "src": "assets/audio/text-h7r3tp.mp3",
+      "text": "医疗仪器",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:7yub84": {
+      "src": "assets/audio/text-7yub84.mp3",
+      "text": "音乐仪器",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:vkv1eu": {
+      "src": "assets/audio/text-vkv1eu.mp3",
+      "text": "通信仪器",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:17ecasv": {
+      "src": "assets/audio/text-17ecasv.mp3",
+      "text": "运动仪器",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:bl8oxg": {
+      "src": "assets/audio/text-bl8oxg.mp3",
+      "text": "教学仪器",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:hi8jb8": {
+      "src": "assets/audio/text-hi8jb8.mp3",
+      "text": "摄影仪器",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:rcd29e": {
+      "src": "assets/audio/text-rcd29e.mp3",
+      "text": "星期日",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1h2mt5l": {
+      "src": "assets/audio/text-1h2mt5l.mp3",
+      "text": "星期一",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:kvz4al": {
+      "src": "assets/audio/text-kvz4al.mp3",
+      "text": "星期二",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1j0k10e": {
+      "src": "assets/audio/text-1j0k10e.mp3",
+      "text": "星期三",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:154of3c": {
+      "src": "assets/audio/text-154of3c.mp3",
+      "text": "星期四",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:n3vxud": {
+      "src": "assets/audio/text-n3vxud.mp3",
+      "text": "星期五",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1szltje": {
+      "src": "assets/audio/text-1szltje.mp3",
+      "text": "星期六",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:m4yqcw": {
+      "src": "assets/audio/text-m4yqcw.mp3",
+      "text": "杭州市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1khrudw": {
+      "src": "assets/audio/text-1khrudw.mp3",
+      "text": "上海市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1g28wro": {
+      "src": "assets/audio/text-1g28wro.mp3",
+      "text": "南京市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1x7cif9": {
+      "src": "assets/audio/text-1x7cif9.mp3",
+      "text": "西安市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:hsxb0l": {
+      "src": "assets/audio/text-hsxb0l.mp3",
+      "text": "社区中心",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1prg2aw": {
+      "src": "assets/audio/text-1prg2aw.mp3",
+      "text": "医院",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:12aasa0": {
+      "src": "assets/audio/text-12aasa0.mp3",
+      "text": "学校",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:fum976": {
+      "src": "assets/audio/text-fum976.mp3",
+      "text": "公园",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:8b57f7": {
+      "src": "assets/audio/text-8b57f7.mp3",
+      "text": "电脑",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:sh9agf": {
+      "src": "assets/audio/text-sh9agf.mp3",
+      "text": "无聊",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:yqzr2d": {
+      "src": "assets/audio/text-yqzr2d.mp3",
+      "text": "写字用的",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:150kitb": {
+      "src": "assets/audio/text-150kitb.mp3",
+      "text": "清洁用的",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:q64zlm": {
+      "src": "assets/audio/text-q64zlm.mp3",
+      "text": "照明仪器",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1w5ykuy": {
+      "src": "assets/audio/text-1w5ykuy.mp3",
+      "text": "厨房仪器",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1ajyf8k": {
+      "src": "assets/audio/text-1ajyf8k.mp3",
+      "text": "北京市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1wssarq": {
+      "src": "assets/audio/text-1wssarq.mp3",
+      "text": "苏州市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1wr1sxi": {
+      "src": "assets/audio/text-1wr1sxi.mp3",
+      "text": "广州市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:841n3h": {
+      "src": "assets/audio/text-841n3h.mp3",
+      "text": "深圳市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1n6jisc": {
+      "src": "assets/audio/text-1n6jisc.mp3",
+      "text": "成都市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:8szek6": {
+      "src": "assets/audio/text-8szek6.mp3",
+      "text": "武汉市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:eaxi9k": {
+      "src": "assets/audio/text-eaxi9k.mp3",
+      "text": "青岛市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:kcqfhv": {
+      "src": "assets/audio/text-kcqfhv.mp3",
+      "text": "厦门市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:ik26eb": {
+      "src": "assets/audio/text-ik26eb.mp3",
+      "text": "天津市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:16qjs9s": {
+      "src": "assets/audio/text-16qjs9s.mp3",
+      "text": "大学",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:i2fxdl": {
+      "src": "assets/audio/text-i2fxdl.mp3",
+      "text": "图书馆",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1uaq418": {
+      "src": "assets/audio/text-1uaq418.mp3",
+      "text": "体育中心",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:ra1s7y": {
+      "src": "assets/audio/text-ra1s7y.mp3",
+      "text": "博物馆",
+      "profile": "gentle",
+      "speedRatio": 1,
       "provider": "doubao-v3",
       "voiceType": "zh_female_peiqi_uranus_bigtts",
       "format": "mp3"
