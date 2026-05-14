@@ -890,7 +890,7 @@ h4 {
   justify-items: center;
   align-content: center;
   gap: clamp(14px, 2dvh, 22px);
-  width: min(1080px, 100%);
+  width: 100%;
   height: 100%;
   min-height: 0;
   padding: clamp(20px, 3dvh, 34px) clamp(22px, 4vw, 48px);
@@ -900,6 +900,10 @@ h4 {
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 10px 28px rgba(36, 52, 71, 0.08);
   -webkit-overflow-scrolling: touch;
+}
+
+.hearing-step-card {
+  align-content: center;
 }
 
 .hearing-intro-card {
@@ -1012,6 +1016,20 @@ h4 {
   overflow: hidden;
 }
 
+.hearing-focus-row .hearing-ear-target:not(.compact) {
+  align-self: center;
+  width: clamp(190px, 28vmin, 250px);
+}
+
+.hearing-focus-row {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(22px, 4vw, 52px);
+  width: 100%;
+}
+
 .hearing-ear-target.left {
   border-color: #d8e9ff;
   background: linear-gradient(90deg, #e8f3ff 0 34%, #f8fcff 34% 100%);
@@ -1118,6 +1136,24 @@ h4 {
   width: min(620px, 100%);
 }
 
+.hearing-response-slot {
+  display: grid;
+  place-items: center;
+  width: min(620px, 100%);
+  min-height: clamp(86px, 12dvh, 112px);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.hearing-response-slot.ready {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.hearing-response-slot .hearing-response-grid {
+  width: 100%;
+}
+
 .hearing-response-grid .option {
   min-height: clamp(76px, 11dvh, 98px);
   font-size: clamp(24px, 3vw, 32px);
@@ -1134,10 +1170,13 @@ h4 {
 }
 
 .hearing-test-card {
-  width: min(980px, 100%);
+  width: 100%;
+  align-content: stretch;
+  grid-template-rows: auto minmax(170px, 1fr) auto minmax(96px, auto) minmax(36px, auto);
 }
 
 .hearing-meter-row {
+  align-self: center;
   display: grid;
   grid-template-columns: minmax(130px, 0.85fr) repeat(2, minmax(150px, 1fr));
   gap: 14px;
@@ -1168,6 +1207,18 @@ h4 {
   font-size: clamp(30px, 4vw, 44px);
   font-weight: 1000;
   line-height: 1.05;
+}
+
+.hearing-message-slot {
+  display: grid;
+  min-height: 36px;
+  place-items: center;
+  text-align: center;
+  visibility: hidden;
+}
+
+.hearing-message-slot.visible {
+  visibility: visible;
 }
 
 .hearing-summary-card {
@@ -1711,8 +1762,14 @@ h4 {
   padding: clamp(16px, 2.6dvh, 26px) clamp(20px, 3vw, 34px);
 }
 
+.memory-page.ready {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-content: center;
+}
+
 .memory-page:not(.ready) {
   grid-template-rows: auto auto;
+  place-content: center;
 }
 
 .memory-audio {
@@ -1729,6 +1786,7 @@ h4 {
   color: var(--ink);
   font-size: 28px;
   font-weight: 950;
+  text-align: center;
 }
 
 .memory-choice-panel span {
@@ -1887,6 +1945,26 @@ h4 {
   border-radius: 999px;
   background: var(--sky);
   transition: width 0.1s linear;
+}
+
+.digit-page.ready {
+  grid-template-rows: auto auto auto minmax(0, auto);
+}
+
+.digit-answer-prompt {
+  color: var(--ink);
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 1000;
+  line-height: 1.12;
+  text-align: center;
+}
+
+.digit-example {
+  margin: 0;
+  color: var(--muted);
+  font-size: clamp(20px, 2.6vw, 28px);
+  font-weight: 900;
+  text-align: center;
 }
 
 .voice-status {
@@ -5950,6 +6028,10 @@ body,
     padding: clamp(16px, 2.4svh, 24px);
   }
 
+  .hearing-step-card {
+    align-content: center;
+  }
+
   .hearing-intro-card,
   .hearing-meter-row,
   .hearing-summary-grid {
@@ -5966,8 +6048,17 @@ body,
     justify-self: center;
   }
 
+  .hearing-focus-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
   .hearing-response-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hearing-response-slot {
+    min-height: clamp(146px, 22svh, 176px);
   }
 
   .hearing-response-grid .option {
@@ -5995,6 +6086,15 @@ body,
     min-height: 0;
     gap: 10px;
     padding: 14px 18px;
+  }
+
+  .hearing-step-card {
+    align-content: center;
+  }
+
+  .hearing-test-card {
+    align-content: stretch;
+    grid-template-rows: auto minmax(0, 1fr) auto minmax(66px, auto) minmax(24px, auto);
   }
 
   .hearing-intro-card {
@@ -6045,6 +6145,10 @@ body,
 
   .hearing-response-grid .option {
     min-height: 58px;
+  }
+
+  .hearing-response-slot {
+    min-height: 66px;
   }
 
   .hearing-play-button {

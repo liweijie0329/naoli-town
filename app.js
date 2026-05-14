@@ -492,6 +492,7 @@ let releaseMicAfterRecordingStop = false;
 let recordingWillTranscribe = false;
 let activeTranscriptionId = 0;
 let vigilanceTimer = null;
+let vigilanceAutoAdvanceTimer = null;
 let vigilancePointerTapAt = 0;
 let fluencyTimer = null;
 let trailGuideFrame = null;
@@ -1267,7 +1268,7 @@ function renderMainView(current) {
 function hearingHeaderPrompt() {
   const screening = state.hearingScreening || createHearingScreeningState();
   if (screening.phase === "summary") return "完成后进入正式测试";
-  if (screening.phase === "practice" || screening.phase === "test") return "听到按一下";
+  if (screening.phase === "practice" || screening.phase === "test") return "播放后选择";
   return "戴好耳机，保持安静";
 }
 
@@ -1330,16 +1331,20 @@ function renderHearingIntro(screening) {
 function renderHearingChannelCheck(screening) {
   const side = HEARING_SIDES[screening.channelCheckIndex] || HEARING_SIDES[0];
   return html`
-    <div class="hearing-card">
+    <div class="hearing-card hearing-step-card hearing-channel-card">
       <div class="hearing-stage-label">声道检查</div>
-      ${renderHearingEarTarget(side)}
       <p class="hearing-instruction">声音应来自${escapeHtml(side.label)}</p>
-      ${renderHearingPlayButton({ ear: side.key, frequencyHz: 1000, levelDbHl: 55, context: "channel" }, screening)}
-      ${screening.currentTonePlayed ? `<div class="hearing-response-grid">
-        <button class="option" data-action="confirmHearingChannel" data-value="correct" ${screening.currentTonePlayed ? "" : "disabled"}>是</button>
-        <button class="option" data-action="confirmHearingChannel" data-value="wrong" ${screening.currentTonePlayed ? "" : "disabled"}>不是</button>
-      </div>` : ""}
-      ${screening.message ? `<p class="task-warning">${escapeHtml(screening.message)}</p>` : ""}
+      <div class="hearing-focus-row">
+        ${renderHearingEarTarget(side)}
+        ${renderHearingPlayButton({ ear: side.key, frequencyHz: 1000, levelDbHl: 55, context: "channel" }, screening)}
+      </div>
+      <div class="hearing-response-slot ${screening.currentTonePlayed ? "ready" : ""}">
+        <div class="hearing-response-grid">
+          <button class="option" data-action="confirmHearingChannel" data-value="correct" ${screening.currentTonePlayed ? "" : "disabled"}>是</button>
+          <button class="option" data-action="confirmHearingChannel" data-value="wrong" ${screening.currentTonePlayed ? "" : "disabled"}>不是</button>
+        </div>
+      </div>
+      ${renderHearingMessageSlot(screening.message, "task-warning")}
     </div>
   `;
 }
@@ -1348,13 +1353,16 @@ function renderHearingPractice(screening) {
   const step = HEARING_PRACTICE_STEPS[screening.practiceIndex] || HEARING_PRACTICE_STEPS[0];
   const side = hearingSide(step.ear);
   return html`
-    <div class="hearing-card">
+    <div class="hearing-card hearing-step-card hearing-practice-card">
       <div class="hearing-stage-label">练习 ${screening.practiceIndex + 1}/${HEARING_PRACTICE_STEPS.length}</div>
-      ${renderHearingEarTarget(side)}
-      <p class="hearing-instruction">听到按一下</p>
-      ${renderHearingPlayButton({ ...step, context: "practice" }, screening)}
-      ${screening.currentTonePlayed ? renderHearingResponseButtons("answerHearingPractice", screening) : ""}
-      ${screening.message ? `<p class="task-warning">${escapeHtml(screening.message)}</p>` : ""}
+      <div class="hearing-focus-row">
+        ${renderHearingEarTarget(side)}
+        ${renderHearingPlayButton({ ...step, context: "practice" }, screening)}
+      </div>
+      <div class="hearing-response-slot ${screening.currentTonePlayed ? "ready" : ""}">
+        ${renderHearingResponseButtons("answerHearingPractice", screening)}
+      </div>
+      ${renderHearingMessageSlot(screening.message, "task-warning")}
     </div>
   `;
 }
@@ -1365,7 +1373,7 @@ function renderHearingTest(screening) {
   const levelDbHl = HEARING_LEVELS_DB_HL[screening.levelIndex] || HEARING_LEVELS_DB_HL[0];
   const completed = hearingCompletedTrialCount(screening);
   return html`
-    <div class="hearing-card hearing-test-card">
+    <div class="hearing-card hearing-step-card hearing-test-card">
       <div class="hearing-stage-label">测试 ${Math.min(completed + 1, screening.trials.length)}/${screening.trials.length}</div>
       <div class="hearing-meter-row">
         ${renderHearingEarTarget(side, { compact: true })}
@@ -1379,10 +1387,16 @@ function renderHearingTest(screening) {
         </div>
       </div>
       ${renderHearingPlayButton({ ear: trial.ear, frequencyHz: trial.frequencyHz, levelDbHl, context: "test" }, screening)}
-      ${screening.currentTonePlayed ? renderHearingResponseButtons("answerHearingTrial", screening) : ""}
-      ${screening.message ? `<p class="${screening.message.includes("再大") ? "task-ok" : "task-warning"}">${escapeHtml(screening.message)}</p>` : ""}
+      <div class="hearing-response-slot ${screening.currentTonePlayed ? "ready" : ""}">
+        ${renderHearingResponseButtons("answerHearingTrial", screening)}
+      </div>
+      ${renderHearingMessageSlot(screening.message, screening.message.includes("再大") ? "task-ok" : "task-warning")}
     </div>
   `;
+}
+
+function renderHearingMessageSlot(message, className = "task-warning") {
+  return `<p class="hearing-message-slot ${className} ${message ? "visible" : ""}">${message ? escapeHtml(message) : "&nbsp;"}</p>`;
 }
 
 function renderHearingResponseButtons(action, screening) {
@@ -1595,10 +1609,7 @@ function taskActionSecondaryButtons(task) {
 }
 
 function shouldShowConfirmButton(task) {
-  if (task.type === "vigilance") {
-    const answer = getResponse("vigilance").answer || {};
-    return Boolean(answer.startedAt) && !answer.running;
-  }
+  if (task.type === "vigilance") return false;
   return true;
 }
 
@@ -1717,13 +1728,13 @@ function renderMemoryTask(task) {
   const ready = task.trial === 2 || Boolean(response.answer.audioReady);
   return html`
     <div class="memory-page ${ready ? "ready" : ""}">
-      <div class="memory-audio">
+      ${ready ? "" : `<div class="memory-audio">
         ${renderAudioWave()}
         ${task.trial === 1 && !ready ? renderMemoryStartButton() : ""}
-      </div>
+      </div>`}
       ${ready ? `
         <div class="memory-choice-panel">
-          <strong>请选择刚刚听到的5个词</strong>
+          <strong>请点击刚刚听到的所有词语</strong>
           <span>${selected.length}/${MEMORY_TARGET_COUNT}</span>
         </div>
         <div class="option-grid memory-options">
@@ -1746,15 +1757,22 @@ function renderChoiceTask(task) {
   const response = getResponse(task.id);
   const sequence = response.answer.sequence || [];
   const ready = Boolean(response.answer.audioReady);
+  const backward = task.id === "digitBackward";
+  const answerPrompt = backward ? "请倒序点击刚刚听到的所有数字" : "请按顺序点击刚刚听到的所有数字";
   return html`
-    <div class="digit-page">
-      ${renderAudioWave()}
+    <div class="digit-page ${ready ? "ready" : ""}">
       ${ready ? `
+        <strong class="digit-answer-prompt">${answerPrompt}</strong>
+        ${backward ? `<p class="digit-example">例：听到 123，您就选择 321</p>` : ""}
         <div class="digit-answer">${sequence.map((digit) => `<span>${digit}</span>`).join("")}</div>
         <div class="keypad digit-keypad">
           ${renderKeypadDigits("appendDigit")}
         </div>
-      ` : renderMemoryStartButton()}
+      ` : `
+        ${backward ? `<p class="digit-example">例：听到 123，您就选择 321</p>` : ""}
+        ${renderAudioWave()}
+        ${renderMemoryStartButton()}
+      `}
     </div>
   `;
 }
@@ -1770,7 +1788,6 @@ function renderVigilanceTask() {
       ${started ? renderAudioWave() : ""}
       ${!started ? `<button class="primary circle-button pulse" data-action="playCurrentAudio">开始</button>` : ""}
       ${started ? `<button class="tap-button ${running ? "pulse" : ""}" data-action="tapVigilance" ${running ? "" : "disabled"}>敲一下</button>` : ""}
-      ${running ? `<p class="vigilance-listening">请仔细听完数字</p>` : started ? `<p class="task-ok">听力反应完成，请点确定。</p>` : ""}
       ${started ? `<span class="tap-count">已敲 ${tapCount} 下</span>` : ""}
     </div>
   `;
@@ -1959,7 +1976,6 @@ function renderAudioWave() {
       <div class="audio-wave ${active ? "active" : ""}" aria-label="${escapeHtml(label)}">
         <span></span><span></span><span></span><span></span><span></span>
       </div>
-      ${(playState === "播放中..." || speechTranscribing) ? `<div class="audio-progress"><div class="audio-progress-fill" id="audioProgressFill"></div></div>` : ""}
     </div>
     ${showLabel ? `<strong class="voice-status">${escapeHtml(label)}</strong>` : ""}
   `;
@@ -3407,6 +3423,10 @@ async function skipTask() {
     stopVoiceInput();
   }
   if (task.type === "vigilance" && response.answer.running) response.answer.running = false;
+  if (task.type === "vigilance") {
+    window.clearTimeout(vigilanceAutoAdvanceTimer);
+    vigilanceAutoAdvanceTimer = null;
+  }
   if (task.type === "drawing" || task.type === "trail") response.drawingImage = captureCanvas(task.id);
   finishTask(task.id);
   response.ai = { mode: "skipped", taskId: task.id, scoreSuggestion: 0, confidence: 1, requiresHumanReview: false };
@@ -3428,10 +3448,18 @@ async function skipTask() {
 function canConfirmTask(task, response) {
   if (task.type === "memory") {
     const selected = response.answer.selectedWords || [];
+    const targets = memoryTargetWords();
     response.behavior.memoryCandidateWords = [...memoryCandidateWords()];
-    response.behavior.memoryTargetWords = [...memoryTargetWords()];
-    response.behavior.memorySelectedCorrectCount = selected.filter((word) => memoryTargetWords().includes(word)).length;
+    response.behavior.memoryTargetWords = [...targets];
+    response.behavior.memorySelectedCorrectCount = selected.filter((word) => targets.includes(word)).length;
     delete response.behavior.selectionWarning;
+    if (task.id === "memory1") {
+      const complete = selected.length === targets.length && targets.every((word) => selected.includes(word));
+      if (!complete) {
+        response.behavior.selectionWarning = "请把刚刚听到的 5 个词都选对，再继续。";
+        return false;
+      }
+    }
   }
   if (task.type === "abstractionChoice") {
     const item = task.items[getTaskStep(task)];
@@ -3554,6 +3582,10 @@ async function submitActiveTask() {
     window.clearInterval(fluencyTimer);
     stopVoiceInput();
   }
+  if (task.type === "vigilance") {
+    window.clearTimeout(vigilanceAutoAdvanceTimer);
+    vigilanceAutoAdvanceTimer = null;
+  }
   if (task.type === "drawing" || task.type === "trail") response.drawingImage = captureCanvas(task.id);
   finishTask(task.id);
   if (needsAiScore(task)) response.ai = await scoreTaskWithAi(task);
@@ -3601,6 +3633,7 @@ function taskInstructionText(task, step) {
     const subtractBy = serialSubtractionNumber();
     return step === 0 ? `100 减 ${subtractBy} 等于多少？` : `再减 ${subtractBy}，等于多少？`;
   }
+  if (task.id === "digitBackward") return "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。例如，听到一二三，您就选择三二一。";
   if (task.type === "abstractionChoice") {
     const item = task.items[step];
     return item.practice
@@ -3619,6 +3652,7 @@ function audioKeyForInstruction(task, step = getTaskStep(task)) {
 function playCurrentAudio() {
   const task = tasks[state.activeTaskIndex];
   const step = getTaskStep(task);
+  if (task.type === "vigilance") return startVigilance();
   if (task.type === "memory") {
     const response = getResponse(task.id);
     prioritizeStartPlayback(task, step);
@@ -3628,7 +3662,6 @@ function playCurrentAudio() {
     prioritizeStartPlayback(task, step);
     return playDigitStimulus(task);
   }
-  if (task.type === "vigilance") return startVigilance();
   if (task.type === "sentence") return playSentenceForRepeat(task, step);
 }
 
@@ -5202,13 +5235,12 @@ function orientationOptions(prompt) {
     return optionObjects(weekdays, today.weekday);
   }
   if (prompt.key === "city") {
-    const expected = cleanCityName(response.answer.expectedCity || response.behavior.location?.city || "");
-    if (!expected) {
-      response.answer.expectedCity = "南京市";
+    const expected = "南京市";
+    if (response.answer.expectedCity !== expected) {
+      response.answer.expectedCity = expected;
       saveDraft();
-      return optionObjects(DEFAULT_CITY_OPTIONS, "南京市");
     }
-    return optionObjects(stableOptionValues(response, `orientation:city:${expected}`, expected, CITY_DISTRACTORS), expected);
+    return optionObjects(stableOptionValues(response, "orientation:city:nanjing-fixed", expected, CITY_DISTRACTORS), expected);
   }
   const expectedPlace = currentPlaceName();
   const location = response.behavior.location || {};
@@ -5478,6 +5510,8 @@ function finishSerialStepTiming(response, step) {
 
 function startVigilance() {
   const response = getResponse("vigilance");
+  window.clearTimeout(vigilanceAutoAdvanceTimer);
+  vigilanceAutoAdvanceTimer = null;
   response.answer.taps = [];
   response.answer.startedAt = Date.now();
   response.answer.running = true;
@@ -5492,8 +5526,12 @@ function startVigilance() {
       window.clearInterval(vigilanceTimer);
       response.answer.running = false;
       response.answer.completedAt = Date.now();
-      delete response.behavior.autoAdvanceDelayMs;
+      response.behavior.autoAdvanceDelayMs = 2000;
       render();
+      vigilanceAutoAdvanceTimer = window.setTimeout(() => {
+        vigilanceAutoAdvanceTimer = null;
+        autoAdvanceVigilance();
+      }, 2000);
     }
   });
   render();
@@ -5623,7 +5661,7 @@ async function reverseGeocodeLocation(response) {
     Object.keys(response.behavior.optionOrders || {}).forEach((key) => {
       if (key.startsWith("orientation:city") || key.startsWith("orientation:place")) delete response.behavior.optionOrders[key];
     });
-    getResponse("orientation").answer.expectedCity = loc.city || "";
+    getResponse("orientation").answer.expectedCity = "南京市";
     getResponse("orientation").answer.expectedPlace = loc.place || "";
   } catch {
     // Coordinates are still kept for backend review.
