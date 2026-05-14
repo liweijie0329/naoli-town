@@ -1412,7 +1412,7 @@ function renderHearingSummary(screening) {
         `).join("")}
         <div class="hearing-summary-item">
           <span>较差耳</span>
-          <strong>${summary.worseEar ? escapeHtml(hearingSide(summary.worseEar).label) : "-"}</strong>
+          <strong>${escapeHtml(formatWorseEarLabel(summary.worseEar))}</strong>
         </div>
       </div>
       <p class="hearing-summary-note">仅作初筛，不替代临床诊断。</p>
@@ -1487,8 +1487,10 @@ function summarizeHearingScreening(screening = state.hearingScreening) {
   }));
   const worseEar = ears.right.pta4 === null && ears.left.pta4 === null
     ? null
-    : (Number(ears.right.pta4 ?? -Infinity) >= Number(ears.left.pta4 ?? -Infinity) ? "right" : "left");
-  const worsePta = worseEar ? ears[worseEar].pta4 : null;
+    : hearingWorseEarKey(ears.right.pta4, ears.left.pta4);
+  const worsePta = [ears.right.pta4, ears.left.pta4]
+    .filter((value) => Number.isFinite(Number(value)))
+    .reduce((max, value) => Math.max(max, Number(value)), null);
   const status = worsePta === null
     ? "incomplete"
     : worsePta > HEARING_PASS_PTA_DB_HL ? "refer" : "pass";
@@ -1506,6 +1508,26 @@ function summarizeHearingScreening(screening = state.hearingScreening) {
     completedTrialCount: hearingCompletedTrialCount(screening),
     totalTrialCount: createHearingTrials().length
   };
+}
+
+function hearingWorseEarKey(rightPta, leftPta) {
+  const rightValue = Number(rightPta);
+  const leftValue = Number(leftPta);
+  const hasRight = Number.isFinite(rightValue);
+  const hasLeft = Number.isFinite(leftValue);
+  if (hasRight && hasLeft) {
+    if (rightValue === leftValue) return "equal";
+    return rightValue > leftValue ? "right" : "left";
+  }
+  if (hasRight) return "right";
+  if (hasLeft) return "left";
+  return null;
+}
+
+function formatWorseEarLabel(key) {
+  if (key === "equal") return "双耳相同";
+  if (key === "right" || key === "left") return hearingSide(key).label;
+  return "-";
 }
 
 function thresholdValueForSummary(entry) {
@@ -6095,7 +6117,7 @@ function csvRowsForSession(session) {
     hearing_status: formatHearingStatus(hearingSummary.status || hearing.status),
     hearing_right_pta4: hearingSummary.ears?.right?.pta4 ?? "",
     hearing_left_pta4: hearingSummary.ears?.left?.pta4 ?? "",
-    hearing_worse_ear: hearingSummary.worseEar ? hearingSide(hearingSummary.worseEar).label : "",
+    hearing_worse_ear: formatWorseEarLabel(hearingSummary.worseEar),
     hearing_screening_json: stringifyForCsv(hearing || {}),
     task_id: item.taskId || "",
     task_title: item.title || "",
