@@ -1917,23 +1917,26 @@ function renderFluencyTask() {
   const response = getResponse("fluency");
   const remaining = response.answer.remaining ?? 60;
   const running = Boolean(response.answer.running);
+  const completed = Boolean(response.answer.completedAt);
   const waiting = speechTranscribing && tasks[state.activeTaskIndex]?.id === "fluency";
   const live = getLiveTranscript(tasks.find((task) => task.id === "fluency"), response, 0);
   const animals = fluencyAnimalNamesFromResponse(response, live);
   return html`
     <div class="fluency-page">
       ${renderAudioWave()}
-      <div class="speech-controls">
+      ${completed ? "" : `<div class="speech-controls">
         <button class="timer-button ${running ? "running" : waiting ? "" : "pulse"}" ${waiting ? "disabled" : `data-action="${running ? "stopFluency" : "startFluency"}"`}>${waiting ? "请稍等" : running ? "停止" : "开始"}</button>
-      </div>
+      </div>`}
       <strong class="fluency-count-status">${fluencyStatusText(response, animals)}</strong>
       <div class="animal-count-list">${renderAnimalCountChips(animals)}</div>
+      ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
     </div>
   `;
 }
 
 function fluencyStatusText(response, animals) {
   const countText = `已识别 ${animals.length} 个`;
+  if (response.answer?.completedAt) return `${countText} · 请确认`;
   return response.answer?.running ? `剩余 ${response.answer.remaining ?? 60} 秒 · ${countText}` : countText;
 }
 
@@ -2354,7 +2357,8 @@ function formatHearingStatus(status) {
 }
 
 function renderItemDetail(item, index) {
-  const answerText = readableItemAnswer(item);
+  const answerParts = readableItemAnswerParts(item);
+  const visual = isVisualItem(item);
   return html`
     <article class="item-detail compact-item-detail">
       <div class="item-detail-row">
@@ -2362,36 +2366,78 @@ function renderItemDetail(item, index) {
         <strong>${escapeHtml(item.title || item.taskId || "未命名题目")}</strong>
         <em>${escapeHtml(item.score ?? "-")}/${escapeHtml(item.maxScore ?? "-")}</em>
       </div>
+      ${visual ? renderAdminDrawingPreview(item) : ""}
       <div class="item-answer-summary">
         <span>回答</span>
-        <p>${escapeHtml(answerText)}</p>
+        <div class="answer-part-list">
+          ${answerParts.map(renderAnswerPart).join("")}
+        </div>
       </div>
     </article>
   `;
 }
 
-function readableItemAnswer(item = {}) {
+function renderAnswerPart(part = {}) {
+  const stateClass = part.correct === false ? "wrong-answer" : part.correct === true ? "correct-answer" : "";
+  const standard = part.correct === false && part.standard ? `<small>标准：${escapeHtml(part.standard)}</small>` : "";
+  return html`
+    <div class="answer-part ${stateClass}">
+      ${part.label ? `<span>${escapeHtml(part.label)}</span>` : ""}
+      <strong>${escapeHtml(part.user || "未答")}</strong>
+      ${standard}
+    </div>
+  `;
+}
+
+function isVisualItem(item = {}) {
+  return ["trail", "cube", "clock"].includes(item.taskId);
+}
+
+function renderAdminDrawingPreview(item = {}) {
+  if (!item.drawingImage || typeof item.drawingImage !== "string") {
+    return `<div class="admin-drawing-preview empty-drawing-preview">未保存图案</div>`;
+  }
+  return html`
+    <div class="admin-drawing-preview">
+      <img src="${escapeHtml(item.drawingImage)}" alt="${escapeHtml(item.title || "作答图案")}" />
+    </div>
+  `;
+}
+
+function readableItemAnswerParts(item = {}) {
   const answer = item.answer || {};
-  if (answer.skipped) return "已跳过";
+  const savedParts = answer.answerSummary?.parts || item.correctness?.parts;
+  if (Array.isArray(savedParts) && savedParts.length) return savedParts.map(normalizeAnswerPart);
+  if (answer.skipped) return [{ label: "", user: "已跳过", standard: "", correct: false }];
   const task = tasks.find((entry) => entry.id === item.taskId);
-  if (item.taskId === "trail") return item.drawingImage ? "已完成连线" : "未记录连线";
-  if (item.taskId === "cube" || item.taskId === "clock") return item.drawingImage ? "已提交画图" : "未提交画图";
-  if (task?.type === "naming") return task.items.map((entry) => `${entry.answer}: ${answer[entry.key] || "未答"}`).join("；");
+  if (item.taskId === "trail") return visualAnswerParts(item, item.drawingImage ? "已完成连线" : "未记录连线");
+  if (item.taskId === "cube" || item.taskId === "clock") return visualAnswerParts(item, item.drawingImage ? "已提交画图" : "未提交画图");
+  if (task?.type === "naming") return task.items.map((entry) => ({
+    label: entry.answer,
+    user: answer[entry.key] || "未答",
+    standard: entry.answer,
+    correct: answer[entry.key] === entry.answer
+  }));
   if (task?.type === "memory") {
     const selected = Array.isArray(answer.selectedWords) ? answer.selectedWords : [];
-    return selected.length ? selected.join("、") : "未选择";
+    return [{ label: "选择", user: selected.length ? selected.join("、") : "未选择", standard: "", correct: item.score >= item.maxScore }];
   }
   if (task?.type === "choice") {
     const sequence = Array.isArray(answer.sequence) ? answer.sequence : [];
-    return sequence.length ? sequence.join(" ") : "未选择";
+    return [{ label: "顺序", user: sequence.length ? sequence.join(" ") : "未选择", standard: "", correct: item.score >= item.maxScore }];
   }
   if (task?.type === "vigilance") {
     const taps = Array.isArray(answer.taps) ? answer.taps.length : 0;
-    return `敲击 ${taps} 次`;
+    return [{ label: "敲击", user: `${taps} 次`, standard: "听到 1 时敲击", correct: item.score >= item.maxScore }];
   }
   if (task?.type === "serial7") {
     const values = Array.isArray(answer.values) ? answer.values : [];
-    return values.length ? values.map((value) => value || "未答").join("，") : "未答";
+    return values.length ? values.map((value, index) => ({
+      label: `第 ${index + 1} 步`,
+      user: value || "未答",
+      standard: "",
+      correct: null
+    })) : [{ label: "", user: "未答", standard: "", correct: false }];
   }
   if (task?.type === "sentence") return readableSentenceAnswer(task, answer);
   if (task?.type === "fluency") return readableFluencyAnswer(answer);
@@ -2400,35 +2446,85 @@ function readableItemAnswer(item = {}) {
   return readableGenericAnswer(answer);
 }
 
+function normalizeAnswerPart(part = {}) {
+  return {
+    label: String(part.label || ""),
+    user: stringifyAnswerValue(part.user ?? part.userAnswer ?? ""),
+    standard: stringifyAnswerValue(part.standard ?? part.standardAnswer ?? ""),
+    correct: typeof part.correct === "boolean" ? part.correct : null
+  };
+}
+
+function visualAnswerParts(item, user) {
+  const parts = [{
+    label: "图案",
+    user,
+    standard: item.taskId === "trail" ? TRAIL_EXPECTED.join("-") : drawingStandardText(item.taskId),
+    correct: Number(item.score) >= Number(item.maxScore)
+  }];
+  const comment = item.ai?.comment || item.answer?.answerSummary?.scoreReason || "";
+  if (comment) {
+    parts.push({
+      label: "评分说明",
+      user: comment,
+      standard: "",
+      correct: Number(item.score) >= Number(item.maxScore)
+    });
+  }
+  return parts;
+}
+
+function drawingStandardText(taskId) {
+  if (taskId === "cube") return "三维结构、线条完整、无多余线、相对边平行且长度一致";
+  if (taskId === "clock") return "圆形表盘、1-12 数字正确、两指针表示 11 点 10 分";
+  return "";
+}
+
 function readableSentenceAnswer(task, answer) {
   const transcript = answer.transcript || {};
-  const parts = task.sentences.map((_, index) => cleanAsrTranscript(transcript[index] || "") || "未答");
-  return parts.map((part, index) => `${index + 1}. ${part}`).join("；");
+  return task.sentences.map((sentence, index) => ({
+    label: `句子 ${index + 1}`,
+    user: cleanAsrTranscript(transcript[index] || "") || "未答",
+    standard: sentence,
+    correct: sentenceMoCaNormalize(transcript[index]) === sentenceMoCaNormalize(sentence)
+  }));
 }
 
 function readableFluencyAnswer(answer) {
   const animals = Array.isArray(answer.animals) && answer.animals.length
     ? answer.animals
     : extractAnimalNames(answer.rawTranscript || "");
-  return animals.length ? `已识别 ${animals.length} 个：${animals.join("、")}` : "未识别到动物";
+  return [{
+    label: "动物",
+    user: animals.length ? `已识别 ${animals.length} 个：${animals.join("、")}` : "未识别到动物",
+    standard: "至少 11 个动物",
+    correct: animals.length >= 11
+  }];
 }
 
 function readableAbstractionAnswer(task, answer) {
   return task.items
     .filter((entry) => !entry.practice)
-    .map((entry) => `${entry.words.join("和")}: ${answer[entry.key] || "未答"}`)
-    .join("；");
+    .map((entry) => {
+      const standard = Array.isArray(entry.correctAnswers) ? entry.correctAnswers[0] : entry.answer;
+      return {
+        label: entry.words.join("和"),
+        user: answer[entry.key] || "未答",
+        standard,
+        correct: answer[entry.key] === standard
+      };
+    });
 }
 
 function readableOrientationAnswer(answer) {
-  const date = [answer.year, answer.month, answer.day].filter(Boolean).join("-");
-  const parts = [
-    date ? `日期: ${date}` : "",
-    answer.weekday ? `星期: ${answer.weekday}` : "",
-    answer.city ? `城市: ${answer.city}` : "",
-    answer.place ? `地点: ${answer.place}` : ""
-  ].filter(Boolean);
-  return parts.length ? parts.join("；") : "未答";
+  return [
+    { label: "年份", user: answer.year || "未答", standard: "", correct: null },
+    { label: "月份", user: answer.month || "未答", standard: "", correct: null },
+    { label: "日期", user: answer.day || "未答", standard: "", correct: null },
+    { label: "星期", user: answer.weekday || "未答", standard: "", correct: null },
+    { label: "城市", user: answer.city || "未答", standard: answer.expectedCity || "", correct: null },
+    { label: "地点", user: answer.place || "未答", standard: answer.expectedPlace || "", correct: null }
+  ];
 }
 
 function readableGenericAnswer(answer) {
@@ -2438,8 +2534,14 @@ function readableGenericAnswer(answer) {
   ]);
   const parts = Object.entries(answer || {})
     .filter(([key, value]) => !hiddenKeys.has(key) && value !== "" && value !== null && value !== undefined)
-    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join("、") : String(value)}`);
-  return parts.length ? parts.join("；") : "未答";
+    .map(([key, value]) => ({ label: key, user: stringifyAnswerValue(value), standard: "", correct: null }));
+  return parts.length ? parts : [{ label: "", user: "未答", standard: "", correct: null }];
+}
+
+function stringifyAnswerValue(value) {
+  if (Array.isArray(value)) return value.join("、");
+  if (value && typeof value === "object") return Object.values(value).map(stringifyAnswerValue).filter(Boolean).join("、");
+  return String(value ?? "");
 }
 
 function renderDetailJson(label, value) {
@@ -3718,6 +3820,13 @@ function canConfirmTask(task, response) {
     const item = task.items[getTaskStep(task)];
     if (item.practice && response.answer[item.key] !== item.answer) {
       response.behavior.selectionWarning = "请选择正确答案：水果";
+      return false;
+    }
+    delete response.behavior.selectionWarning;
+  }
+  if (task.type === "fluency") {
+    if (!response.answer.completedAt) {
+      response.behavior.selectionWarning = "请先完成 1 分钟动物词语流畅性计数。";
       return false;
     }
     delete response.behavior.selectionWarning;
@@ -5917,10 +6026,11 @@ function tapVigilance(at = Date.now()) {
 
 async function startFluency() {
   const response = getResponse("fluency");
-  if (response.answer.running) return;
+  if (response.answer.running || response.answer.completedAt) return;
   response.answer.remaining = 60;
   response.answer.running = true;
   response.answer.timerStartedAt = Date.now();
+  delete response.answer.completedAt;
   render();
   const voiceStarted = await startVoiceInput();
   if (!voiceStarted) {
@@ -5936,8 +6046,10 @@ async function startFluency() {
     if (response.answer.remaining <= 0) {
       response.answer.remaining = 0;
       response.answer.running = false;
+      response.answer.completedAt = Date.now();
       window.clearInterval(fluencyTimer);
       stopVoiceInput();
+      saveDraft();
     }
     render();
   }, 1000);
@@ -5947,6 +6059,7 @@ async function startFluency() {
 function stopFluency() {
   const response = getResponse("fluency");
   response.answer.running = false;
+  response.answer.completedAt = Date.now();
   window.clearInterval(fluencyTimer);
   stopVoiceInput();
   saveDraft();
@@ -6524,7 +6637,128 @@ function compactAnswerForBackend(answer) {
   return copy;
 }
 
+function answerSummaryForTask(task, response, score) {
+  const parts = answerSummaryPartsForTask(task, response, score).map(normalizeAnswerPart);
+  return {
+    userAnswer: parts.map((part) => part.label ? `${part.label}: ${part.user}` : part.user).join("；"),
+    standardAnswer: parts.filter((part) => part.standard).map((part) => part.label ? `${part.label}: ${part.standard}` : part.standard).join("；"),
+    parts,
+    score,
+    maxScore: task.maxScore,
+    scoreReason: drawingScoreReason(task, response, score)
+  };
+}
+
+function answerSummaryPartsForTask(task, response, score) {
+  const answer = response.answer || {};
+  if (answer.skipped) return [answerPart("", "已跳过", "", false)];
+  if (task.id === "trail") {
+    const sequence = Array.isArray(response.behavior.sequence) && response.behavior.sequence.length
+      ? response.behavior.sequence.join("-")
+      : "未完成";
+    const parts = [answerPart("连线", sequence, TRAIL_EXPECTED.join("-"), score === task.maxScore)];
+    const reason = drawingScoreReason(task, response, score);
+    if (reason) parts.push(answerPart("评分说明", reason, "", score === task.maxScore));
+    return parts;
+  }
+  if (task.id === "cube" || task.id === "clock") {
+    const parts = [answerPart("图案", response.drawingImage || state.drawings[task.id] ? "已提交画图" : "未提交画图", drawingStandardText(task.id), score === task.maxScore)];
+    const reason = drawingScoreReason(task, response, score);
+    if (reason) parts.push(answerPart("评分说明", reason, "", score === task.maxScore));
+    return parts;
+  }
+  if (task.type === "naming") {
+    return task.items.map((entry) => answerPart(entry.answer, answer[entry.key] || "未答", entry.answer, answer[entry.key] === entry.answer));
+  }
+  if (task.type === "memory") return memoryAnswerParts(response);
+  if (task.type === "choice") {
+    const item = activeDigitItem(task);
+    const user = Array.isArray(answer.sequence) && answer.sequence.length ? answer.sequence.join("") : "未答";
+    return [answerPart("顺序", user, item.answer, user === item.answer)];
+  }
+  if (task.type === "vigilance") {
+    const taps = Array.isArray(answer.taps) ? answer.taps.length : 0;
+    const errors = response.behavior.vigilance?.errors;
+    return [answerPart("敲击", `${taps} 次${Number.isFinite(Number(errors)) ? `，错误 ${errors} 次` : ""}`, "听到数字 1 时敲击，其他数字不敲", score === task.maxScore)];
+  }
+  if (task.type === "serial7") {
+    const steps = response.behavior.serialSubtractionSteps || [];
+    return steps.length ? steps.map((entry) => answerPart(`第 ${entry.step} 步`, entry.answer ?? "未答", entry.expected ?? "", Boolean(entry.correct))) : readableItemAnswerParts({ taskId: task.id, answer });
+  }
+  if (task.type === "sentence") {
+    const details = response.behavior.sentenceScoring?.details || [];
+    return details.length
+      ? details.map((entry, index) => answerPart(`句子 ${index + 1}`, entry.transcript || "未答", entry.expected || task.sentences[index] || "", Boolean(entry.correct)))
+      : readableSentenceAnswer(task, answer);
+  }
+  if (task.type === "fluency") {
+    const animals = fluencyAnimalNamesFromResponse(response);
+    return [answerPart("动物", animals.length ? `已识别 ${animals.length} 个：${animals.join("、")}` : "未识别到动物", "至少 11 个动物", animals.length >= 11)];
+  }
+  if (task.type === "abstractionChoice") {
+    return task.items
+      .filter((entry) => !entry.practice)
+      .map((entry) => {
+        const standard = response.behavior.abstractionCorrectAnswers?.[entry.key]
+          || (Array.isArray(entry.correctAnswers) ? entry.correctAnswers[0] : entry.answer);
+        return answerPart(entry.words.join("和"), answer[entry.key] || "未答", standard, answer[entry.key] === standard);
+      });
+  }
+  if (task.type === "orientation") return orientationAnswerParts(answer);
+  return readableGenericAnswer(answer);
+}
+
+function answerPart(label, user, standard, correct) {
+  return { label, user: stringifyAnswerValue(user), standard: stringifyAnswerValue(standard), correct };
+}
+
+function memoryAnswerParts(response) {
+  const answer = response.answer || {};
+  const selected = Array.isArray(answer.selectedWords) ? answer.selectedWords : [];
+  const targets = Array.isArray(response.behavior.memoryTargetWords) && response.behavior.memoryTargetWords.length
+    ? response.behavior.memoryTargetWords
+    : memoryTargetWords();
+  const parts = targets.map((word) => answerPart(word, selected.includes(word) ? word : "未选", word, selected.includes(word)));
+  selected.filter((word) => !targets.includes(word)).forEach((word, index) => {
+    parts.push(answerPart(`误选 ${index + 1}`, word, "不应选择", false));
+  });
+  if (!parts.length) return [answerPart("选择", "未选择", "", false)];
+  return parts;
+}
+
+function orientationAnswerParts(answer = {}) {
+  const today = todayParts();
+  const expectedCity = answer.expectedCity || "南京市";
+  const expectedPlace = answer.expectedPlace || "";
+  const city = normalizeText(answer.city || "");
+  const place = normalizeText(answer.place || "");
+  const cityExpected = normalizeText(expectedCity);
+  const placeExpected = normalizeText(expectedPlace);
+  return [
+    answerPart("年份", answer.year || "未答", today.year, String(Number(answer.year)) === today.year),
+    answerPart("月份", answer.month || "未答", today.month, String(Number(answer.month)) === today.month),
+    answerPart("日期", answer.day || "未答", today.day, String(Number(answer.day)) === today.day),
+    answerPart("星期", answer.weekday || "未答", today.weekday, normalizeText(answer.weekday) === normalizeText(today.weekday)),
+    answerPart("城市", answer.city || "未答", expectedCity, Boolean(city) && (cityExpected ? city.includes(cityExpected) || cityExpected.includes(city) : true)),
+    answerPart("地点", answer.place || "未答", expectedPlace || "定位地点", Boolean(place) && (placeExpected ? place.includes(placeExpected) || placeExpected.includes(place) : true))
+  ];
+}
+
+function drawingScoreReason(task, response, score) {
+  if (task.type !== "drawing" && task.type !== "trail") return "";
+  if (response.ai?.comment) return response.ai.comment;
+  if (task.type === "trail" && score < task.maxScore) return "连线顺序不完整、顺序错误或出现交叉线。";
+  if (task.type === "drawing" && score < task.maxScore) return "图片 AI 按 MoCA 标准判为未满足全部给分条件。";
+  return "";
+}
+
+function hasCompletedHearingScreening(screening) {
+  const normalized = normalizeHearingScreening(screening);
+  return normalized.status === "completed" && hearingCompletedTrialCount(normalized) > 0;
+}
+
 function compactHearingScreeningForPayload(screening) {
+  if (!hasCompletedHearingScreening(screening)) return null;
   const copy = JSON.parse(JSON.stringify(normalizeHearingScreening(screening)));
   copy.summary = copy.summary || summarizeHearingScreening(copy);
   delete copy.currentTonePlaying;
@@ -6558,17 +6792,24 @@ function buildSessionPayload({ includeAudioBlobs = false } = {}) {
     ttsManifestVersion: staticTtsManifest?.version ?? null,
     itemResponses: tasks.map((task) => {
       const response = getResponse(task.id);
+      const score = computeTaskScore(task, response);
+      const answerSummary = answerSummaryForTask(task, response, score);
+      const answerPayload = includeAudioBlobs ? JSON.parse(JSON.stringify(response.answer || {})) : compactAnswerForBackend(response.answer);
+      answerPayload.answerSummary = answerSummary;
       return {
         taskId: task.id,
         domain: task.domain,
         title: task.title,
         modality: task.modality,
         maxScore: task.maxScore,
-        score: computeTaskScore(task, response),
+        score,
         startedAt: response.startedAt,
         endedAt: response.endedAt,
         durationMs: response.durationMs,
-        answer: includeAudioBlobs ? response.answer : compactAnswerForBackend(response.answer),
+        answer: answerPayload,
+        standardAnswer: answerSummary.standardAnswer,
+        userAnswer: answerSummary.userAnswer,
+        correctness: { parts: answerSummary.parts },
         behavior: response.behavior,
         drawingImage: response.drawingImage || state.drawings[task.id],
         ai: response.ai
@@ -6677,8 +6918,8 @@ async function exportSessionsCsv() {
 
 function csvRowsForSession(session) {
   const participant = session.participant || {};
-  const hearing = session.hearingScreening || {};
-  const hearingSummary = hearing.summary || {};
+  const hearing = session.hearingScreening || null;
+  const hearingSummary = hearing?.summary || {};
   const itemResponses = Array.isArray(session.itemResponses) && session.itemResponses.length
     ? session.itemResponses
     : [{ taskId: "", title: "", domain: "", modality: "", maxScore: "", score: "", answer: {}, behavior: {}, ai: null }];
@@ -6699,12 +6940,12 @@ function csvRowsForSession(session) {
     total_score: session.totalScore ?? "",
     risk_band: session.riskBand || "",
     domain_scores_json: stringifyForCsv(session.domainScores || {}),
-    hearing_status: formatHearingStatus(hearingSummary.status || hearing.status),
+    hearing_status: hearing ? formatHearingStatus(hearingSummary.status || hearing.status) : "",
     hearing_right_pta4: hearingSummary.ears?.right?.pta4 ?? "",
     hearing_left_pta4: hearingSummary.ears?.left?.pta4 ?? "",
     hearing_worse_ear: formatWorseEarLabel(hearingSummary.worseEar),
     hearing_moca_audio_level: hearingSummary.mocaAudioLevelDbHl ?? "",
-    hearing_screening_json: stringifyForCsv(hearing || {}),
+    hearing_screening_json: hearing ? stringifyForCsv(hearing) : "",
     task_id: item.taskId || "",
     task_title: item.title || "",
     domain: item.domain || "",
@@ -6714,6 +6955,9 @@ function csvRowsForSession(session) {
     item_started_at: item.startedAt || "",
     item_ended_at: item.endedAt || "",
     item_duration_ms: item.durationMs ?? "",
+    standard_answer: item.standardAnswer || item.answer?.answerSummary?.standardAnswer || "",
+    user_answer: item.userAnswer || item.answer?.answerSummary?.userAnswer || "",
+    correctness_json: stringifyForCsv(item.correctness || item.answer?.answerSummary?.parts || null),
     answer_json: stringifyForCsv(item.answer || {}),
     behavior_json: stringifyForCsv(item.behavior || {}),
     ai_json: stringifyForCsv(item.ai || null),
