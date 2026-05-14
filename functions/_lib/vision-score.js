@@ -107,11 +107,12 @@ function openAiRequestBody(payload, model) {
             type: "input_text",
             text: [
               "你是 MoCA 中文量表画图题评分助手。",
-              "只根据用户提交的图片和评分标准评分，不使用人工勾选，也不要宽松给印象分。",
+              "只根据用户提交的图片和评分标准评分，不使用人工勾选。",
+              "评分必须考虑手绘因素：线条抖动、重描、轻微断开、歪斜、大小不一、间距不均、椭圆或近似圆表盘都不应直接扣分。",
               "必须返回严格 JSON，不要 Markdown，不要解释 JSON 以外的文字。",
               "scoreSuggestion 必须是 0 到 maxScore 的整数；confidence 是 0 到 1；requiresHumanReview 固定返回 false。",
-              "立方体：所有条件都满足才 1 分，任一条件不满足为 0 分。",
-              "钟表：轮廓、数字、指针三项各 1 分，严格按 rubricDetails 判断。"
+              "立方体：能辨认为三维盒状/立方体、主要边线基本存在、无明显无关多余线、相对边大致平行且长度接近，即可 1 分。",
+              "钟表：轮廓、数字、指针三项各 1 分；圆/椭圆/近似圆可给轮廓分，1-12 基本写全且总体顺时针可给数字分，两根指针大致表示 11 点 10 分可给指针分。"
             ].join("\n")
           }
         ]
@@ -259,12 +260,13 @@ function firstBalancedJsonObject(text) {
 function workersAiPrompt(payload) {
   return [
     "你是 MoCA 中文量表画图题评分助手。只根据图片和评分标准评分。",
-    "不要使用人工勾选，不要宽松给印象分。",
+    "不要使用人工勾选。评分要考虑老年人手绘因素。",
+    "线条抖动、重描、轻微断开、歪斜、大小不一、间距不均、椭圆或近似圆表盘都不应直接扣分。",
     "必须只输出一个单行 JSON 对象，不要 Markdown，不要解释文字，不要在 JSON 前后添加任何字符。",
     "JSON 字段：scoreSuggestion(integer), confidence(number), rubricMatched(boolean), requiresHumanReview(boolean), comment(string), criteria(array)。criteria 可为空数组。",
     "requiresHumanReview 固定 false。",
-    "立方体：所有条件都满足才 1 分，任一条件不满足为 0 分。",
-    "钟表：轮廓、数字、指针三项各 1 分，严格按 rubricDetails 判断。",
+    "立方体：能辨认为三维盒状/立方体、主要边线基本存在、无明显无关多余线、相对边大致平行且长度接近，即可 1 分。",
+    "钟表：轮廓、数字、指针三项各 1 分；圆/椭圆/近似圆可给轮廓分，1-12 基本写全且总体顺时针可给数字分，两根指针大致表示 11 点 10 分可给指针分。",
     JSON.stringify({
       taskId: payload.taskId,
       taskType: payload.taskType,
