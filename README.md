@@ -48,7 +48,12 @@ Cloudflare Pages + D1 的部署步骤见 [docs/cloudflare-d1.md](./docs/cloudfla
 
 默认 `POST /api/ai-score` 是演示评分服务；复制立方体和画钟表没有真实视觉模型时会返回 0 分并提示未配置。
 
-生产环境推荐直接配置 OpenAI 视觉模型：
+Cloudflare Pages 生产环境推荐优先使用 Workers AI：
+
+1. 在 Pages 项目 `Settings` → `Functions` 中绑定 Workers AI，变量名设为 `AI`
+2. 可选设置 `WORKERS_AI_VISION_MODEL`，默认 `@cf/meta/llama-3.2-11b-vision-instruct`
+
+如果没有 Workers AI 绑定，也可以配置 OpenAI 视觉模型作为备用：
 
 ```bash
 OPENAI_API_KEY=sk-... npm start
@@ -60,7 +65,7 @@ OPENAI_API_KEY=sk-... npm start
 - `OPENAI_RESPONSES_ENDPOINT`：Responses API 地址，默认 `https://api.openai.com/v1/responses`
 - `AI_SCORE_ENDPOINT`：保留的外部评分服务兼容入口；通常不需要配置
 
-Cloudflare Pages 上线时，在项目 `Settings` → `Variables and Secrets` 中添加：
+Cloudflare Pages 上线时，如使用 OpenAI 备用方案，在项目 `Settings` → `Variables and Secrets` 中添加：
 
 - `OPENAI_API_KEY`
 - 可选 `OPENAI_VISION_MODEL`

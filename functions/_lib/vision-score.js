@@ -1,5 +1,6 @@
 const DEFAULT_OPENAI_VISION_MODEL = "gpt-4.1-mini";
 const DEFAULT_OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
+const DEFAULT_WORKERS_AI_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
 
 function clampScore(value, maxScore) {
   const score = Number.isFinite(Number(value)) ? Math.round(Number(value)) : 0;
@@ -37,6 +38,10 @@ export function demoScore(payload = {}, mode = "demo-ai") {
 }
 
 export async function scorePayload(payload = {}, env = {}, options = {}) {
+  if (isDrawingPayload(payload) && env?.AI?.run) {
+    return scoreDrawingWithWorkersAi(payload, env);
+  }
+
   if (isDrawingPayload(payload) && envValue(env, "OPENAI_API_KEY")) {
     return scoreDrawingWithOpenAi(payload, env);
   }
@@ -46,6 +51,17 @@ export async function scorePayload(payload = {}, env = {}, options = {}) {
   }
 
   return demoScore(payload, options.demoMode || "demo-ai");
+}
+
+async function scoreDrawingWithWorkersAi(payload, env) {
+  const model = envValue(env, "WORKERS_AI_VISION_MODEL") || DEFAULT_WORKERS_AI_VISION_MODEL;
+  const result = await env.AI.run(model, {
+    image: [...dataUrlToUint8Array(payload.image)],
+    prompt: workersAiPrompt(payload),
+    max_tokens: 700
+  });
+  const parsed = parseJsonText(result?.response || result?.description || result?.text || JSON.stringify(result));
+  return normalizeAiScore(parsed, payload, "cloudflare-workers-ai");
 }
 
 async function scoreWithExternalEndpoint(payload, env) {
@@ -162,13 +178,44 @@ function openAiRequestBody(payload, model) {
 function parseModelJson(result) {
   const text = extractOutputText(result);
   if (!text) throw new Error("OpenAI response did not include output text");
+  return parseJsonText(text);
+}
+
+function parseJsonText(text) {
   try {
     return JSON.parse(text);
   } catch {
     const match = text.match(/```json\s*([\s\S]*?)```/i) || text.match(/({[\s\S]*})/);
     if (match) return JSON.parse(match[1]);
-    throw new Error("OpenAI response was not valid JSON");
+    throw new Error("AI response was not valid JSON");
   }
+}
+
+function workersAiPrompt(payload) {
+  return [
+    "你是 MoCA 中文量表画图题评分助手。只根据图片和评分标准评分。",
+    "不要使用人工勾选，不要宽松给印象分。必须只输出 JSON，不要 Markdown。",
+    "JSON 字段：scoreSuggestion(integer), confidence(number), rubricMatched(boolean), requiresHumanReview(boolean), comment(string), criteria(array)。",
+    "criteria 每项字段：key, label, passed, evidence。",
+    "requiresHumanReview 固定 false。",
+    "立方体：所有条件都满足才 1 分，任一条件不满足为 0 分。",
+    "钟表：轮廓、数字、指针三项各 1 分，严格按 rubricDetails 判断。",
+    JSON.stringify({
+      taskId: payload.taskId,
+      taskType: payload.taskType,
+      maxScore: payload.maxScore,
+      rubric: payload.rubric,
+      rubricDetails: payload.rubricDetails
+    })
+  ].join("\n");
+}
+
+function dataUrlToUint8Array(dataUrl) {
+  const [, body = ""] = String(dataUrl || "").split(",");
+  const binary = atob(body);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
 }
 
 function extractOutputText(result) {
@@ -190,7 +237,7 @@ function normalizeAiScore(result = {}, payload = {}, mode = "ai-score") {
     scoreSuggestion: clampScore(result.scoreSuggestion, maxScore),
     confidence: Math.max(0, Math.min(1, Number(result.confidence) || 0)),
     requiresHumanReview: false,
-    aiImageScoringConfigured: mode === "openai-vision" || mode === "external-ai-score-endpoint",
+    aiImageScoringConfigured: mode === "cloudflare-workers-ai" || mode === "openai-vision" || mode === "external-ai-score-endpoint",
     rubricMatched: Boolean(result.rubricMatched),
     comment: String(result.comment || ""),
     criteria: Array.isArray(result.criteria) ? result.criteria : []
