@@ -182,16 +182,54 @@ function parseModelJson(result) {
 }
 
 function parseJsonText(text) {
+  if (text && typeof text === "object") {
+    if (!Array.isArray(text)) return text;
+    const object = text.find((item) => item && typeof item === "object" && !Array.isArray(item));
+    if (object) return object;
+  }
   const cleaned = String(text || "").trim();
   try {
     return JSON.parse(cleaned);
   } catch {
     const fenced = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
-    if (fenced) return JSON.parse(fenced[1].trim());
+    if (fenced) {
+      const parsed = tryParseJson(fenced[1].trim());
+      if (parsed) return parsed;
+    }
     const objectText = firstBalancedJsonObject(cleaned);
-    if (objectText) return JSON.parse(objectText);
+    if (objectText) {
+      const parsed = tryParseJson(objectText);
+      if (parsed) return parsed;
+    }
+    const looseScore = looseScoreFromText(cleaned);
+    if (looseScore) return looseScore;
     throw new Error("AI response was not valid JSON");
   }
+}
+
+function tryParseJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function looseScoreFromText(text) {
+  const scoreMatch = text.match(/"?scoreSuggestion"?\s*[:：]\s*"?(-?\d+)/i)
+    || text.match(/(?:得分|分数|score)\D{0,12}(\d+)/i)
+    || text.match(/给\s*(\d+)\s*分/);
+  if (!scoreMatch) return null;
+  const confidenceMatch = text.match(/"?confidence"?\s*[:：]\s*"?([01](?:\.\d+)?)/i);
+  const commentMatch = text.match(/"?comment"?\s*[:：]\s*"([^"]{0,240})"/i);
+  return {
+    scoreSuggestion: Number(scoreMatch[1]),
+    confidence: confidenceMatch ? Number(confidenceMatch[1]) : 0.5,
+    rubricMatched: true,
+    requiresHumanReview: false,
+    comment: commentMatch?.[1] || "Workers AI 返回了非标准 JSON，已提取 scoreSuggestion 作为评分。",
+    criteria: []
+  };
 }
 
 function firstBalancedJsonObject(text) {
@@ -221,9 +259,9 @@ function firstBalancedJsonObject(text) {
 function workersAiPrompt(payload) {
   return [
     "你是 MoCA 中文量表画图题评分助手。只根据图片和评分标准评分。",
-    "不要使用人工勾选，不要宽松给印象分。必须只输出 JSON，不要 Markdown。",
-    "JSON 字段：scoreSuggestion(integer), confidence(number), rubricMatched(boolean), requiresHumanReview(boolean), comment(string), criteria(array)。",
-    "criteria 每项字段：key, label, passed, evidence。",
+    "不要使用人工勾选，不要宽松给印象分。",
+    "必须只输出一个单行 JSON 对象，不要 Markdown，不要解释文字，不要在 JSON 前后添加任何字符。",
+    "JSON 字段：scoreSuggestion(integer), confidence(number), rubricMatched(boolean), requiresHumanReview(boolean), comment(string), criteria(array)。criteria 可为空数组。",
     "requiresHumanReview 固定 false。",
     "立方体：所有条件都满足才 1 分，任一条件不满足为 0 分。",
     "钟表：轮廓、数字、指针三项各 1 分，严格按 rubricDetails 判断。",
