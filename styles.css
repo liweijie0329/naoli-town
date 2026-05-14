@@ -1189,9 +1189,12 @@ h4 {
 }
 
 .clock-time-reference strong {
-  font-size: clamp(82px, 10vw, 146px);
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(52px, 7vw, 112px);
   font-weight: 1000;
   line-height: 0.9;
+  white-space: nowrap;
 }
 
 .clock-time-reference span {
@@ -1340,9 +1343,7 @@ h4 {
 }
 
 .option.picked::before {
-  content: "✓ ";
-  font-size: 24px;
-  font-weight: 950;
+  content: none;
 }
 
 .memory-page {
@@ -1404,7 +1405,8 @@ h4 {
 }
 
 .task-warning,
-.task-ok {
+.task-ok,
+.vigilance-listening {
   justify-self: center;
   margin: 0;
   font-size: 22px;
@@ -1417,6 +1419,10 @@ h4 {
 
 .task-ok {
   color: var(--leaf-dark);
+}
+
+.vigilance-listening {
+  color: var(--muted);
 }
 
 .speech-page,
@@ -5101,5 +5107,170 @@ body,
 
   .task-actions {
     padding-inline: clamp(28px, 8vw, 48px);
+  }
+}
+
+/* Latest clinician review adjustments */
+:root {
+  --login-edge-gap: clamp(16px, 2.3dvh, 28px);
+}
+
+.setup-panel {
+  padding-top: max(var(--login-edge-gap), env(safe-area-inset-top));
+  padding-bottom: max(var(--login-edge-gap), env(safe-area-inset-bottom));
+}
+
+.setup-left {
+  max-height: calc(var(--app-height) - (var(--login-edge-gap) * 2));
+}
+
+.skip-login-button {
+  bottom: max(10px, env(safe-area-inset-bottom));
+}
+
+.clock-time-reference {
+  padding: clamp(16px, 2.6dvh, 26px) clamp(10px, 1.6vw, 18px);
+}
+
+.clock-time-reference strong {
+  max-width: 100%;
+  font-size: clamp(52px, 7vw, 112px);
+  white-space: nowrap;
+}
+
+.date-input-with-units {
+  grid-template-columns: minmax(110px, 1fr) auto minmax(110px, 1fr) auto;
+  align-items: center;
+  width: min(620px, 96%);
+}
+
+.date-input-with-units .date-input-box {
+  width: 100%;
+}
+
+.date-unit {
+  color: var(--ink);
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 1000;
+  line-height: 1;
+}
+
+.final-celebration {
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 232, 150, 0.42), transparent 34%),
+    linear-gradient(180deg, #fffdf2, #f0fff6);
+}
+
+.results-page {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.final-celebration strong {
+  font-size: clamp(76px, 14dvh, 128px);
+}
+
+.final-celebration p {
+  color: var(--leaf-dark);
+  font-size: clamp(28px, 4vw, 46px);
+}
+
+.result-fireworks {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.result-fireworks i {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--coral);
+  box-shadow:
+    0 -42px 0 var(--sun),
+    32px -30px 0 var(--sky),
+    42px 0 0 var(--leaf),
+    30px 32px 0 var(--violet),
+    0 42px 0 var(--coral),
+    -32px 30px 0 var(--sky),
+    -42px 0 0 var(--sun),
+    -30px -32px 0 var(--leaf);
+  opacity: 0;
+  animation: fireworkBurst 1.8s ease-out infinite;
+}
+
+.result-fireworks i:nth-child(1) {
+  left: 24%;
+  top: 28%;
+}
+
+.result-fireworks i:nth-child(2) {
+  right: 22%;
+  top: 24%;
+  animation-delay: 0.45s;
+}
+
+.result-fireworks i:nth-child(3) {
+  left: 50%;
+  bottom: 30%;
+  animation-delay: 0.9s;
+}
+
+.final-results-actions {
+  justify-content: center;
+}
+
+.final-results-actions .primary {
+  min-width: min(360px, 70vw);
+  min-height: clamp(62px, 8dvh, 78px);
+  border-radius: 999px;
+  font-size: clamp(24px, 3vw, 32px);
+}
+
+@keyframes fireworkBurst {
+  0% {
+    transform: scale(0.15) rotate(0deg);
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  68% {
+    transform: scale(1) rotate(24deg);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.18) rotate(32deg);
+    opacity: 0;
+  }
+}
+
+@media (orientation: portrait), (max-width: 760px) {
+  :root {
+    --login-edge-gap: clamp(14px, 1.9svh, 20px);
+  }
+
+  .setup-panel {
+    padding-top: max(var(--login-edge-gap), env(safe-area-inset-top));
+    padding-bottom: max(var(--login-edge-gap), env(safe-area-inset-bottom));
+  }
+
+  .setup-left {
+    max-height: calc(var(--app-height) - (var(--login-edge-gap) * 2));
+  }
+
+  .clock-time-reference strong {
+    font-size: clamp(42px, 12vw, 78px);
+  }
+
+  .date-input-with-units {
+    grid-template-columns: minmax(82px, 1fr) auto minmax(82px, 1fr) auto;
+    gap: 10px;
+  }
+
+  .date-unit {
+    font-size: clamp(26px, 7vw, 34px);
   }
 }

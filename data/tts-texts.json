@@ -93,31 +93,26 @@
     },
     {
       "key": "stimulus:vigilance:digit:0",
-      "text": "1",
-      "speedRatio": 0.78
-    },
-    {
-      "key": "stimulus:vigilance:digit:1",
       "text": "5",
       "speedRatio": 0.78
     },
     {
-      "key": "stimulus:vigilance:digit:2",
+      "key": "stimulus:vigilance:digit:1",
       "text": "2",
       "speedRatio": 0.78
     },
     {
-      "key": "stimulus:vigilance:digit:3",
+      "key": "stimulus:vigilance:digit:2",
       "text": "9",
       "speedRatio": 0.78
     },
     {
-      "key": "stimulus:vigilance:digit:4",
+      "key": "stimulus:vigilance:digit:3",
       "text": "4",
       "speedRatio": 0.78
     },
     {
-      "key": "stimulus:vigilance:digit:5",
+      "key": "stimulus:vigilance:digit:4",
       "text": "5",
       "speedRatio": 0.78
     },

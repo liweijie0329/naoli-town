@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-07T17:16:13.230Z",
+  "generatedAt": "2026-05-14T03:20:24.385Z",
   "provider": "doubao",
   "source": "data/tts-texts.json",
   "entries": {
@@ -60,7 +60,7 @@
     },
     "instruction:memory1:0": {
       "src": "assets/audio/instruction-memory1-0.mp3",
-      "text": "这是一个记忆力测验。我会给您读几个词，您要注意听，一定要记住。当我读完后，请选出您记住的词。",
+      "text": "这是一个记忆力测验。我会给您读几个词，您要注意听，一定要记住，这些词后面还会再问。当我读完后，请选出您记住的词。",
       "profile": "gentle",
       "speedRatio": 1,
       "provider": "doubao-v3",
@@ -366,7 +366,7 @@
     },
     "stimulus:vigilance:digit:0": {
       "src": "assets/audio/stimulus-vigilance-digit-0.mp3",
-      "text": "1",
+      "text": "5",
       "profile": "gentle",
       "speedRatio": 0.78,
       "provider": "doubao-v3",
@@ -375,7 +375,7 @@
     },
     "stimulus:vigilance:digit:1": {
       "src": "assets/audio/stimulus-vigilance-digit-1.mp3",
-      "text": "5",
+      "text": "2",
       "profile": "gentle",
       "speedRatio": 0.78,
       "provider": "doubao-v3",
@@ -384,7 +384,7 @@
     },
     "stimulus:vigilance:digit:2": {
       "src": "assets/audio/stimulus-vigilance-digit-2.mp3",
-      "text": "2",
+      "text": "9",
       "profile": "gentle",
       "speedRatio": 0.78,
       "provider": "doubao-v3",
@@ -393,7 +393,7 @@
     },
     "stimulus:vigilance:digit:3": {
       "src": "assets/audio/stimulus-vigilance-digit-3.mp3",
-      "text": "9",
+      "text": "4",
       "profile": "gentle",
       "speedRatio": 0.78,
       "provider": "doubao-v3",
@@ -402,15 +402,6 @@
     },
     "stimulus:vigilance:digit:4": {
       "src": "assets/audio/stimulus-vigilance-digit-4.mp3",
-      "text": "4",
-      "profile": "gentle",
-      "speedRatio": 0.78,
-      "provider": "doubao-v3",
-      "voiceType": "zh_female_peiqi_uranus_bigtts",
-      "format": "mp3"
-    },
-    "stimulus:vigilance:digit:5": {
-      "src": "assets/audio/stimulus-vigilance-digit-5.mp3",
       "text": "5",
       "profile": "gentle",
       "speedRatio": 0.78,

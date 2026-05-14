@@ -4,6 +4,12 @@ Web 端读题优先播放 `assets/audio/manifest.json` 中登记的本地音频�
 
 ## 生成音频
 
+如果改了 `app.js` 里的记忆词库、警觉性数字串、数字顺背/倒背题本、数字键盘或连续减法题干，先把网页程序同步到语音文本清单：
+
+```bash
+npm run sync:audio-texts
+```
+
 先配置火山引擎语音合成环境变量，再运行生成脚本：
 
 ```bash
@@ -23,6 +29,22 @@ npm run generate:audio
 ```bash
 npm run generate:audio -- --force
 ```
+
+普通运行会自动补齐新增 MP3；如果同一个 key 的文本变了，也会只重生成这些变更条目，不需要全量 `--force`。
+
+只想处理文本已变化的旧条目时：
+
+```bash
+npm run generate:audio -- --changed-only
+```
+
+只想处理某一组 key 时：
+
+```bash
+npm run generate:audio -- --key-prefix stimulus:vigilance:digit
+```
+
+如果已经手动替换了本地 MP3，只需要刷新 manifest，可加 `--manifest-only`。
 
 只想检查会生成哪些文件时：
 
@@ -57,7 +79,7 @@ npm run generate:audio -- --dry-run
 
 如果语音条目增加到几百或几千个，仍可放在 `assets/audio/` 随 Cloudflare Pages 静态发布。若后续词库、场地库很大，可以把 MP3 上传到对象存储或 CDN，并在 `assets/audio/manifest.json` 中保存绝对 URL；网页读取 manifest 的方式不需要改变。
 
-建议后续新增一个语音清单生成步骤：从 50 个记忆词、50 道顺背数字题、50 道倒背数字题、抽象答案池、定向选项池和题干模板自动枚举文本，生成稳定 key；同一文本只生成一次音频，脚本跳过已存在文件，只补齐新增条目。
+当前已提供 `npm run sync:audio-texts`：它会从 `app.js` 自动同步 50 个记忆词、警觉性数字串、50 道顺背数字题、50 道倒背数字题、数字键盘和连续减法题干，生成稳定 key；生成脚本会跳过已存在且文本未变化的文件，只补齐新增或文本已变化的条目。
 
 ## 可选变量
 

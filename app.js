@@ -8,7 +8,7 @@ const MEMORY_WORD_BANK = [
 const MEMORY_TARGET_COUNT = 5;
 const MEMORY_CANDIDATE_COUNT = 10;
 const TRAIL_EXPECTED = ["1", "甲", "2", "乙", "3", "丙", "4", "丁", "5", "戊"];
-const VIGILANCE_DIGITS = "152945".split("");
+const VIGILANCE_DIGITS = "52945".split("");
 const DIGIT_PAD = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 const DIGIT_FORWARD_BANK = [
   "21854", "49317", "72605", "58429", "13786", "90524", "64139", "37281", "85073", "29614",
@@ -261,7 +261,7 @@ const tasks = [
   {
     id: "memory2",
     domain: "延迟回忆",
-    title: "词语回忆 第二遍",
+    title: "词语回忆 第二次",
     maxScore: 5,
     type: "memory",
     modality: "10选5",
@@ -1185,12 +1185,23 @@ function taskActionSecondaryButtons(task) {
   if (task.type === "drawing") return `<button class="utility-button" data-action="clearDrawing">重画</button>`;
   if (task.type === "choice" && getResponse(task.id).answer.audioReady) return `<button class="utility-button" data-action="backspaceDigit">删除</button>`;
   if (task.type === "serial7") return `<button class="utility-button" data-action="backspaceSerial">删除</button>`;
+  if (task.type === "orientation") {
+    const prompt = orientationPrompts[getTaskStep(task)];
+    if (prompt?.key === "year") return `<button class="utility-button" data-action="backspaceOrientation" data-field="year">删除</button>`;
+    if (prompt?.key === "date") {
+      const field = getResponse("orientation").answer.orientationDateActiveField || "month";
+      return `<button class="utility-button" data-action="backspaceOrientation" data-field="${field}">删除</button>`;
+    }
+  }
   if (task.type === "memory" && task.trial === 1 && getResponse(task.id).answer.audioReady) return `<button class="utility-button replay-button" data-action="playCurrentAudio">再听一遍</button>`;
   return "";
 }
 
 function shouldShowConfirmButton(task) {
-  if (task.type === "vigilance") return false;
+  if (task.type === "vigilance") {
+    const answer = getResponse("vigilance").answer || {};
+    return Boolean(answer.startedAt) && !answer.running;
+  }
   return true;
 }
 
@@ -1315,7 +1326,7 @@ function renderMemoryTask(task) {
       </div>
       ${ready ? `
         <div class="memory-choice-panel">
-          <strong>请选择 5 个词</strong>
+          <strong>请选择刚刚听到的5个词</strong>
           <span>${selected.length}/${MEMORY_TARGET_COUNT}</span>
         </div>
         <div class="option-grid memory-options">
@@ -1355,12 +1366,11 @@ function renderVigilanceTask() {
   const response = getResponse("vigilance");
   const started = Boolean(response.answer.startedAt);
   const running = Boolean(response.answer.running);
-  const taps = response.answer.taps || [];
   return html`
     <div class="vigilance-page">
       <strong class="tap-instruction">听到 1 敲一下</strong>
       ${started ? renderAudioWave() : ""}
-      ${!started ? `<button class="primary circle-button pulse" data-action="playCurrentAudio">开始</button>` : running ? `<button class="tap-button pulse" data-action="tapVigilance">敲一下</button><span class="tap-count">已敲 ${taps.length} 次</span>` : `<p class="task-ok">听力反应完成，请点确定。</p>`}
+      ${!started ? `<button class="primary circle-button pulse" data-action="playCurrentAudio">开始</button>` : running ? `<p class="vigilance-listening">请仔细听完数字</p>` : `<p class="task-ok">听力反应完成，请点确定。</p>`}
     </div>
   `;
 }
@@ -1459,15 +1469,15 @@ function renderOrientationNumberTask(response, prompt) {
   return html`
     <div class="orientation-page orientation-number-page">
       <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
-      <div class="date-input-pair">
+      <div class="date-input-pair date-input-with-units">
         <button class="date-input-box ${activeField === "month" ? "active" : ""}" data-action="setOrientationDateField" data-field="month">
-          <span>月份</span>
           <strong>${escapeHtml(response.answer.month || " ")}</strong>
         </button>
+        <span class="date-unit">月</span>
         <button class="date-input-box ${activeField === "day" ? "active" : ""}" data-action="setOrientationDateField" data-field="day">
-          <span>日期</span>
           <strong>${escapeHtml(response.answer.day || " ")}</strong>
         </button>
+        <span class="date-unit">号</span>
       </div>
       <div class="keypad orientation-keypad">
         ${renderOrientationKeypad(activeField)}
@@ -1481,6 +1491,7 @@ function renderSpeechCard(live) {
     <div class="speech-page">
       ${renderAudioWave()}
       ${renderAudioButton("playCurrentAudio")}
+      ${live?.warningText ? `<p class="task-warning">${escapeHtml(live.warningText)}</p>` : ""}
       ${renderTranscriptEditor(live, "sentence")}
     </div>
   `;
@@ -1499,7 +1510,8 @@ function getLiveTranscript(task, response, step = 0) {
   if (task?.type === "sentence") {
     return {
       finalText: response.answer.transcript?.[step] || "",
-      interimText: response.answer.interimTranscript?.[step] || ""
+      interimText: response.answer.interimTranscript?.[step] || "",
+      warningText: response.behavior.speechWarning?.[step] || ""
     };
   }
   if (task?.type === "fluency") {
@@ -1559,17 +1571,24 @@ function renderAudioButton(action) {
   }
   if (speechTranscribing) return `<button class="secondary circle-button sound-button" disabled>请稍等</button>`;
   if (recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">停止</button>`;
+  if (current?.type === "sentence" && sentenceStepSpeechWarning(current, getTaskStep(current))) {
+    return `<button class="primary circle-button pulse sound-button" data-action="toggleVoiceInput">再说一次</button>`;
+  }
   if (current?.type === "sentence" && sentenceStepHasSpeechAttempt(current, getTaskStep(current))) {
     return `<button class="primary circle-button sound-button" disabled>已播放</button>`;
   }
   return `<button class="primary circle-button pulse sound-button" data-action="${action}">开始</button>`;
 }
 
+function sentenceStepSpeechWarning(task, step) {
+  return Boolean(getResponse(task.id).behavior?.speechWarning?.[step]);
+}
+
 function sentenceStepHasSpeechAttempt(task, step) {
   const response = getResponse(task.id);
   if (String(response.answer?.transcript?.[step] || "").trim()) return true;
   return (response.behavior?.speechRecognition || []).some((event) => (
-    Number(event.step) === Number(step) && event.eventType === "cloudflare-asr-result"
+    Number(event.step) === Number(step) && event.eventType === "cloudflare-asr-result" && String(event.text || "").trim()
   ));
 }
 
@@ -1582,10 +1601,9 @@ function renderKeypadDigits(action) {
 }
 
 function renderOrientationKeypad(field) {
-  return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "删", "0", ""]
+  return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""]
     .map((value) => {
       if (!value) return `<span class="keypad-spacer"></span>`;
-      if (value === "删") return `<button class="key-action" data-action="backspaceOrientation" data-field="${field}">删除</button>`;
       return `<button data-action="inputOrientationDigit" data-field="${field}" data-digit="${value}"${speechAttrs(value, `digit:${value}`)}>${value}</button>`;
     })
     .join("");
@@ -1612,13 +1630,23 @@ function renderResults() {
   const totals = computeTotals();
   return html`
     <section class="single-page results-page">
-      <div class="result-hero soft-alert">
-        <span>筛查完成</span>
+      <div class="result-hero celebrate final-celebration">
+        ${renderConfetti()}
+        <div class="result-fireworks" aria-hidden="true">
+          <i></i><i></i><i></i>
+        </div>
         <strong>${totals.totalScore}<em>/30</em></strong>
         <p>谢谢您的参与！</p>
       </div>
+      <div class="control-row results-actions final-results-actions">
+        <button class="primary big-button" data-action="goHome">退出</button>
+      </div>
     </section>
   `;
+}
+
+function renderConfetti() {
+  return `<div class="confetti" aria-hidden="true">${Array.from({ length: 8 }, () => "<i></i>").join("")}</div>`;
 }
 
 function renderRadarChart(domainScores) {
@@ -2616,8 +2644,11 @@ function canConfirmTask(task, response) {
   }
   if (task.type === "abstractionChoice") {
     const item = task.items[getTaskStep(task)];
-    if (item.practice && response.answer[item.key] && response.answer[item.key] !== item.answer) response.behavior.selectionWarning = "例题请选择“水果”";
-    else delete response.behavior.selectionWarning;
+    if (item.practice && response.answer[item.key] !== item.answer) {
+      response.behavior.selectionWarning = "请选择正确答案：水果";
+      return false;
+    }
+    delete response.behavior.selectionWarning;
   }
   return true;
 }
@@ -2670,8 +2701,12 @@ function nextTaskIndexAfterSubmit(task) {
     const resumeIndex = state.resumeAfterMemory2Index;
     state.resumeAfterMemory2Index = null;
     if (Number.isInteger(resumeIndex) && resumeIndex >= 0 && resumeIndex < tasks.length) return resumeIndex;
+    if (allNonMemory2TasksSubmitted()) return -1;
   }
-  return nextSequentialIndex(state.activeTaskIndex);
+  const nextIndex = nextSequentialIndex(state.activeTaskIndex);
+  if (nextIndex >= 0) return nextIndex;
+  if (shouldRunMemory2AtEnd()) return taskIndex("memory2");
+  return -1;
 }
 
 function nextSequentialIndex(fromIndex) {
@@ -2695,7 +2730,7 @@ function ensureRenderableTask() {
 }
 
 function isMemory2Available() {
-  return isMemory2Submitted() || isMemory2Ready();
+  return isMemory2Submitted() || isMemory2Ready() || allNonMemory2TasksSubmitted();
 }
 
 function isMemory2Submitted() {
@@ -2704,6 +2739,14 @@ function isMemory2Submitted() {
 
 function isMemory2Ready() {
   return Boolean(state.memoryWaitStartedAt) && memoryWaitRemaining() <= 0;
+}
+
+function shouldRunMemory2AtEnd() {
+  return Boolean(state.memoryWaitStartedAt) && !isMemory2Submitted() && allNonMemory2TasksSubmitted();
+}
+
+function allNonMemory2TasksSubmitted() {
+  return tasks.every((task) => task.id === "memory2" || Boolean(state.responses[task.id]?.submitted));
 }
 
 function taskIndex(taskId) {
@@ -3390,6 +3433,10 @@ function initSpeechRecognition() {
       speechRecognitionWanted = false;
     }
     voiceState = speechRecognitionErrorText(event?.error);
+    if (error === "no-speech") {
+      const { task, step } = activeVoiceContext();
+      if (task?.type === "sentence") setSpeechWarning(getResponse(task.id), step, "未录到声音，请再说一次");
+    }
     render();
     if (SPEECH_RECOGNITION_RECORDING_FALLBACK_ERRORS.includes(error)) {
       await fallbackToAudioRecording("识别服务不可用，已改为录音，可手动修改文字");
@@ -3601,7 +3648,8 @@ async function startAudioRecording(options = {}) {
           await transcribeAudioBlob(blob, task.id, step);
         } else if (transcribeOnStop) {
           speechTranscribing = false;
-          voiceState = "没有录到声音";
+          voiceState = "未录到声音，请再说一次";
+          setSpeechWarning(response, step, "未录到声音，请再说一次");
           saveDraft();
           render();
         }
@@ -3730,7 +3778,8 @@ async function finishPcmAudioRecording(recorder) {
       await transcribeAudioBlob(blob, recorder.taskId, recorder.step);
     } else if (recorder.transcribeOnStop) {
       speechTranscribing = false;
-      voiceState = "没有录到声音";
+      voiceState = "未录到声音，请再说一次";
+      setSpeechWarning(response, recorder.step, "未录到声音，请再说一次");
       saveDraft();
       render();
     }
@@ -3800,7 +3849,7 @@ async function flushFluencyLiveAsr(recorder, options = {}) {
   const uploadPromise = (async () => {
     const result = await requestAsrJson(task, `live-${sequence}`, blob);
     if (recorder.finished && !finalChunk) return;
-    const text = toSimplifiedChinese(String(result?.text || result?.transcription || "").trim());
+    const text = cleanAsrTranscript(result?.text || result?.transcription || "");
     response.behavior.speechRecognition.push({
       step: recorder.step,
       eventType: "cloudflare-asr-live-result",
@@ -3976,7 +4025,7 @@ async function transcribeAudioBlob(blob, taskId, step) {
   render();
   try {
     const result = await requestAsrJson(task, step, blob);
-    const text = toSimplifiedChinese(String(result?.text || result?.transcription || "").trim());
+    const text = cleanAsrTranscript(result?.text || result?.transcription || "");
     response.behavior.speechRecognition.push({
       step,
       eventType: "cloudflare-asr-result",
@@ -3985,8 +4034,12 @@ async function transcribeAudioBlob(blob, taskId, step) {
       text,
       at: new Date().toISOString()
     });
-    if (text) applyVoiceTextForTask(task, response, step, text);
-    voiceState = text ? "转文字完成" : "没有识别到文字";
+    if (text) {
+      applyVoiceTextForTask(task, response, step, text);
+    } else {
+      setSpeechWarning(response, step, "未录到声音，请再说一次");
+    }
+    voiceState = text ? "转文字完成" : "未录到声音，请再说一次";
     render();
   } catch (error) {
     response.behavior.speechRecognition.push({
@@ -4035,13 +4088,14 @@ async function requestAsrJson(task, step, blob) {
 }
 
 function applyVoiceTextForTask(task, response, step, text) {
-  text = toSimplifiedChinese(text);
+  text = cleanAsrTranscript(text);
   if (!text) return;
   if (task.type === "sentence") {
     response.answer.transcript = response.answer.transcript || {};
     response.answer.interimTranscript = response.answer.interimTranscript || {};
     response.answer.transcript[step] = text;
     response.answer.interimTranscript[step] = "";
+    clearSpeechWarning(response, step);
   }
   if (task.type === "fluency") {
     response.answer.rawTranscript = fluencyTranscriptFromAsrText(text, response.answer.rawTranscript);
@@ -4098,7 +4152,7 @@ async function primeMicrophonePermission() {
 
 function speechRecognitionErrorText(error) {
   if (error === "not-allowed" || error === "service-not-allowed") return "请允许麦克风和语音识别权限";
-  if (error === "no-speech") return "没有听到声音，请靠近麦克风再试";
+  if (error === "no-speech") return "未录到声音，请再说一次";
   if (error === "audio-capture") return "没有检测到麦克风";
   if (error === "network") return "浏览器语音识别服务不可用，请换 Chrome/Edge 或接入云端识别";
   return "识别未完成，请再试一次";
@@ -4109,7 +4163,7 @@ function recognitionTranscriptFromEvent(event) {
   let interimText = "";
   for (let i = 0; i < event.results.length; i += 1) {
     const result = event.results[i];
-    const text = toSimplifiedChinese(result?.[0]?.transcript || "");
+    const text = cleanAsrTranscript(result?.[0]?.transcript || "");
     if (result?.isFinal) finalPart = joinTranscriptText(finalPart, text);
     else interimText = joinTranscriptText(interimText, text);
   }
@@ -4124,6 +4178,37 @@ function joinTranscriptText(...parts) {
     .map((part) => String(part || "").trim())
     .filter(Boolean)
     .join(" ");
+}
+
+function cleanAsrTranscript(text) {
+  const normalized = toSimplifiedChinese(String(text || ""))
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized || isAsrAdLike(normalized)) return "";
+  return normalized
+    .replace(/字幕由[^。]*?(提供|制作)[。.!！]?/g, "")
+    .replace(/本字幕由[^。]*?提供[。.!！]?/g, "")
+    .trim();
+}
+
+function isAsrAdLike(text) {
+  const compact = normalizeText(text);
+  if (!compact) return false;
+  const adPhrases = [
+    "谢谢观看", "感谢观看", "请不吝点赞", "点赞订阅", "订阅转发", "打赏支持",
+    "明镜与点点栏目", "字幕由", "amara", "广告", "下集再见"
+  ];
+  return adPhrases.some((phrase) => compact.toLowerCase().includes(phrase.toLowerCase()));
+}
+
+function setSpeechWarning(response, step, message) {
+  response.behavior.speechWarning = response.behavior.speechWarning || {};
+  response.behavior.speechWarning[step] = message;
+}
+
+function clearSpeechWarning(response, step) {
+  if (!response.behavior.speechWarning) return;
+  delete response.behavior.speechWarning[step];
 }
 
 function beginLiveTranscriptSession({ resetFinal = false } = {}) {
@@ -4146,8 +4231,8 @@ function currentLiveFinalText() {
 }
 
 function applyLiveVoiceText({ finalText = "", interimText = "" } = {}) {
-  finalText = toSimplifiedChinese(finalText);
-  interimText = toSimplifiedChinese(interimText);
+  finalText = cleanAsrTranscript(finalText);
+  interimText = cleanAsrTranscript(interimText);
   const { task, step } = activeVoiceContext();
   if (["sentence", "fluency"].includes(task?.type)) {
     const response = getResponse(task.id);
@@ -4158,13 +4243,14 @@ function applyLiveVoiceText({ finalText = "", interimText = "" } = {}) {
 }
 
 function setLiveVoiceText(task, response, step, { finalText = "", interimText = "", eventType = "update" } = {}) {
-  finalText = toSimplifiedChinese(finalText);
-  interimText = toSimplifiedChinese(interimText);
+  finalText = cleanAsrTranscript(finalText);
+  interimText = cleanAsrTranscript(interimText);
   if (task.type === "sentence") {
     response.answer.transcript = response.answer.transcript || {};
     response.answer.interimTranscript = response.answer.interimTranscript || {};
     response.answer.transcript[step] = finalText;
     response.answer.interimTranscript[step] = interimText;
+    if (finalText || interimText) clearSpeechWarning(response, step);
   }
   if (task.type === "fluency") {
     const transcript = joinTranscriptText(finalText, interimText);
@@ -4603,9 +4689,9 @@ function startVigilance() {
     done: () => {
       window.clearInterval(vigilanceTimer);
       response.answer.running = false;
-      response.behavior.autoAdvanceDelayMs = 3000;
+      response.answer.completedAt = Date.now();
+      delete response.behavior.autoAdvanceDelayMs;
       render();
-      window.setTimeout(() => autoAdvanceVigilance(), 3000);
     }
   });
   render();
