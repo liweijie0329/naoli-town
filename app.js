@@ -1262,9 +1262,9 @@ function renderMainView(current) {
 
 function hearingHeaderPrompt() {
   const screening = state.hearingScreening || createHearingScreeningState();
-  if (screening.phase === "summary") return "校准完成后进入正式认知任务";
-  if (screening.phase === "test") return "听到声音请点听见了，没有听到请点没听见";
-  return "请戴好耳机，按左右耳分别完成纯音校准";
+  if (screening.phase === "summary") return "完成后进入正式测试";
+  if (screening.phase === "test") return "听到就点听见";
+  return "戴好耳机，保持安静";
 }
 
 function hearingProgressPercent() {
@@ -1299,8 +1299,8 @@ function renderHearingIntro(screening) {
     <div class="hearing-card hearing-intro-card">
       <div class="hearing-hero-icon"><span class="headphone-icon"></span></div>
       <div class="hearing-copy">
-        <h3>先做听力校准</h3>
-        <p>请戴好耳机，找一个安静的位置。接下来会分别检查左右耳，在不同频率和声强下判断是否听见。</p>
+        <h3>听力校准</h3>
+        <p>戴好耳机，保持安静。</p>
       </div>
       <div class="hearing-check-row">
         <button class="utility-button hearing-check-button" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
@@ -1311,7 +1311,7 @@ function renderHearingIntro(screening) {
         </span>
       </div>
       <div class="hearing-actions">
-        <button class="primary big-button" data-action="startHearingCalibration">开始校准</button>
+        <button class="primary big-button" data-action="startHearingCalibration">开始</button>
         <button class="ghost big-button" data-action="skipHearingCalibration">跳过</button>
       </div>
     </div>
@@ -1322,16 +1322,13 @@ function renderHearingChannelCheck(screening) {
   const side = HEARING_SIDES[screening.channelCheckIndex] || HEARING_SIDES[0];
   return html`
     <div class="hearing-card">
-      <div class="hearing-stage-label">左右声道检查</div>
-      <div class="hearing-ear-target ${side.key}">
-        <span>${escapeHtml(side.shortLabel)}</span>
-        <strong>${escapeHtml(side.label)}</strong>
-      </div>
-      <p class="hearing-instruction">请播放提示音，确认声音来自${escapeHtml(side.label)}。</p>
+      <div class="hearing-stage-label">声道检查</div>
+      ${renderHearingEarTarget(side)}
+      <p class="hearing-instruction">声音应来自${escapeHtml(side.label)}</p>
       ${renderHearingPlayButton({ ear: side.key, frequencyHz: 1000, levelDbHl: 55, context: "channel" }, screening)}
       <div class="hearing-response-grid">
-        <button class="option" data-action="confirmHearingChannel" data-value="correct" ${screening.currentTonePlayed ? "" : "disabled"}>是这一侧</button>
-        <button class="option" data-action="confirmHearingChannel" data-value="wrong" ${screening.currentTonePlayed ? "" : "disabled"}>不是这一侧</button>
+        <button class="option" data-action="confirmHearingChannel" data-value="correct" ${screening.currentTonePlayed ? "" : "disabled"}>正确</button>
+        <button class="option" data-action="confirmHearingChannel" data-value="wrong" ${screening.currentTonePlayed ? "" : "disabled"}>不对</button>
       </div>
       ${screening.message ? `<p class="task-warning">${escapeHtml(screening.message)}</p>` : ""}
     </div>
@@ -1344,11 +1341,8 @@ function renderHearingPractice(screening) {
   return html`
     <div class="hearing-card">
       <div class="hearing-stage-label">练习 ${screening.practiceIndex + 1}/${HEARING_PRACTICE_STEPS.length}</div>
-      <div class="hearing-ear-target ${side.key}">
-        <span>${escapeHtml(side.shortLabel)}</span>
-        <strong>${escapeHtml(side.label)}</strong>
-      </div>
-      <p class="hearing-instruction">这是一道练习题。听到声音请点听见了。</p>
+      ${renderHearingEarTarget(side)}
+      <p class="hearing-instruction">听到就点</p>
       ${renderHearingPlayButton({ ...step, context: "practice" }, screening)}
       <div class="hearing-response-grid">
         <button class="option" data-action="answerHearingPractice" data-heard="true" ${screening.currentTonePlayed ? "" : "disabled"}>听见了</button>
@@ -1366,12 +1360,9 @@ function renderHearingTest(screening) {
   const completed = hearingCompletedTrialCount(screening);
   return html`
     <div class="hearing-card hearing-test-card">
-      <div class="hearing-stage-label">正式测试 ${Math.min(completed + 1, screening.trials.length)}/${screening.trials.length}</div>
+      <div class="hearing-stage-label">测试 ${Math.min(completed + 1, screening.trials.length)}/${screening.trials.length}</div>
       <div class="hearing-meter-row">
-        <div class="hearing-ear-target compact ${side.key}">
-          <span>${escapeHtml(side.shortLabel)}</span>
-          <strong>${escapeHtml(side.label)}</strong>
-        </div>
+        ${renderHearingEarTarget(side, { compact: true })}
         <div class="hearing-stimulus-panel">
           <span>频率</span>
           <strong>${formatFrequency(trial.frequencyHz)}</strong>
@@ -1415,7 +1406,7 @@ function renderHearingSummary(screening) {
       <div class="hearing-summary-grid">
         ${HEARING_SIDES.map((side) => `
           <div class="hearing-summary-item">
-            <span>${escapeHtml(side.label)} 4fPTA</span>
+            <span>${escapeHtml(side.label)}平均</span>
             <strong>${formatThreshold(ears[side.key]?.pta4)}</strong>
           </div>
         `).join("")}
@@ -1424,10 +1415,10 @@ function renderHearingSummary(screening) {
           <strong>${summary.worseEar ? escapeHtml(hearingSide(summary.worseEar).label) : "-"}</strong>
         </div>
       </div>
-      <p class="hearing-summary-note">该结果仅作网页初筛记录，不替代临床听力诊断；接下来可以继续完成认知测试。</p>
+      <p class="hearing-summary-note">仅作初筛，不替代临床诊断。</p>
       <div class="hearing-actions">
         <button class="primary big-button" data-action="enterCognitionTest">进入测试</button>
-        <button class="ghost big-button" data-action="restartHearingCalibration">重新校准</button>
+        <button class="ghost big-button" data-action="restartHearingCalibration">重测</button>
       </div>
     </div>
   `;
@@ -1445,13 +1436,32 @@ function hearingSide(key) {
   return HEARING_SIDES.find((side) => side.key === key) || HEARING_SIDES[0];
 }
 
+function renderHearingEarTarget(side, { compact = false } = {}) {
+  return html`
+    <div class="hearing-ear-target ${side.key} ${compact ? "compact" : ""}" aria-label="${escapeHtml(side.label)}">
+      <svg class="ear-illustration" viewBox="0 0 180 180" aria-hidden="true" focusable="false">
+        <path class="sound-wave wave-1" d="M123 64 C139 78 139 102 123 116"></path>
+        <path class="sound-wave wave-2" d="M136 48 C163 70 163 110 136 132"></path>
+        <path class="ear-fill" d="M76 28 C50 28 32 51 32 83 C32 121 57 148 80 148 C96 148 101 135 98 121 C96 109 104 101 113 91 C128 74 118 28 76 28Z"></path>
+        <path class="ear-line" d="M76 28 C50 28 32 51 32 83 C32 121 57 148 80 148 C96 148 101 135 98 121 C96 109 104 101 113 91 C128 74 118 28 76 28Z"></path>
+        <path class="ear-inner" d="M77 58 C91 62 96 79 87 91 C80 101 66 102 65 118"></path>
+        <path class="ear-inner" d="M64 79 C70 72 82 73 85 84"></path>
+      </svg>
+      <strong>${escapeHtml(side.label)}</strong>
+    </div>
+  `;
+}
+
 function formatFrequency(frequencyHz) {
   return frequencyHz >= 1000 ? `${frequencyHz / 1000} kHz` : `${frequencyHz} Hz`;
 }
 
 function formatThreshold(value) {
   if (!Number.isFinite(Number(value))) return "-";
-  return `${Math.round(Number(value))} dB HL`;
+  const rounded = Math.round(Number(value));
+  const minimumLevel = HEARING_LEVELS_DB_HL[0];
+  if (rounded <= minimumLevel) return `≤${minimumLevel} dB HL`;
+  return `${rounded} dB HL`;
 }
 
 function hearingCompletedTrialCount(screening) {

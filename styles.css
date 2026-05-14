@@ -1006,9 +1006,10 @@ h4 {
 .hearing-ear-target {
   display: grid;
   place-items: center;
-  gap: 10px;
+  gap: 8px;
   width: clamp(180px, 24vw, 240px);
   aspect-ratio: 1;
+  padding: 14px;
   border: 3px solid #d8e9ff;
   border-radius: 8px;
   background: #f5fbff;
@@ -1028,29 +1029,55 @@ h4 {
   width: clamp(130px, 16vw, 170px);
 }
 
-.hearing-ear-target span {
-  display: grid;
-  width: clamp(70px, 9vw, 92px);
-  aspect-ratio: 1;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--leaf);
-  color: #fff;
-  font-size: clamp(42px, 6vw, 62px);
-  font-weight: 1000;
-  line-height: 1;
-  box-shadow: 0 6px 0 var(--leaf-dark);
-}
-
-.hearing-ear-target.left span {
-  background: var(--sky);
-  box-shadow: 0 6px 0 #2167bf;
-}
-
 .hearing-ear-target strong {
   color: var(--ink);
-  font-size: clamp(24px, 3vw, 34px);
+  font-size: clamp(22px, 2.6vw, 30px);
   font-weight: 1000;
+}
+
+.ear-illustration {
+  width: min(150px, 78%);
+  max-height: 72%;
+  overflow: visible;
+}
+
+.hearing-ear-target.compact .ear-illustration {
+  width: min(110px, 74%);
+}
+
+.hearing-ear-target.left .ear-illustration {
+  transform: scaleX(-1);
+}
+
+.ear-fill {
+  fill: #ffd9b0;
+}
+
+.ear-line,
+.ear-inner,
+.sound-wave {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ear-line {
+  stroke: #7d563b;
+  stroke-width: 8;
+}
+
+.ear-inner {
+  stroke: #9c6c4b;
+  stroke-width: 7;
+}
+
+.sound-wave {
+  stroke: var(--leaf);
+  stroke-width: 8;
+}
+
+.hearing-ear-target.left .sound-wave {
+  stroke: var(--sky);
 }
 
 .hearing-play-button {
@@ -5948,9 +5975,12 @@ body,
     width: clamp(102px, 20svh, 130px);
   }
 
-  .hearing-ear-target span {
-    width: clamp(52px, 10svh, 70px);
-    font-size: clamp(30px, 7svh, 44px);
+  .ear-illustration {
+    width: min(96px, 72%);
+  }
+
+  .hearing-ear-target.compact .ear-illustration {
+    width: min(82px, 70%);
   }
 
   .hearing-stimulus-panel {
