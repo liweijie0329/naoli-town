@@ -66,6 +66,35 @@ const VOICE_PROFILES = {
   clear: { label: "清晰慢速", hints: ["google 普通话", "google 國語", "mandarin", "普通话", "中文"], rateScale: 0.82, pitchOffset: -0.16 },
   system: { label: "系统默认", hints: [], rateScale: 1.04, pitchOffset: -0.26 }
 };
+const HEARING_PROTOCOL_VERSION = "web-pure-tone-screening-v1";
+const HEARING_SIDES = [
+  { key: "right", label: "右耳", shortLabel: "右" },
+  { key: "left", label: "左耳", shortLabel: "左" }
+];
+const HEARING_PRIMARY_FREQUENCIES = [500, 1000, 2000, 4000];
+const HEARING_TEST_FREQUENCIES = [1000, 2000, 4000, 500, 8000];
+const HEARING_LEVELS_DB_HL = [35, 45, 55, 65];
+const HEARING_TONE_DURATION_MS = 1000;
+const HEARING_FADE_SECONDS = 0.035;
+const HEARING_MAX_NO_RESPONSE_DB_HL = 70;
+const HEARING_PASS_PTA_DB_HL = 35;
+const HEARING_PRACTICE_STEPS = [
+  { ear: "right", frequencyHz: 1000, levelDbHl: 55 },
+  { ear: "left", frequencyHz: 1000, levelDbHl: 55 }
+];
+const HEARING_GAIN_BY_LEVEL = {
+  35: 0.035,
+  45: 0.07,
+  55: 0.14,
+  65: 0.26
+};
+const HEARING_FREQUENCY_GAIN_SCALE = {
+  500: 1.05,
+  1000: 1,
+  2000: 0.95,
+  4000: 0.88,
+  8000: 0.78
+};
 
 const TRADITIONAL_PHRASE_REPLACEMENTS = [
   ["甚麼", "什么"],
@@ -444,6 +473,7 @@ let speechItemTimer = null;
 let speechTextFallbackTimer = null;
 let speechRecognitionRestartTimer = null;
 let activeSpeechAudio = null;
+let activeHearingTone = null;
 let staticTtsManifest = null;
 let staticTtsManifestPromise = null;
 let instructionTimer = null;
@@ -516,6 +546,7 @@ function createInitialState() {
     startedAt: null,
     finishedAt: null,
     participant: { name: "", birthYear: "1966-01-01", sex: "", educationLevel: "" },
+    hearingScreening: createHearingScreeningState(),
     responses: {},
     drawings: {},
     trail: createTrailState(),
@@ -544,6 +575,74 @@ function createTrailState(overrides = {}) {
     correctStep: 0,
     ...overrides
   };
+}
+
+function createHearingScreeningState(overrides = {}) {
+  return {
+    protocolVersion: HEARING_PROTOCOL_VERSION,
+    phase: "intro",
+    status: "not_started",
+    startedAt: null,
+    finishedAt: null,
+    channelCheckIndex: 0,
+    practiceIndex: 0,
+    trialIndex: 0,
+    levelIndex: 0,
+    currentTonePlayed: false,
+    currentTonePlaying: false,
+    lastToneStartedAt: null,
+    lastToneEndedAt: null,
+    message: "",
+    environment: { status: "not_checked", relativeDb: null, checkedAt: null },
+    channelChecks: [],
+    practiceResponses: [],
+    responses: [],
+    thresholds: { right: {}, left: {} },
+    summary: null,
+    trials: createHearingTrials(),
+    ...overrides
+  };
+}
+
+function createHearingTrials() {
+  return HEARING_SIDES.flatMap((side) => (
+    HEARING_TEST_FREQUENCIES.map((frequencyHz) => ({
+      ear: side.key,
+      frequencyHz,
+      primary: HEARING_PRIMARY_FREQUENCIES.includes(frequencyHz)
+    }))
+  ));
+}
+
+function normalizeHearingScreening(screening = {}) {
+  const base = createHearingScreeningState(screening && typeof screening === "object" ? screening : {});
+  base.protocolVersion = base.protocolVersion || HEARING_PROTOCOL_VERSION;
+  base.phase = base.phase || "intro";
+  base.status = base.status || "not_started";
+  base.channelCheckIndex = clampInteger(base.channelCheckIndex, 0, HEARING_SIDES.length - 1);
+  base.practiceIndex = clampInteger(base.practiceIndex, 0, HEARING_PRACTICE_STEPS.length - 1);
+  base.trials = createHearingTrials();
+  base.trialIndex = clampInteger(base.trialIndex, 0, base.trials.length - 1);
+  base.levelIndex = clampInteger(base.levelIndex, 0, HEARING_LEVELS_DB_HL.length - 1);
+  base.currentTonePlayed = Boolean(base.currentTonePlayed);
+  base.currentTonePlaying = Boolean(base.currentTonePlaying);
+  base.environment = base.environment && typeof base.environment === "object"
+    ? { status: "not_checked", relativeDb: null, checkedAt: null, ...base.environment }
+    : { status: "not_checked", relativeDb: null, checkedAt: null };
+  base.channelChecks = Array.isArray(base.channelChecks) ? base.channelChecks : [];
+  base.practiceResponses = Array.isArray(base.practiceResponses) ? base.practiceResponses : [];
+  base.responses = Array.isArray(base.responses) ? base.responses : [];
+  base.thresholds = {
+    right: base.thresholds?.right && typeof base.thresholds.right === "object" ? base.thresholds.right : {},
+    left: base.thresholds?.left && typeof base.thresholds.left === "object" ? base.thresholds.left : {}
+  };
+  return base;
+}
+
+function clampInteger(value, min, max) {
+  const number = Number(value);
+  if (!Number.isInteger(number)) return min;
+  return Math.max(min, Math.min(max, number));
 }
 
 function normalizeTrailState(trail = {}) {
@@ -630,6 +729,7 @@ function migrateState() {
   delete state.participant.educationYears;
   delete state.participant.expectedPlace;
   delete state.participant.expectedCity;
+  state.hearingScreening = normalizeHearingScreening(state.hearingScreening);
   state.responses = state.responses || {};
   state.drawings = state.drawings || {};
   state.taskRuntime = normalizeTaskRuntime(state.taskRuntime);
@@ -666,6 +766,7 @@ function compactStateForDraft(value) {
 function resetState() {
   stopTimers();
   stopAudioPlayback();
+  stopHearingTone();
   stopSetupVoiceCapture({ releaseMic: true });
   stopVoiceInput({ releaseMic: true, shouldRender: false });
   localStorage.removeItem("moca-game-draft");
@@ -1087,6 +1188,9 @@ function segmentedField(key, label, value, options, invalid = false) {
 
 function renderShell(current) {
   const totals = computeTotals();
+  const hearingView = state.view === "hearing";
+  const progressLabel = hearingView ? "校准" : `${state.activeTaskIndex + 1}/${tasks.length}`;
+  const progressWidth = hearingView ? hearingProgressPercent() : ((state.activeTaskIndex + 1) / tasks.length) * 100;
   return html`
     <div class="app-shell">
       <aside class="hidden-drawer ${menuOpen ? "open" : ""}">
@@ -1100,11 +1204,12 @@ function renderShell(current) {
             </div>
           </div>
           <button class="drawer-item" data-action="navView" data-view="test">当前任务</button>
+          ${state.startedAt ? `<button class="drawer-item" data-action="navView" data-view="hearing">听力校准</button>` : ""}
           <button class="drawer-item" data-action="navView" data-view="results">本次结果</button>
           <button class="drawer-item" data-action="navView" data-view="design">评分标准</button>
           <button class="drawer-item" data-action="navView" data-view="admin">后台</button>
           <button class="drawer-item" data-action="goHome">返回首页</button>
-          <div class="drawer-score"><span>${state.view === "test" ? `${state.activeTaskIndex + 1}/${tasks.length}` : `${totals.totalScore}/30`}</span></div>
+          <div class="drawer-score"><span>${hearingView ? "听力" : state.view === "test" ? `${state.activeTaskIndex + 1}/${tasks.length}` : `${totals.totalScore}/30`}</span></div>
           <nav class="drawer-task-list">
             ${tasks.map((task, index) => renderTaskNav(task, index)).join("")}
           </nav>
@@ -1115,11 +1220,11 @@ function renderShell(current) {
           <button class="icon-button" data-action="openMenu" aria-label="打开菜单">≡</button>
           <div class="header-title">
             <h2>${state.view === "test" ? escapeHtml(current.title) : viewTitle()}</h2>
-            ${state.view === "test" ? `<p class="header-prompt">${escapeHtml(current.prompt)}</p>` : ""}
+            ${state.view === "test" ? `<p class="header-prompt">${escapeHtml(current.prompt)}</p>` : hearingView ? `<p class="header-prompt">${hearingHeaderPrompt()}</p>` : ""}
           </div>
           <div class="header-progress">
-            <span>${state.activeTaskIndex + 1}/${tasks.length}</span>
-            <div class="progress-track"><span style="width:${((state.activeTaskIndex + 1) / tasks.length) * 100}%"></span></div>
+            <span>${progressLabel}</span>
+            <div class="progress-track"><span style="width:${progressWidth}%"></span></div>
           </div>
         </header>
         ${renderMainView(current)}
@@ -1140,6 +1245,7 @@ function renderTaskNav(task, index) {
 }
 
 function viewTitle() {
+  if (state.view === "hearing") return "听力校准";
   if (state.view === "results") return "闯关结果";
   if (state.view === "admin") return "后台数据库";
   if (state.view === "design") return "评分标准";
@@ -1147,10 +1253,259 @@ function viewTitle() {
 }
 
 function renderMainView(current) {
+  if (state.view === "hearing") return renderHearingCalibration();
   if (state.view === "results") return renderResults();
   if (state.view === "admin") return renderAdmin();
   if (state.view === "design") return renderDesign();
   return renderTask(current);
+}
+
+function hearingHeaderPrompt() {
+  const screening = state.hearingScreening || createHearingScreeningState();
+  if (screening.phase === "summary") return "校准完成后进入正式认知任务";
+  if (screening.phase === "test") return "听到声音请点听见了，没有听到请点没听见";
+  return "请戴好耳机，按左右耳分别完成纯音校准";
+}
+
+function hearingProgressPercent() {
+  const screening = state.hearingScreening || createHearingScreeningState();
+  if (screening.phase === "summary") return 100;
+  if (screening.phase === "intro") return 8;
+  if (screening.phase === "channel") return 16 + (screening.channelCheckIndex / HEARING_SIDES.length) * 14;
+  if (screening.phase === "practice") return 30 + (screening.practiceIndex / HEARING_PRACTICE_STEPS.length) * 16;
+  if (screening.phase === "test") {
+    const trialCount = createHearingTrials().length;
+    return 46 + (screening.trialIndex / Math.max(1, trialCount)) * 48;
+  }
+  return 8;
+}
+
+function renderHearingCalibration() {
+  state.hearingScreening = normalizeHearingScreening(state.hearingScreening);
+  const screening = state.hearingScreening;
+  return html`
+    <section class="single-page hearing-page">
+      ${screening.phase === "intro" ? renderHearingIntro(screening) : ""}
+      ${screening.phase === "channel" ? renderHearingChannelCheck(screening) : ""}
+      ${screening.phase === "practice" ? renderHearingPractice(screening) : ""}
+      ${screening.phase === "test" ? renderHearingTest(screening) : ""}
+      ${screening.phase === "summary" ? renderHearingSummary(screening) : ""}
+    </section>
+  `;
+}
+
+function renderHearingIntro(screening) {
+  return html`
+    <div class="hearing-card hearing-intro-card">
+      <div class="hearing-hero-icon"><span class="headphone-icon"></span></div>
+      <div class="hearing-copy">
+        <h3>先做听力校准</h3>
+        <p>请戴好耳机，找一个安静的位置。接下来会分别检查左右耳，在不同频率和声强下判断是否听见。</p>
+      </div>
+      <div class="hearing-check-row">
+        <button class="utility-button hearing-check-button" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
+          ${screening.environment.status === "checking" ? "检测中..." : "环境检测"}
+        </button>
+        <span class="hearing-env-status ${screening.environment.status}">
+          ${hearingEnvironmentText(screening.environment)}
+        </span>
+      </div>
+      <div class="hearing-actions">
+        <button class="primary big-button" data-action="startHearingCalibration">开始校准</button>
+        <button class="ghost big-button" data-action="skipHearingCalibration">跳过</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderHearingChannelCheck(screening) {
+  const side = HEARING_SIDES[screening.channelCheckIndex] || HEARING_SIDES[0];
+  return html`
+    <div class="hearing-card">
+      <div class="hearing-stage-label">左右声道检查</div>
+      <div class="hearing-ear-target ${side.key}">
+        <span>${escapeHtml(side.shortLabel)}</span>
+        <strong>${escapeHtml(side.label)}</strong>
+      </div>
+      <p class="hearing-instruction">请播放提示音，确认声音来自${escapeHtml(side.label)}。</p>
+      ${renderHearingPlayButton({ ear: side.key, frequencyHz: 1000, levelDbHl: 55, context: "channel" }, screening)}
+      <div class="hearing-response-grid">
+        <button class="option" data-action="confirmHearingChannel" data-value="correct" ${screening.currentTonePlayed ? "" : "disabled"}>是这一侧</button>
+        <button class="option" data-action="confirmHearingChannel" data-value="wrong" ${screening.currentTonePlayed ? "" : "disabled"}>不是这一侧</button>
+      </div>
+      ${screening.message ? `<p class="task-warning">${escapeHtml(screening.message)}</p>` : ""}
+    </div>
+  `;
+}
+
+function renderHearingPractice(screening) {
+  const step = HEARING_PRACTICE_STEPS[screening.practiceIndex] || HEARING_PRACTICE_STEPS[0];
+  const side = hearingSide(step.ear);
+  return html`
+    <div class="hearing-card">
+      <div class="hearing-stage-label">练习 ${screening.practiceIndex + 1}/${HEARING_PRACTICE_STEPS.length}</div>
+      <div class="hearing-ear-target ${side.key}">
+        <span>${escapeHtml(side.shortLabel)}</span>
+        <strong>${escapeHtml(side.label)}</strong>
+      </div>
+      <p class="hearing-instruction">这是一道练习题。听到声音请点听见了。</p>
+      ${renderHearingPlayButton({ ...step, context: "practice" }, screening)}
+      <div class="hearing-response-grid">
+        <button class="option" data-action="answerHearingPractice" data-heard="true" ${screening.currentTonePlayed ? "" : "disabled"}>听见了</button>
+        <button class="option" data-action="answerHearingPractice" data-heard="false" ${screening.currentTonePlayed ? "" : "disabled"}>没听见</button>
+      </div>
+      ${screening.message ? `<p class="task-warning">${escapeHtml(screening.message)}</p>` : ""}
+    </div>
+  `;
+}
+
+function renderHearingTest(screening) {
+  const trial = screening.trials[screening.trialIndex] || screening.trials[0];
+  const side = hearingSide(trial.ear);
+  const levelDbHl = HEARING_LEVELS_DB_HL[screening.levelIndex] || HEARING_LEVELS_DB_HL[0];
+  const completed = hearingCompletedTrialCount(screening);
+  return html`
+    <div class="hearing-card hearing-test-card">
+      <div class="hearing-stage-label">正式测试 ${Math.min(completed + 1, screening.trials.length)}/${screening.trials.length}</div>
+      <div class="hearing-meter-row">
+        <div class="hearing-ear-target compact ${side.key}">
+          <span>${escapeHtml(side.shortLabel)}</span>
+          <strong>${escapeHtml(side.label)}</strong>
+        </div>
+        <div class="hearing-stimulus-panel">
+          <span>频率</span>
+          <strong>${formatFrequency(trial.frequencyHz)}</strong>
+        </div>
+        <div class="hearing-stimulus-panel">
+          <span>声强</span>
+          <strong>${levelDbHl} dB HL</strong>
+        </div>
+      </div>
+      ${renderHearingPlayButton({ ear: trial.ear, frequencyHz: trial.frequencyHz, levelDbHl, context: "test" }, screening)}
+      <div class="hearing-response-grid">
+        <button class="option hearing-heard" data-action="answerHearingTrial" data-heard="true" ${screening.currentTonePlayed ? "" : "disabled"}>听见了</button>
+        <button class="option hearing-missed" data-action="answerHearingTrial" data-heard="false" ${screening.currentTonePlayed ? "" : "disabled"}>没听见</button>
+      </div>
+      ${screening.message ? `<p class="${screening.message.includes("下一档") ? "task-ok" : "task-warning"}">${escapeHtml(screening.message)}</p>` : ""}
+    </div>
+  `;
+}
+
+function renderHearingPlayButton(stimulus, screening) {
+  const busy = Boolean(screening.currentTonePlaying);
+  return html`
+    <button class="primary circle-button sound-button hearing-play-button ${busy ? "" : "pulse"}" data-action="playHearingTone" data-ear="${stimulus.ear}" data-frequency="${stimulus.frequencyHz}" data-level="${stimulus.levelDbHl}" data-context="${stimulus.context}" ${busy ? "disabled" : ""}>
+      ${busy ? "请听" : "播放"}
+    </button>
+  `;
+}
+
+function renderHearingSummary(screening) {
+  const summary = screening.summary || summarizeHearingScreening(screening);
+  const ears = summary.ears || {};
+  const pass = summary.status === "pass";
+  const skipped = summary.status === "skipped";
+  return html`
+    <div class="hearing-card hearing-summary-card ${pass ? "pass" : skipped ? "skipped" : "refer"}">
+      <div class="result-hero ${pass ? "celebrate" : "soft-alert"} hearing-result-panel">
+        ${pass ? renderConfetti() : ""}
+        <strong>${pass ? "通过" : skipped ? "已跳过" : "需复查"}</strong>
+        <p>${pass ? "听力校准已完成" : skipped ? "未记录听力初筛结果" : "听力初筛未通过，建议进一步专业检查"}</p>
+      </div>
+      <div class="hearing-summary-grid">
+        ${HEARING_SIDES.map((side) => `
+          <div class="hearing-summary-item">
+            <span>${escapeHtml(side.label)} 4fPTA</span>
+            <strong>${formatThreshold(ears[side.key]?.pta4)}</strong>
+          </div>
+        `).join("")}
+        <div class="hearing-summary-item">
+          <span>较差耳</span>
+          <strong>${summary.worseEar ? escapeHtml(hearingSide(summary.worseEar).label) : "-"}</strong>
+        </div>
+      </div>
+      <p class="hearing-summary-note">该结果仅作网页初筛记录，不替代临床听力诊断；接下来可以继续完成认知测试。</p>
+      <div class="hearing-actions">
+        <button class="primary big-button" data-action="enterCognitionTest">进入测试</button>
+        <button class="ghost big-button" data-action="restartHearingCalibration">重新校准</button>
+      </div>
+    </div>
+  `;
+}
+
+function hearingEnvironmentText(environment = {}) {
+  if (environment.status === "checking") return "正在听环境声";
+  if (environment.status === "quiet") return "环境较安静";
+  if (environment.status === "noisy") return "环境偏吵";
+  if (environment.status === "unavailable") return "未检测";
+  return "可选检测";
+}
+
+function hearingSide(key) {
+  return HEARING_SIDES.find((side) => side.key === key) || HEARING_SIDES[0];
+}
+
+function formatFrequency(frequencyHz) {
+  return frequencyHz >= 1000 ? `${frequencyHz / 1000} kHz` : `${frequencyHz} Hz`;
+}
+
+function formatThreshold(value) {
+  if (!Number.isFinite(Number(value))) return "-";
+  return `${Math.round(Number(value))} dB HL`;
+}
+
+function hearingCompletedTrialCount(screening) {
+  const responses = Array.isArray(screening.responses) ? screening.responses : [];
+  const keys = new Set(responses.filter((entry) => entry.finalForFrequency).map((entry) => `${entry.ear}:${entry.frequencyHz}`));
+  return keys.size;
+}
+
+function summarizeHearingScreening(screening = state.hearingScreening) {
+  const thresholds = screening.thresholds || { right: {}, left: {} };
+  const ears = Object.fromEntries(HEARING_SIDES.map((side) => {
+    const primaryValues = HEARING_PRIMARY_FREQUENCIES
+      .map((frequencyHz) => thresholdValueForSummary(thresholds[side.key]?.[frequencyHz]))
+      .filter((value) => Number.isFinite(value));
+    const pta4 = primaryValues.length === HEARING_PRIMARY_FREQUENCIES.length
+      ? primaryValues.reduce((sum, value) => sum + value, 0) / primaryValues.length
+      : null;
+    return [side.key, {
+      pta4,
+      thresholds: thresholds[side.key] || {},
+      pass: pta4 !== null ? pta4 <= HEARING_PASS_PTA_DB_HL : null
+    }];
+  }));
+  const worseEar = ears.right.pta4 === null && ears.left.pta4 === null
+    ? null
+    : (Number(ears.right.pta4 ?? -Infinity) >= Number(ears.left.pta4 ?? -Infinity) ? "right" : "left");
+  const worsePta = worseEar ? ears[worseEar].pta4 : null;
+  const status = worsePta === null
+    ? "incomplete"
+    : worsePta > HEARING_PASS_PTA_DB_HL ? "refer" : "pass";
+  return {
+    protocolVersion: HEARING_PROTOCOL_VERSION,
+    status,
+    pass: status === "pass",
+    criterion: `较差耳 500/1000/2000/4000 Hz 平均听阈 <= ${HEARING_PASS_PTA_DB_HL} dB HL`,
+    primaryFrequenciesHz: [...HEARING_PRIMARY_FREQUENCIES],
+    testFrequenciesHz: [...HEARING_TEST_FREQUENCIES],
+    levelsDbHl: [...HEARING_LEVELS_DB_HL],
+    ears,
+    worseEar,
+    worsePta4: worsePta,
+    completedTrialCount: hearingCompletedTrialCount(screening),
+    totalTrialCount: createHearingTrials().length
+  };
+}
+
+function thresholdValueForSummary(entry) {
+  if (entry && typeof entry === "object") {
+    if (entry.noResponseAtMax) return HEARING_MAX_NO_RESPONSE_DB_HL;
+    const value = Number(entry.thresholdDbHl);
+    return Number.isFinite(value) ? value : null;
+  }
+  const value = Number(entry);
+  return Number.isFinite(value) ? value : null;
 }
 
 function renderTask(task) {
@@ -1760,6 +2115,8 @@ function formatSavedTime(session) {
 function renderSessionDetail(session) {
   const participant = session.participant || {};
   const itemResponses = Array.isArray(session.itemResponses) ? session.itemResponses : [];
+  const hearing = session.hearingScreening || {};
+  const hearingSummary = hearing.summary || null;
   return html`
     <aside class="admin-detail">
       <div class="detail-header">
@@ -1775,6 +2132,9 @@ function renderSessionDetail(session) {
         ${detailMetric("年龄", formatParticipantAge(participant))}
         ${detailMetric("性别", participant.sex || participant.gender || "-")}
         ${detailMetric("教育水平", participant.educationLevel || "-")}
+        ${detailMetric("听力初筛", formatHearingStatus(hearingSummary?.status || hearing.status))}
+        ${detailMetric("右耳 4fPTA", formatThreshold(hearingSummary?.ears?.right?.pta4))}
+        ${detailMetric("左耳 4fPTA", formatThreshold(hearingSummary?.ears?.left?.pta4))}
         ${detailMetric("保存时间", session.savedAt ? new Date(session.savedAt).toLocaleString() : "-")}
       </div>
       <div class="item-detail-list">
@@ -1786,6 +2146,16 @@ function renderSessionDetail(session) {
 
 function detailMetric(label, value) {
   return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+}
+
+function formatHearingStatus(status) {
+  if (status === "pass") return "通过";
+  if (status === "refer") return "需复查";
+  if (status === "skipped") return "已跳过";
+  if (status === "incomplete") return "未完成";
+  if (status === "completed") return "已完成";
+  if (status === "in_progress") return "进行中";
+  return "-";
 }
 
 function renderItemDetail(item, index) {
@@ -2331,6 +2701,330 @@ function cubeReferenceSvg() {
   `;
 }
 
+function startHearingCalibration() {
+  state.hearingScreening = createHearingScreeningState({
+    environment: state.hearingScreening?.environment || { status: "not_checked", relativeDb: null, checkedAt: null },
+    phase: "channel",
+    status: "in_progress",
+    startedAt: new Date().toISOString()
+  });
+  saveDraft();
+  render();
+}
+
+function skipHearingCalibration() {
+  state.hearingScreening = {
+    ...normalizeHearingScreening(state.hearingScreening),
+    phase: "summary",
+    status: "skipped",
+    finishedAt: new Date().toISOString(),
+    summary: {
+      protocolVersion: HEARING_PROTOCOL_VERSION,
+      status: "skipped",
+      pass: null,
+      note: "用户跳过听力校准"
+    }
+  };
+  enterCognitionTest();
+}
+
+function restartHearingCalibration() {
+  const environment = state.hearingScreening?.environment || { status: "not_checked", relativeDb: null, checkedAt: null };
+  state.hearingScreening = createHearingScreeningState({ environment });
+  saveDraft();
+  render();
+}
+
+function enterCognitionTest() {
+  stopHearingTone();
+  state.view = "test";
+  state.activeTaskIndex = 0;
+  requestImmediateInstructionPlayback(tasks[0]);
+  saveDraft();
+  render();
+}
+
+async function checkHearingEnvironment() {
+  const screening = normalizeHearingScreening(state.hearingScreening);
+  state.hearingScreening = {
+    ...screening,
+    environment: { ...screening.environment, status: "checking", checkedAt: new Date().toISOString() },
+    message: ""
+  };
+  render();
+  if (!navigator.mediaDevices?.getUserMedia) {
+    state.hearingScreening.environment = { status: "unavailable", relativeDb: null, checkedAt: new Date().toISOString(), reason: "microphone_unsupported" };
+    saveDraft();
+    render();
+    return;
+  }
+  let context = null;
+  try {
+    const stream = await getReusableMicStream();
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    context = new AudioContextClass();
+    await context.resume?.().catch(() => {});
+    const source = context.createMediaStreamSource(stream);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    const relativeDb = await sampleRelativeEnvironmentDb(analyser, 3000);
+    source.disconnect();
+    analyser.disconnect();
+    context.close?.().catch(() => {});
+    releaseMicStream();
+    const quiet = relativeDb <= -38;
+    state.hearingScreening.environment = {
+      status: quiet ? "quiet" : "noisy",
+      relativeDb,
+      checkedAt: new Date().toISOString(),
+      note: "浏览器麦克风相对噪声估计，非校准 dB(A)"
+    };
+  } catch (error) {
+    console.error("Hearing environment check failed", error);
+    context?.close?.().catch(() => {});
+    releaseMicStream();
+    state.hearingScreening.environment = {
+      status: "unavailable",
+      relativeDb: null,
+      checkedAt: new Date().toISOString(),
+      reason: error?.message || "environment_check_failed"
+    };
+  }
+  saveDraft();
+  render();
+}
+
+function sampleRelativeEnvironmentDb(analyser, durationMs) {
+  return new Promise((resolve) => {
+    const samples = [];
+    const data = new Float32Array(analyser.fftSize);
+    const startedAt = Date.now();
+    const tick = () => {
+      analyser.getFloatTimeDomainData(data);
+      let sumSquares = 0;
+      for (let index = 0; index < data.length; index += 1) sumSquares += data[index] * data[index];
+      const rms = Math.sqrt(sumSquares / data.length);
+      samples.push(20 * Math.log10(Math.max(rms, 0.000001)));
+      if (Date.now() - startedAt >= durationMs) {
+        const average = samples.reduce((sum, value) => sum + value, 0) / Math.max(1, samples.length);
+        resolve(Math.round(average * 10) / 10);
+      } else {
+        window.setTimeout(tick, 120);
+      }
+    };
+    tick();
+  });
+}
+
+function confirmHearingChannel(value) {
+  const screening = normalizeHearingScreening(state.hearingScreening);
+  const side = HEARING_SIDES[screening.channelCheckIndex] || HEARING_SIDES[0];
+  screening.channelChecks.push({
+    ear: side.key,
+    expectedLabel: side.label,
+    response: value === "correct" ? "correct" : "wrong",
+    at: new Date().toISOString(),
+    reactionMs: hearingReactionMs(screening)
+  });
+  screening.currentTonePlayed = false;
+  screening.currentTonePlaying = false;
+  screening.message = value === "correct" ? "" : "请检查耳机左右是否戴反。";
+  if (screening.channelCheckIndex < HEARING_SIDES.length - 1) {
+    screening.channelCheckIndex += 1;
+  } else {
+    screening.phase = "practice";
+    screening.practiceIndex = 0;
+    screening.message = "";
+  }
+  state.hearingScreening = screening;
+  saveDraft();
+  render();
+}
+
+function answerHearingPractice(heard) {
+  const screening = normalizeHearingScreening(state.hearingScreening);
+  const step = HEARING_PRACTICE_STEPS[screening.practiceIndex] || HEARING_PRACTICE_STEPS[0];
+  screening.practiceResponses.push({
+    ...step,
+    heard,
+    at: new Date().toISOString(),
+    reactionMs: hearingReactionMs(screening)
+  });
+  screening.currentTonePlayed = false;
+  screening.currentTonePlaying = false;
+  screening.message = "";
+  if (screening.practiceIndex < HEARING_PRACTICE_STEPS.length - 1) {
+    screening.practiceIndex += 1;
+  } else {
+    screening.phase = "test";
+    screening.trialIndex = 0;
+    screening.levelIndex = 0;
+  }
+  state.hearingScreening = screening;
+  saveDraft();
+  render();
+}
+
+function answerHearingTrial(heard) {
+  const screening = normalizeHearingScreening(state.hearingScreening);
+  const trial = screening.trials[screening.trialIndex] || screening.trials[0];
+  const levelDbHl = HEARING_LEVELS_DB_HL[screening.levelIndex] || HEARING_LEVELS_DB_HL[0];
+  const response = {
+    ear: trial.ear,
+    frequencyHz: trial.frequencyHz,
+    primary: trial.primary,
+    levelDbHl,
+    heard,
+    at: new Date().toISOString(),
+    reactionMs: hearingReactionMs(screening)
+  };
+  screening.responses.push(response);
+  screening.currentTonePlayed = false;
+  screening.currentTonePlaying = false;
+  if (heard) {
+    recordHearingThreshold(screening, trial, { thresholdDbHl: levelDbHl, noResponseAtMax: false });
+    response.finalForFrequency = true;
+    advanceHearingTrial(screening);
+  } else if (screening.levelIndex < HEARING_LEVELS_DB_HL.length - 1) {
+    screening.levelIndex += 1;
+    screening.message = "没关系，下一档会稍大一些，请再听一遍。";
+  } else {
+    recordHearingThreshold(screening, trial, { thresholdDbHl: null, noResponseAtMax: true });
+    response.finalForFrequency = true;
+    advanceHearingTrial(screening);
+  }
+  state.hearingScreening = screening;
+  saveDraft();
+  render();
+}
+
+function recordHearingThreshold(screening, trial, result) {
+  screening.thresholds[trial.ear] = screening.thresholds[trial.ear] || {};
+  screening.thresholds[trial.ear][trial.frequencyHz] = {
+    frequencyHz: trial.frequencyHz,
+    primary: trial.primary,
+    thresholdDbHl: result.thresholdDbHl,
+    noResponseAtMax: Boolean(result.noResponseAtMax),
+    recordedAt: new Date().toISOString()
+  };
+}
+
+function advanceHearingTrial(screening) {
+  screening.message = "";
+  screening.levelIndex = 0;
+  if (screening.trialIndex < screening.trials.length - 1) {
+    screening.trialIndex += 1;
+    return;
+  }
+  screening.phase = "summary";
+  screening.status = "completed";
+  screening.finishedAt = new Date().toISOString();
+  screening.summary = summarizeHearingScreening(screening);
+}
+
+function hearingReactionMs(screening) {
+  const endedAt = Number(screening.lastToneEndedAt || 0);
+  if (!endedAt) return null;
+  return Math.max(0, Date.now() - endedAt);
+}
+
+async function playHearingTone(stimulus) {
+  const screening = normalizeHearingScreening(state.hearingScreening);
+  const frequencyHz = Number(stimulus.frequencyHz);
+  const levelDbHl = Number(stimulus.levelDbHl);
+  const ear = stimulus.ear === "left" ? "left" : "right";
+  if (!Number.isFinite(frequencyHz) || !Number.isFinite(levelDbHl)) return;
+  const playbackId = beginAudioPlayback();
+  const context = await resumeSpeechAudioContext();
+  if (!context || playbackId !== speechPlaybackId) {
+    screening.message = "当前浏览器无法播放校准音，请检查声音设置后重试。";
+    state.hearingScreening = screening;
+    render();
+    return;
+  }
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  const merger = context.createChannelMerger(2);
+  const now = context.currentTime + 0.06;
+  const duration = HEARING_TONE_DURATION_MS / 1000;
+  const endAt = now + duration;
+  const outputGain = hearingGainForLevel(levelDbHl, frequencyHz);
+
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(frequencyHz, now);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.linearRampToValueAtTime(outputGain, now + HEARING_FADE_SECONDS);
+  gain.gain.setValueAtTime(outputGain, Math.max(now + HEARING_FADE_SECONDS, endAt - HEARING_FADE_SECONDS));
+  gain.gain.linearRampToValueAtTime(0.0001, endAt);
+  oscillator.connect(gain);
+  gain.connect(merger, 0, ear === "left" ? 0 : 1);
+  merger.connect(context.destination);
+
+  activeHearingTone = { oscillator, gain, merger, playbackId };
+  screening.currentTonePlaying = true;
+  screening.currentTonePlayed = false;
+  screening.lastToneStartedAt = Date.now();
+  screening.lastToneEndedAt = null;
+  screening.message = "";
+  state.hearingScreening = screening;
+  playState = "播放中...";
+  saveDraft();
+  render();
+
+  oscillator.onended = () => {
+    if (playbackId !== speechPlaybackId) return;
+    cleanupHearingToneNodes(activeHearingTone);
+    activeHearingTone = null;
+    state.hearingScreening = {
+      ...normalizeHearingScreening(state.hearingScreening),
+      currentTonePlaying: false,
+      currentTonePlayed: true,
+      lastToneEndedAt: Date.now()
+    };
+    playState = "开始";
+    saveDraft();
+    render();
+  };
+  oscillator.start(now);
+  oscillator.stop(endAt + 0.02);
+}
+
+function hearingGainForLevel(levelDbHl, frequencyHz) {
+  const base = HEARING_GAIN_BY_LEVEL[levelDbHl] || HEARING_GAIN_BY_LEVEL[35];
+  const scale = HEARING_FREQUENCY_GAIN_SCALE[frequencyHz] || 1;
+  return Math.max(0.001, Math.min(0.32, base * scale));
+}
+
+function stopHearingTone({ markPlayed = false } = {}) {
+  if (!activeHearingTone) return false;
+  const tone = activeHearingTone;
+  activeHearingTone = null;
+  try {
+    tone.oscillator.onended = null;
+    tone.oscillator.stop();
+  } catch {}
+  cleanupHearingToneNodes(tone);
+  if (state.hearingScreening) {
+    state.hearingScreening.currentTonePlaying = false;
+    if (!markPlayed) state.hearingScreening.currentTonePlayed = false;
+  }
+  return true;
+}
+
+function cleanupHearingToneNodes(tone) {
+  if (!tone) return;
+  try {
+    tone.oscillator.disconnect();
+  } catch {}
+  try {
+    tone.gain.disconnect();
+  } catch {}
+  try {
+    tone.merger.disconnect();
+  } catch {}
+}
+
 root.addEventListener("click", async (event) => {
   const target = event.target.closest("[data-action]");
   if (!target) return;
@@ -2339,13 +3033,54 @@ root.addEventListener("click", async (event) => {
   const buttonSpeech = buttonSpeechData(target);
   if (action === "startSession") playSfx("start");
   else if (["skipTask", "nextTask", "skipLogin", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
-  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession"].includes(action)) playSfx("pick");
+  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment"].includes(action)) playSfx("pick");
 
   if (action !== "tapVigilance") stopAudioPlayback();
   if (buttonSpeech) speakButtonSelection(buttonSpeech);
 
   if (action === "toggleSetupVoice") {
     await toggleSetupVoiceRegistration();
+    return;
+  }
+  if (action === "checkHearingEnvironment") {
+    await checkHearingEnvironment();
+    return;
+  }
+  if (action === "startHearingCalibration") {
+    startHearingCalibration();
+    return;
+  }
+  if (action === "skipHearingCalibration") {
+    skipHearingCalibration();
+    return;
+  }
+  if (action === "restartHearingCalibration") {
+    restartHearingCalibration();
+    return;
+  }
+  if (action === "enterCognitionTest") {
+    enterCognitionTest();
+    return;
+  }
+  if (action === "playHearingTone") {
+    await playHearingTone({
+      ear: target.dataset.ear,
+      frequencyHz: Number(target.dataset.frequency),
+      levelDbHl: Number(target.dataset.level),
+      context: target.dataset.context || "test"
+    });
+    return;
+  }
+  if (action === "confirmHearingChannel") {
+    confirmHearingChannel(target.dataset.value);
+    return;
+  }
+  if (action === "answerHearingPractice") {
+    answerHearingPractice(target.dataset.heard === "true");
+    return;
+  }
+  if (action === "answerHearingTrial") {
+    answerHearingTrial(target.dataset.heard === "true");
     return;
   }
 
@@ -2571,8 +3306,8 @@ async function startNewSession(participant) {
   state.adminSessions = adminSessions;
   state.startedAt = new Date().toISOString();
   state.activeTaskIndex = 0;
-  state.view = "test";
-  requestImmediateInstructionPlayback(tasks[0]);
+  state.hearingScreening = createHearingScreeningState();
+  state.view = "hearing";
   render();
 }
 
@@ -3306,6 +4041,7 @@ function beginAudioPlayback() {
   clearSpeechTextFallbackTimer();
   stopActiveSpeechAudio();
   stopStaticSpeechSources();
+  stopHearingTone();
   prepareAudioOutputMode();
   if (speechItemTimer) {
     window.clearTimeout(speechItemTimer);
@@ -3326,7 +4062,8 @@ function prepareAudioOutputMode() {
 
 function stopAudioPlayback() {
   clearInstructionTimer();
-  if (!("speechSynthesis" in window) && !activeSpeechAudio && !speechItemTimer && playState !== "播放中...") return;
+  const stoppedHearingTone = stopHearingTone();
+  if (!("speechSynthesis" in window) && !activeSpeechAudio && !speechItemTimer && playState !== "播放中..." && !stoppedHearingTone) return;
   speechPlaybackId += 1;
   clearSpeechTextFallbackTimer();
   stopActiveSpeechAudio();
@@ -5222,6 +5959,17 @@ function compactAnswerForBackend(answer) {
   return copy;
 }
 
+function compactHearingScreeningForPayload(screening) {
+  const copy = JSON.parse(JSON.stringify(normalizeHearingScreening(screening)));
+  copy.summary = copy.summary || summarizeHearingScreening(copy);
+  delete copy.currentTonePlaying;
+  delete copy.currentTonePlayed;
+  delete copy.message;
+  delete copy.lastToneStartedAt;
+  delete copy.lastToneEndedAt;
+  return copy;
+}
+
 function buildSessionPayload({ includeAudioBlobs = false } = {}) {
   const totals = computeTotals();
   const now = new Date().toISOString();
@@ -5240,6 +5988,7 @@ function buildSessionPayload({ includeAudioBlobs = false } = {}) {
     totalScore: totals.totalScore,
     riskBand: totals.riskBand,
     domainScores: totals.domainScores,
+    hearingScreening: compactHearingScreeningForPayload(state.hearingScreening),
     taskRuntime: ensureTaskRuntime(),
     ttsManifestVersion: staticTtsManifest?.version ?? null,
     itemResponses: tasks.map((task) => {
@@ -5311,6 +6060,8 @@ async function exportSessionsCsv() {
 
 function csvRowsForSession(session) {
   const participant = session.participant || {};
+  const hearing = session.hearingScreening || {};
+  const hearingSummary = hearing.summary || {};
   const itemResponses = Array.isArray(session.itemResponses) && session.itemResponses.length
     ? session.itemResponses
     : [{ taskId: "", title: "", domain: "", modality: "", maxScore: "", score: "", answer: {}, behavior: {}, ai: null }];
@@ -5331,6 +6082,11 @@ function csvRowsForSession(session) {
     total_score: session.totalScore ?? "",
     risk_band: session.riskBand || "",
     domain_scores_json: stringifyForCsv(session.domainScores || {}),
+    hearing_status: formatHearingStatus(hearingSummary.status || hearing.status),
+    hearing_right_pta4: hearingSummary.ears?.right?.pta4 ?? "",
+    hearing_left_pta4: hearingSummary.ears?.left?.pta4 ?? "",
+    hearing_worse_ear: hearingSummary.worseEar ? hearingSide(hearingSummary.worseEar).label : "",
+    hearing_screening_json: stringifyForCsv(hearing || {}),
     task_id: item.taskId || "",
     task_title: item.title || "",
     domain: item.domain || "",
@@ -5383,6 +6139,7 @@ function downloadTextFile(filename, content, mimeType) {
 
 function stopTimers() {
   stopTrailGuide();
+  stopHearingTone();
   clearSpeechRecognitionRestartTimer();
   window.clearInterval(vigilanceTimer);
   window.clearInterval(fluencyTimer);
