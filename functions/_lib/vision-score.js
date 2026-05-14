@@ -112,7 +112,8 @@ function openAiRequestBody(payload, model) {
               "必须返回严格 JSON，不要 Markdown，不要解释 JSON 以外的文字。",
               "scoreSuggestion 必须是 0 到 maxScore 的整数；confidence 是 0 到 1；requiresHumanReview 固定返回 false。",
               "立方体：能辨认为三维盒状/立方体、主要边线基本存在、无明显无关多余线、相对边大致平行且长度接近，即可 1 分。",
-              "钟表：轮廓、数字、指针三项各 1 分；圆/椭圆/近似圆可给轮廓分，1-12 基本写全且总体顺时针可给数字分，两根指针大致表示 11 点 10 分可给指针分。"
+              "钟表：轮廓、数字、指针三项各 1 分；圆/椭圆/近似圆可给轮廓分，1-12 基本写全且总体顺时针可给数字分。",
+              "钟表指针项必须看得到两根明确的指针/线段，并大致表示 11 点 10 分才给 1 分；没有指针、只有一根指针、只有数字/表盘时，指针项固定 0 分，不能凭题目要求或猜测补分。"
             ].join("\n")
           }
         ]
@@ -266,7 +267,8 @@ function workersAiPrompt(payload) {
     "JSON 字段：scoreSuggestion(integer), confidence(number), rubricMatched(boolean), requiresHumanReview(boolean), comment(string), criteria(array)。criteria 可为空数组。",
     "requiresHumanReview 固定 false。",
     "立方体：能辨认为三维盒状/立方体、主要边线基本存在、无明显无关多余线、相对边大致平行且长度接近，即可 1 分。",
-    "钟表：轮廓、数字、指针三项各 1 分；圆/椭圆/近似圆可给轮廓分，1-12 基本写全且总体顺时针可给数字分，两根指针大致表示 11 点 10 分可给指针分。",
+    "钟表：轮廓、数字、指针三项各 1 分；圆/椭圆/近似圆可给轮廓分，1-12 基本写全且总体顺时针可给数字分。",
+    "钟表指针项必须看得到两根明确的指针/线段，并大致表示 11 点 10 分才给 1 分；没有指针、只有一根指针、只有数字/表盘时，指针项固定 0 分，不能凭题目要求或猜测补分。",
     JSON.stringify({
       taskId: payload.taskId,
       taskType: payload.taskType,
