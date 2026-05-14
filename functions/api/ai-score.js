@@ -22,6 +22,7 @@ export async function onRequestPost({ request, env }) {
   let scoreSuggestion = typeof payload.clientAutoScore === "number"
     ? payload.clientAutoScore
     : null;
+  const needsConfiguredAi = ["cube", "clock"].includes(payload.taskId) && payload.image && scoreSuggestion === null;
 
   if (scoreSuggestion === null) scoreSuggestion = 0;
 
@@ -29,9 +30,11 @@ export async function onRequestPost({ request, env }) {
     mode: "cloudflare-demo-ai",
     taskId: payload.taskId,
     scoreSuggestion: clampScore(scoreSuggestion, maxScore),
-    confidence: payload.image ? 0.68 : 0.82,
-    requiresHumanReview: false,
-    rubricMatched: true,
-    comment: "Cloudflare 演示评分已返回结果；正式研究请绑定 AI_SCORE_ENDPOINT。"
+    confidence: needsConfiguredAi ? 0 : payload.image ? 0.68 : 0.82,
+    requiresHumanReview: needsConfiguredAi,
+    rubricMatched: !needsConfiguredAi,
+    comment: needsConfiguredAi
+      ? "画图题已关闭人工勾选；请绑定 AI_SCORE_ENDPOINT 进行图片 AI 评分。"
+      : "Cloudflare 演示评分已返回结果；正式研究请绑定 AI_SCORE_ENDPOINT。"
   });
 }

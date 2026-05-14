@@ -241,6 +241,7 @@ async function handleApi(req, res, url) {
       typeof payload.clientAutoScore === "number"
         ? payload.clientAutoScore
         : null;
+    const needsConfiguredAi = ["cube", "clock"].includes(payload.taskId) && payload.image && scoreSuggestion === null;
 
     if (scoreSuggestion === null) scoreSuggestion = 0;
     scoreSuggestion = Math.max(0, Math.min(maxScore, Math.round(scoreSuggestion)));
@@ -249,11 +250,13 @@ async function handleApi(req, res, url) {
       mode: "local-ai-demo",
       taskId: payload.taskId,
       scoreSuggestion,
-      confidence: payload.image ? 0.68 : 0.82,
-      requiresHumanReview: false,
-      rubricMatched: true,
+      confidence: needsConfiguredAi ? 0 : payload.image ? 0.68 : 0.82,
+      requiresHumanReview: needsConfiguredAi,
+      rubricMatched: !needsConfiguredAi,
       comment:
-        "本地演示环境已直接返回 AI 评分；生产环境请设置 AI_SCORE_ENDPOINT 接入真实模型评分服务。"
+        needsConfiguredAi
+          ? "画图题已关闭人工勾选；请设置 AI_SCORE_ENDPOINT 接入图片 AI 评分服务。"
+          : "本地演示环境已直接返回 AI 评分；生产环境请设置 AI_SCORE_ENDPOINT 接入真实模型评分服务。"
     });
     return;
   }

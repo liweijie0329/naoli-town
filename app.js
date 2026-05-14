@@ -257,7 +257,7 @@ const fluencyFillerPhrases = [
   "嗯", "啊", "呃", "额"
 ];
 
-const DRAWING_RUBRICS = {
+const DRAWING_AI_RUBRICS = {
   cube: [
     { key: "threeDimensional", label: "三维结构", detail: "图形必须表现为三维立方体。" },
     { key: "allLinesPresent", label: "线条完整", detail: "所有必要线条都存在。" },
@@ -1773,34 +1773,7 @@ function renderDrawingTask(task) {
           <canvas id="taskCanvas" class="task-canvas ${task.drawingKind === "cube" ? "cube-canvas" : ""}" aria-label="${escapeHtml(task.title)}画图区域"></canvas>
         </div>
       </div>
-      ${renderDrawingRubric(task)}
     </div>
-  `;
-}
-
-function renderDrawingRubric(task) {
-  const items = DRAWING_RUBRICS[task.drawingKind] || [];
-  if (!items.length) return "";
-  const response = getResponse(task.id);
-  const values = response.answer?.drawingRubric || {};
-  const score = drawingRubricScore(task, response);
-  return html`
-    <section class="drawing-rubric-panel" aria-label="${escapeHtml(task.title)}评分标准">
-      <div class="drawing-rubric-head">
-        <span>评分员勾选</span>
-        <strong>${score}/${task.maxScore}</strong>
-      </div>
-      <p>${task.drawingKind === "cube" ? "四项全部满足才给 1 分。" : "每项满足给 1 分，最多 3 分。"}</p>
-      <div class="drawing-rubric-list">
-        ${items.map((item) => `
-          <button type="button" class="drawing-rubric-item ${values[item.key] ? "picked" : ""}" data-action="toggleDrawingRubric" data-key="${item.key}">
-            <span>${values[item.key] ? "✓" : ""}</span>
-            <strong>${escapeHtml(item.label)}</strong>
-            <em>${escapeHtml(item.detail)}</em>
-          </button>
-        `).join("")}
-      </div>
-    </section>
   `;
 }
 
@@ -3266,7 +3239,7 @@ root.addEventListener("click", async (event) => {
   const buttonSpeech = buttonSpeechData(target);
   if (action === "startSession") playSfx("start");
   else if (["skipTask", "nextTask", "skipLogin", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
-  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "toggleDrawingRubric", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu"].includes(action)) playSfx("pick");
+  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu"].includes(action)) playSfx("pick");
 
   if (action !== "tapVigilance") stopAudioPlayback();
   if (buttonSpeech) speakButtonSelection(buttonSpeech);
@@ -3392,7 +3365,6 @@ root.addEventListener("click", async (event) => {
     render();
   }
   if (action === "toggleMemoryWord") toggleMemoryWord(target.dataset.word);
-  if (action === "toggleDrawingRubric") toggleDrawingRubric(current, target.dataset.key);
   if (action === "chooseAbstraction") {
     const response = getResponse("abstraction");
     response.answer[target.dataset.key] = target.dataset.value;
@@ -3430,9 +3402,8 @@ root.addEventListener("click", async (event) => {
     delete state.drawings[current.id];
     const response = getResponse(current.id);
     delete response.drawingImage;
-    delete response.answer.drawingRubric;
+    delete response.ai;
     response.behavior.strokes = 0;
-    delete response.behavior.drawingRubricScore;
     delete response.behavior.confirmNudge;
     delete response.behavior.firstInteractionAt;
     render();
@@ -5844,35 +5815,6 @@ function tapVigilance(at = Date.now()) {
   render();
 }
 
-function toggleDrawingRubric(task, key) {
-  if (!task || task.type !== "drawing" || !key) return;
-  const items = DRAWING_RUBRICS[task.drawingKind] || [];
-  if (!items.some((item) => item.key === key)) return;
-  const response = getResponse(task.id);
-  response.answer.drawingRubric = response.answer.drawingRubric || {};
-  response.answer.drawingRubric[key] = !response.answer.drawingRubric[key];
-  response.behavior.drawingRubric = { ...response.answer.drawingRubric };
-  response.behavior.drawingRubricScore = drawingRubricScore(task, response);
-  response.behavior.drawingRubricUpdatedAt = new Date().toISOString();
-  saveDraft();
-  render();
-}
-
-function drawingRubricScore(task, response = getResponse(task.id)) {
-  const items = DRAWING_RUBRICS[task?.drawingKind] || [];
-  if (!items.length) return 0;
-  const values = response.answer?.drawingRubric || {};
-  const passed = items.filter((item) => values[item.key]).length;
-  const score = task.drawingKind === "cube" ? (passed === items.length ? 1 : 0) : passed;
-  const clamped = Math.max(0, Math.min(task.maxScore, score));
-  response.behavior.drawingRubric = { ...values };
-  response.behavior.drawingRubricScore = clamped;
-  response.behavior.drawingRubricPassed = items
-    .filter((item) => values[item.key])
-    .map((item) => item.key);
-  return clamped;
-}
-
 async function startFluency() {
   const response = getResponse("fluency");
   if (response.answer.running) return;
@@ -6040,9 +5982,18 @@ function localListSessions() {
 function localAiScore(payload) {
   const maxScore = Number.isFinite(Number(payload.maxScore)) ? Number(payload.maxScore) : 0;
   let scoreSuggestion = typeof payload.clientAutoScore === "number" ? payload.clientAutoScore : null;
+  const needsConfiguredAi = ["cube", "clock"].includes(payload.taskId) && payload.image && scoreSuggestion === null;
   if (scoreSuggestion === null) scoreSuggestion = 0;
   scoreSuggestion = Math.max(0, Math.min(maxScore, Math.round(scoreSuggestion)));
-  return { mode: "browser-local-demo", taskId: payload.taskId, scoreSuggestion, confidence: payload.image ? 0.68 : 0.82, requiresHumanReview: false, rubricMatched: true };
+  return {
+    mode: "browser-local-demo",
+    taskId: payload.taskId,
+    scoreSuggestion,
+    confidence: needsConfiguredAi ? 0 : payload.image ? 0.68 : 0.82,
+    requiresHumanReview: needsConfiguredAi,
+    rubricMatched: !needsConfiguredAi,
+    comment: needsConfiguredAi ? "画图题已关闭人工勾选，本地演示环境未配置 AI_SCORE_ENDPOINT，无法完成图片 AI 评分。" : "本地演示评分已返回结果。"
+  };
 }
 
 async function scoreTaskWithAi(task) {
@@ -6054,6 +6005,7 @@ async function scoreTaskWithAi(task) {
     image,
     answer: response.answer,
     rubric: task.scoring,
+    rubricDetails: drawingAiRubric(task),
     maxScore: task.maxScore,
     clientAutoScore: clientAutoScoreForAi(task, response)
   };
@@ -6072,17 +6024,26 @@ function needsAiScore(task) {
 
 function clientAutoScoreForAi(task, response) {
   if (task.type === "trail") return scoreTrail().score;
-  if (task.id === "cube" || task.id === "clock") return drawingRubricScore(task, response);
+  if (task.id === "cube" || task.id === "clock") return null;
   if (task.type === "sentence") return scoreSentenceTranscript(task, response);
   if (task.type === "fluency") return fluencyAnimalCount(response) >= 11 ? 1 : 0;
   if (task.type === "orientation") return scoreOrientationByInputs(response);
   return null;
 }
 
+function drawingAiRubric(task) {
+  if (!task || task.type !== "drawing") return null;
+  return {
+    scoringMode: "ai_image_only",
+    instruction: "请只根据用户画布图片，严格按照 MoCA 评分标准给出 scoreSuggestion；不要使用人工勾选或客户端预评分。",
+    criteria: DRAWING_AI_RUBRICS[task.drawingKind] || []
+  };
+}
+
 function computeTaskScore(task, response = getResponse(task.id)) {
   const aiScore = aiScoreValue(task, response);
   if (task.type === "trail") return scoreTrail().score;
-  if (task.id === "cube" || task.id === "clock") return drawingRubricScore(task, response);
+  if (task.id === "cube" || task.id === "clock") return aiScore ?? 0;
   if (task.type === "naming") return task.items.reduce((sum, item) => sum + (response.answer?.[item.key] === item.answer ? 1 : 0), 0);
   if (task.type === "memory") return task.trial === 2 ? scoreMemoryChoices(response) : 0;
   if (task.type === "choice") return (response.answer?.sequence || []).join("") === activeDigitItem(task).answer ? 1 : 0;
