@@ -881,8 +881,8 @@ h4 {
 
 .hearing-page {
   display: grid;
-  place-items: center;
-  padding: clamp(14px, 2.5dvh, 28px) clamp(18px, 4vw, 52px) var(--bottom-safe);
+  place-items: stretch center;
+  padding: clamp(8px, 1.5dvh, 16px) clamp(10px, 2.5vw, 28px) var(--bottom-safe);
 }
 
 .hearing-card {
@@ -890,8 +890,9 @@ h4 {
   justify-items: center;
   align-content: center;
   gap: clamp(14px, 2dvh, 22px);
-  width: min(920px, 100%);
-  min-height: min(620px, 100%);
+  width: min(1080px, 100%);
+  height: 100%;
+  min-height: 0;
   padding: clamp(20px, 3dvh, 34px) clamp(22px, 4vw, 48px);
   overflow: auto;
   border: 2px solid var(--soft-line);
@@ -905,7 +906,7 @@ h4 {
   grid-template-columns: minmax(160px, 0.55fr) minmax(0, 1fr);
   justify-items: stretch;
   align-items: center;
-  min-height: min(560px, 100%);
+  min-height: 0;
 }
 
 .hearing-hero-icon {
@@ -1122,16 +1123,6 @@ h4 {
   font-size: clamp(24px, 3vw, 32px);
 }
 
-.hearing-single-response {
-  display: grid;
-  width: min(460px, 100%);
-}
-
-.hearing-heard-button {
-  min-height: clamp(86px, 12dvh, 112px);
-  font-size: clamp(28px, 3.5vw, 38px);
-}
-
 .hearing-heard {
   border-color: #cdebd8;
   background: #f2fff7;
@@ -1198,7 +1189,7 @@ h4 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-  width: min(760px, 100%);
+  width: min(860px, 100%);
 }
 
 .hearing-summary-item {
@@ -5983,10 +5974,6 @@ body,
     min-height: 70px;
   }
 
-  .hearing-heard-button {
-    min-height: 78px;
-  }
-
   .hearing-play-button {
     width: clamp(132px, 36vw, 160px);
     min-width: clamp(132px, 36vw, 160px);
@@ -6058,11 +6045,6 @@ body,
 
   .hearing-response-grid .option {
     min-height: 58px;
-  }
-
-  .hearing-heard-button {
-    min-height: 58px;
-    font-size: 24px;
   }
 
   .hearing-play-button {

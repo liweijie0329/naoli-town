@@ -41,6 +41,10 @@ const PLACE_SEARCH_TERMS = ["医院", "学校", "社区中心", "大学", "公�
 const MIN_PLACE_DISTRACTOR_KM = 10;
 const DRAWING_CONFIRM_NUDGE_MS = 10000;
 const SPEECH_VOLUME = 1;
+const MOCA_AUDIO_OFFSET_DB = 30;
+const MOCA_AUDIO_REFERENCE_LEVEL_DB_HL = 65;
+const MOCA_AUDIO_REFERENCE_VOLUME = 0.72;
+const MOCA_AUDIO_MAX_LEVEL_DB_HL = 95;
 const STATIC_TTS_MANIFEST_SRC = "./assets/audio/manifest.json";
 const LOCAL_DEV_API_ORIGIN = "http://127.0.0.1:5178";
 const API_ORIGIN = location.protocol === "file:" ? LOCAL_DEV_API_ORIGIN : "";
@@ -76,7 +80,6 @@ const HEARING_TEST_FREQUENCIES = [1000, 2000, 4000, 500, 8000];
 const HEARING_LEVELS_DB_HL = [35, 45, 55, 65];
 const HEARING_TONE_DURATION_MS = 1000;
 const HEARING_FADE_SECONDS = 0.035;
-const HEARING_NO_RESPONSE_DELAY_MS = 2600;
 const HEARING_MAX_NO_RESPONSE_DB_HL = 70;
 const HEARING_PASS_PTA_DB_HL = 35;
 const HEARING_PRACTICE_STEPS = [
@@ -475,7 +478,6 @@ let speechTextFallbackTimer = null;
 let speechRecognitionRestartTimer = null;
 let activeSpeechAudio = null;
 let activeHearingTone = null;
-let hearingNoResponseTimer = null;
 let staticTtsManifest = null;
 let staticTtsManifestPromise = null;
 let instructionTimer = null;
@@ -1297,6 +1299,11 @@ function renderHearingCalibration() {
 }
 
 function renderHearingIntro(screening) {
+  const checked = screening.environment.status !== "not_checked" && screening.environment.status !== "checking";
+  const canStart = screening.environment.status === "quiet" || screening.environment.status === "unavailable";
+  const checkLabel = screening.environment.status === "checking"
+    ? "检测中..."
+    : checked ? "重新检测" : "环境检测";
   return html`
     <div class="hearing-card hearing-intro-card">
       <div class="hearing-hero-icon"><span class="headphone-icon"></span></div>
@@ -1305,7 +1312,7 @@ function renderHearingIntro(screening) {
       </div>
       <div class="hearing-check-row">
         <button class="utility-button hearing-check-button" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
-          ${screening.environment.status === "checking" ? "检测中..." : "环境检测"}
+          ${checkLabel}
         </button>
         ${screening.environment.status === "not_checked" ? "" : `
           <span class="hearing-env-status ${screening.environment.status}">
@@ -1313,10 +1320,9 @@ function renderHearingIntro(screening) {
           </span>
         `}
       </div>
-      <div class="hearing-actions">
+      ${canStart ? `<div class="hearing-actions">
         <button class="primary big-button" data-action="startHearingCalibration">开始</button>
-        <button class="ghost big-button" data-action="skipHearingCalibration">跳过</button>
-      </div>
+      </div>` : ""}
     </div>
   `;
 }
@@ -1329,10 +1335,10 @@ function renderHearingChannelCheck(screening) {
       ${renderHearingEarTarget(side)}
       <p class="hearing-instruction">声音应来自${escapeHtml(side.label)}</p>
       ${renderHearingPlayButton({ ear: side.key, frequencyHz: 1000, levelDbHl: 55, context: "channel" }, screening)}
-      <div class="hearing-response-grid">
+      ${screening.currentTonePlayed ? `<div class="hearing-response-grid">
         <button class="option" data-action="confirmHearingChannel" data-value="correct" ${screening.currentTonePlayed ? "" : "disabled"}>是</button>
         <button class="option" data-action="confirmHearingChannel" data-value="wrong" ${screening.currentTonePlayed ? "" : "disabled"}>不是</button>
-      </div>
+      </div>` : ""}
       ${screening.message ? `<p class="task-warning">${escapeHtml(screening.message)}</p>` : ""}
     </div>
   `;
@@ -1347,7 +1353,7 @@ function renderHearingPractice(screening) {
       ${renderHearingEarTarget(side)}
       <p class="hearing-instruction">听到按一下</p>
       ${renderHearingPlayButton({ ...step, context: "practice" }, screening)}
-      ${renderHearingSingleResponseButton("answerHearingPractice", screening)}
+      ${screening.currentTonePlayed ? renderHearingResponseButtons("answerHearingPractice", screening) : ""}
       ${screening.message ? `<p class="task-warning">${escapeHtml(screening.message)}</p>` : ""}
     </div>
   `;
@@ -1373,25 +1379,27 @@ function renderHearingTest(screening) {
         </div>
       </div>
       ${renderHearingPlayButton({ ear: trial.ear, frequencyHz: trial.frequencyHz, levelDbHl, context: "test" }, screening)}
-      ${renderHearingSingleResponseButton("answerHearingTrial", screening)}
+      ${screening.currentTonePlayed ? renderHearingResponseButtons("answerHearingTrial", screening) : ""}
       ${screening.message ? `<p class="${screening.message.includes("再大") ? "task-ok" : "task-warning"}">${escapeHtml(screening.message)}</p>` : ""}
     </div>
   `;
 }
 
-function renderHearingSingleResponseButton(action, screening) {
+function renderHearingResponseButtons(action, screening) {
   return html`
-    <div class="hearing-single-response">
-      <button class="option hearing-heard hearing-heard-button" data-action="${action}" data-heard="true" ${screening.currentTonePlayed ? "" : "disabled"}>听到了</button>
+    <div class="hearing-response-grid">
+      <button class="option hearing-heard" data-action="${action}" data-heard="true" ${screening.currentTonePlayed ? "" : "disabled"}>听到了</button>
+      <button class="option hearing-missed" data-action="${action}" data-heard="false" ${screening.currentTonePlayed ? "" : "disabled"}>没听到</button>
     </div>
   `;
 }
 
 function renderHearingPlayButton(stimulus, screening) {
   const busy = Boolean(screening.currentTonePlaying);
+  const label = busy ? "请听" : screening.currentTonePlayed ? "再听一次" : "播放";
   return html`
     <button class="primary circle-button sound-button hearing-play-button ${busy ? "" : "pulse"}" data-action="playHearingTone" data-ear="${stimulus.ear}" data-frequency="${stimulus.frequencyHz}" data-level="${stimulus.levelDbHl}" data-context="${stimulus.context}" ${busy ? "disabled" : ""}>
-      ${busy ? "请听" : "播放"}
+      ${label}
     </button>
   `;
 }
@@ -1421,7 +1429,7 @@ function hearingEnvironmentText(environment = {}) {
   if (environment.status === "checking") return "正在听环境声";
   if (environment.status === "quiet") return "环境较安静";
   if (environment.status === "noisy") return "环境偏吵";
-  if (environment.status === "unavailable") return "未检测";
+  if (environment.status === "unavailable") return "无法检测";
   return "";
 }
 
@@ -1484,6 +1492,10 @@ function summarizeHearingScreening(screening = state.hearingScreening) {
   const worsePta = [ears.right.pta4, ears.left.pta4]
     .filter((value) => Number.isFinite(Number(value)))
     .reduce((max, value) => Math.max(max, Number(value)), null);
+  const mocaAudioBaselineDbHl = Number.isFinite(Number(worsePta)) ? Number(worsePta) : null;
+  const mocaAudioLevelDbHl = mocaAudioBaselineDbHl === null
+    ? null
+    : Math.min(MOCA_AUDIO_MAX_LEVEL_DB_HL, Math.round(mocaAudioBaselineDbHl + MOCA_AUDIO_OFFSET_DB));
   const status = worsePta === null
     ? "incomplete"
     : worsePta > HEARING_PASS_PTA_DB_HL ? "refer" : "pass";
@@ -1498,6 +1510,9 @@ function summarizeHearingScreening(screening = state.hearingScreening) {
     ears,
     worseEar,
     worsePta4: worsePta,
+    mocaAudioBaselineDbHl,
+    mocaAudioOffsetDb: MOCA_AUDIO_OFFSET_DB,
+    mocaAudioLevelDbHl,
     completedTrialCount: hearingCompletedTrialCount(screening),
     totalTrialCount: createHearingTrials().length
   };
@@ -2160,6 +2175,7 @@ function renderSessionDetail(session) {
         ${detailMetric("听力初筛", formatHearingStatus(hearingSummary?.status || hearing.status))}
         ${detailMetric("右耳 4fPTA", formatThreshold(hearingSummary?.ears?.right?.pta4))}
         ${detailMetric("左耳 4fPTA", formatThreshold(hearingSummary?.ears?.left?.pta4))}
+        ${detailMetric("MoCA 音量", formatThreshold(hearingSummary?.mocaAudioLevelDbHl))}
         ${detailMetric("保存时间", session.savedAt ? new Date(session.savedAt).toLocaleString() : "-")}
       </div>
       <div class="item-detail-list">
@@ -2727,7 +2743,6 @@ function cubeReferenceSvg() {
 }
 
 function startHearingCalibration() {
-  clearHearingNoResponseTimer();
   state.hearingScreening = createHearingScreeningState({
     environment: state.hearingScreening?.environment || { status: "not_checked", relativeDb: null, checkedAt: null },
     phase: "channel",
@@ -2755,7 +2770,6 @@ function skipHearingCalibration() {
 }
 
 function restartHearingCalibration() {
-  clearHearingNoResponseTimer();
   const environment = state.hearingScreening?.environment || { status: "not_checked", relativeDb: null, checkedAt: null };
   state.hearingScreening = createHearingScreeningState({ environment });
   saveDraft();
@@ -2763,7 +2777,6 @@ function restartHearingCalibration() {
 }
 
 function enterCognitionTest() {
-  clearHearingNoResponseTimer();
   stopHearingTone();
   state.view = "test";
   state.activeTaskIndex = 0;
@@ -2809,7 +2822,6 @@ async function checkHearingEnvironment() {
       note: "浏览器麦克风相对噪声估计，非校准 dB(A)"
     };
   } catch (error) {
-    console.error("Hearing environment check failed", error);
     context?.close?.().catch(() => {});
     releaseMicStream();
     state.hearingScreening.environment = {
@@ -2846,7 +2858,6 @@ function sampleRelativeEnvironmentDb(analyser, durationMs) {
 }
 
 function confirmHearingChannel(value) {
-  clearHearingNoResponseTimer();
   const screening = normalizeHearingScreening(state.hearingScreening);
   const side = HEARING_SIDES[screening.channelCheckIndex] || HEARING_SIDES[0];
   screening.channelChecks.push({
@@ -2856,12 +2867,15 @@ function confirmHearingChannel(value) {
     at: new Date().toISOString(),
     reactionMs: hearingReactionMs(screening)
   });
-  screening.currentTonePlayed = false;
   screening.currentTonePlaying = false;
   screening.message = value === "correct" ? "" : "请检查耳机左右是否戴反。";
-  if (screening.channelCheckIndex < HEARING_SIDES.length - 1) {
+  if (value !== "correct") {
+    screening.currentTonePlayed = true;
+  } else if (screening.channelCheckIndex < HEARING_SIDES.length - 1) {
+    screening.currentTonePlayed = false;
     screening.channelCheckIndex += 1;
   } else {
+    screening.currentTonePlayed = false;
     screening.phase = "practice";
     screening.practiceIndex = 0;
     screening.message = "";
@@ -2872,7 +2886,6 @@ function confirmHearingChannel(value) {
 }
 
 function answerHearingPractice(heard, { source = "button" } = {}) {
-  clearHearingNoResponseTimer();
   const screening = normalizeHearingScreening(state.hearingScreening);
   const step = HEARING_PRACTICE_STEPS[screening.practiceIndex] || HEARING_PRACTICE_STEPS[0];
   screening.practiceResponses.push({
@@ -2898,7 +2911,6 @@ function answerHearingPractice(heard, { source = "button" } = {}) {
 }
 
 function answerHearingTrial(heard, { source = "button" } = {}) {
-  clearHearingNoResponseTimer();
   const screening = normalizeHearingScreening(state.hearingScreening);
   const trial = screening.trials[screening.trialIndex] || screening.trials[0];
   const levelDbHl = HEARING_LEVELS_DB_HL[screening.levelIndex] || HEARING_LEVELS_DB_HL[0];
@@ -2963,7 +2975,6 @@ function hearingReactionMs(screening) {
 }
 
 async function playHearingTone(stimulus) {
-  clearHearingNoResponseTimer();
   const screening = normalizeHearingScreening(state.hearingScreening);
   const frequencyHz = Number(stimulus.frequencyHz);
   const levelDbHl = Number(stimulus.levelDbHl);
@@ -3019,7 +3030,6 @@ async function playHearingTone(stimulus) {
     playState = "开始";
     saveDraft();
     render();
-    scheduleHearingNoResponse();
   };
   oscillator.start(now);
   oscillator.stop(endAt + 0.02);
@@ -3032,7 +3042,6 @@ function hearingGainForLevel(levelDbHl, frequencyHz) {
 }
 
 function stopHearingTone({ markPlayed = false } = {}) {
-  clearHearingNoResponseTimer();
   if (!activeHearingTone) return false;
   const tone = activeHearingTone;
   activeHearingTone = null;
@@ -3046,28 +3055,6 @@ function stopHearingTone({ markPlayed = false } = {}) {
     if (!markPlayed) state.hearingScreening.currentTonePlayed = false;
   }
   return true;
-}
-
-function scheduleHearingNoResponse() {
-  clearHearingNoResponseTimer();
-  const screening = normalizeHearingScreening(state.hearingScreening);
-  if (!screening.currentTonePlayed || screening.currentTonePlaying) return;
-  if (!["practice", "test"].includes(screening.phase)) return;
-  hearingNoResponseTimer = window.setTimeout(() => {
-    const current = normalizeHearingScreening(state.hearingScreening);
-    if (!current.currentTonePlayed || current.currentTonePlaying) return;
-    if (current.phase === "practice") {
-      answerHearingPractice(false, { source: "timeout" });
-    } else if (current.phase === "test") {
-      answerHearingTrial(false, { source: "timeout" });
-    }
-  }, HEARING_NO_RESPONSE_DELAY_MS);
-}
-
-function clearHearingNoResponseTimer() {
-  if (!hearingNoResponseTimer) return;
-  window.clearTimeout(hearingNoResponseTimer);
-  hearingNoResponseTimer = null;
 }
 
 function cleanupHearingToneNodes(tone) {
@@ -3768,7 +3755,7 @@ function speakTextWithBrowser(text, { playbackId, speechParams, onStart, finish 
   utterance.lang = "zh-CN";
   utterance.rate = speechParams.speedRatio;
   utterance.pitch = speechParams.browserPitch;
-  utterance.volume = SPEECH_VOLUME;
+  utterance.volume = mocaSpeechVolume();
   const voice = pickNaturalVoice();
   if (voice) utterance.voice = voice;
   utterance.onstart = () => {
@@ -3860,7 +3847,7 @@ function speakItemsWithBrowser(items, { gapMs, rate, done, onItemStart, audioKey
     utterance.lang = "zh-CN";
     utterance.rate = speechParams.speedRatio;
     utterance.pitch = speechParams.browserPitch;
-    utterance.volume = SPEECH_VOLUME;
+    utterance.volume = mocaSpeechVolume();
     const voice = pickNaturalVoice();
     if (voice) utterance.voice = voice;
     let itemFinished = false;
@@ -3894,6 +3881,14 @@ function speechParamsFor(rate, pitch) {
     pitchRatio: clampSpeech(browserPitch / 1.18, 0.6, 1.4),
     browserPitch
   };
+}
+
+function mocaSpeechVolume() {
+  const level = Number(state.hearingScreening?.summary?.mocaAudioLevelDbHl);
+  if (!Number.isFinite(level)) return SPEECH_VOLUME;
+  const volume = MOCA_AUDIO_REFERENCE_VOLUME
+    + ((level - MOCA_AUDIO_REFERENCE_LEVEL_DB_HL) / 30) * (1 - MOCA_AUDIO_REFERENCE_VOLUME);
+  return clampSpeech(volume, 0.48, 1);
 }
 
 async function playStaticTtsAudio(audioKey, { playbackId, onStart, done }) {
@@ -3952,8 +3947,11 @@ async function playStaticItemSequence(items, { audioKeyPrefix, audioKeys, gapMs,
   const gapSeconds = gapMs / 1000;
   buffers.forEach((buffer, index) => {
     const source = context.createBufferSource();
+    const gain = context.createGain();
     source.buffer = buffer;
-    source.connect(context.destination);
+    gain.gain.value = mocaSpeechVolume();
+    source.connect(gain);
+    gain.connect(context.destination);
     activeSpeechBufferSources.push(source);
     const delayMs = Math.max(0, (cursor - context.currentTime) * 1000);
     const timer = window.setTimeout(() => {
@@ -4048,7 +4046,7 @@ function playAudioUrl(url, playbackId, onStart, done) {
       progressFrame = requestAnimationFrame(updateProgress);
     };
     activeSpeechAudio = audio;
-    audio.volume = SPEECH_VOLUME;
+    audio.volume = mocaSpeechVolume();
     audio.onended = () => {
       stopProgress();
       const fill = document.getElementById("audioProgressFill");
@@ -6144,6 +6142,7 @@ function csvRowsForSession(session) {
     hearing_right_pta4: hearingSummary.ears?.right?.pta4 ?? "",
     hearing_left_pta4: hearingSummary.ears?.left?.pta4 ?? "",
     hearing_worse_ear: formatWorseEarLabel(hearingSummary.worseEar),
+    hearing_moca_audio_level: hearingSummary.mocaAudioLevelDbHl ?? "",
     hearing_screening_json: stringifyForCsv(hearing || {}),
     task_id: item.taskId || "",
     task_title: item.title || "",
