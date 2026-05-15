@@ -6798,3 +6798,305 @@ body,
     font-size: clamp(21px, 5.6vw, 27px);
   }
 }
+
+.education-field .edu-segment-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hearing-start-button {
+  min-width: clamp(260px, 28vw, 360px);
+  min-height: clamp(86px, 11dvh, 112px);
+  box-shadow:
+    0 8px 0 var(--leaf-dark),
+    0 18px 34px rgba(34, 169, 107, 0.22);
+}
+
+.hearing-recheck-button {
+  min-width: clamp(128px, 14vw, 170px);
+  min-height: clamp(46px, 6dvh, 58px);
+  padding-inline: 18px;
+  border: 2px solid #d9e6de;
+  background: #f6faf8;
+  color: var(--muted);
+  box-shadow: 0 3px 0 #cddbd2;
+  font-size: clamp(17px, 2vw, 22px);
+}
+
+.keypad-split-page {
+  gap: clamp(10px, 2vw, 24px);
+  padding: clamp(12px, 2dvh, 22px);
+}
+
+.keypad-question-panel,
+.keypad-panel {
+  align-content: stretch;
+  place-items: center;
+}
+
+.keypad-panel .keypad {
+  width: min(100%, 520px);
+  height: 100%;
+  max-height: 520px;
+  grid-auto-rows: minmax(0, 1fr);
+  align-self: stretch;
+}
+
+.keypad-panel .keypad button,
+.keypad-panel .keypad-spacer {
+  min-height: 0;
+}
+
+.digit-question-panel {
+  align-content: center;
+}
+
+.digit-mode-label {
+  color: var(--ink);
+  font-size: clamp(42px, 6vw, 72px);
+  font-weight: 1000;
+  line-height: 1;
+}
+
+.answer-square-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 1.6vw, 16px);
+  width: 100%;
+}
+
+.answer-square {
+  display: grid;
+  width: clamp(76px, 9.5vmin, 112px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 3px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--leaf-dark);
+  box-shadow: 0 4px 0 #cddbd2;
+  font-size: clamp(38px, 6vw, 58px);
+  font-weight: 1000;
+  line-height: 1;
+}
+
+.answer-square.empty {
+  color: transparent;
+}
+
+.digit-answer-squares .answer-square {
+  width: clamp(70px, 8.4vmin, 104px);
+  height: auto;
+}
+
+.serial-page .math-question {
+  max-width: min(560px, 96%);
+  font-size: clamp(38px, 5.2vw, 66px);
+  line-height: 1.12;
+  text-align: center;
+}
+
+.serial-page .serial-display {
+  width: clamp(190px, 22vmin, 270px);
+  height: clamp(112px, 16vmin, 170px);
+  font-size: clamp(48px, 7vw, 78px);
+}
+
+.date-input-with-units {
+  width: auto;
+  grid-template-columns: auto auto auto auto;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 1.4vw, 16px);
+}
+
+.date-input-with-units .date-input-box {
+  width: clamp(86px, 11vmin, 118px);
+  min-height: 0;
+  aspect-ratio: 1;
+}
+
+.date-input-with-units .date-input-box strong {
+  font-size: clamp(38px, 6vw, 58px);
+}
+
+.abstraction-split-page {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  justify-items: stretch;
+  gap: clamp(18px, 3vw, 36px);
+  overflow: hidden;
+}
+
+.abstraction-visual-panel,
+.abstraction-choice-panel {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  align-content: center;
+  justify-items: center;
+}
+
+.abstraction-split-page .word-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(14px, 2vw, 24px);
+  width: min(100%, 560px);
+}
+
+.abstraction-split-page .word-card {
+  min-width: 0;
+  min-height: clamp(180px, 34dvh, 280px);
+}
+
+.abstraction-split-page .word-card span {
+  font-size: clamp(62px, 11vw, 112px);
+}
+
+.abstraction-split-page .word-card strong {
+  font-size: clamp(34px, 5vw, 58px);
+}
+
+.abstraction-choice-panel .abstraction-options {
+  width: min(520px, 100%);
+  height: min(100%, 460px);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+}
+
+.abstraction-choice-panel .option {
+  min-height: 0;
+  font-size: clamp(24px, 3vw, 34px);
+}
+
+.orientation-choice-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  justify-items: stretch;
+  gap: clamp(16px, 3vw, 34px);
+  overflow: hidden;
+}
+
+.orientation-choice-question-panel,
+.orientation-choice-option-panel {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  align-content: center;
+  justify-items: center;
+  gap: clamp(14px, 2.4dvh, 24px);
+}
+
+.weekday-answer-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 2vw, 20px);
+  color: var(--ink);
+  font-size: clamp(38px, 5vw, 62px);
+  font-weight: 1000;
+}
+
+.orientation-answer-square {
+  width: clamp(82px, 11vmin, 118px);
+}
+
+.orientation-answer-box {
+  display: grid;
+  width: min(520px, 92%);
+  min-height: clamp(94px, 14dvh, 138px);
+  place-items: center;
+  padding: 14px 18px;
+  border: 3px solid var(--line);
+  border-left: 7px solid var(--leaf);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--leaf-dark);
+  box-shadow: 0 4px 0 #cddbd2;
+  font-size: clamp(30px, 4.2vw, 52px);
+  font-weight: 1000;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.orientation-answer-box.empty {
+  color: transparent;
+}
+
+.orientation-choice-option-panel .orientation-options {
+  width: min(520px, 100%);
+}
+
+.orientation-weekday-options {
+  grid-template-columns: repeat(3, minmax(0, clamp(82px, 11vmin, 118px)));
+  justify-content: center;
+  gap: clamp(10px, 1.8vw, 16px);
+}
+
+.orientation-weekday-options .option {
+  width: clamp(82px, 11vmin, 118px);
+  min-height: 0;
+  aspect-ratio: 1;
+  padding: 0;
+  font-size: clamp(34px, 5vw, 54px);
+}
+
+.orientation-weekday-options .option:nth-child(7) {
+  grid-column: 2;
+}
+
+.orientation-text-options {
+  height: min(100%, 430px);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+}
+
+.orientation-text-options .option {
+  min-height: 0;
+  font-size: clamp(22px, 2.6vw, 30px);
+}
+
+@media (orientation: portrait), (max-width: 760px) {
+  .keypad-split-page,
+  .abstraction-split-page,
+  .orientation-choice-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 0.42fr) minmax(0, 0.58fr);
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .answer-square,
+  .digit-answer-squares .answer-square,
+  .orientation-answer-square,
+  .orientation-weekday-options .option {
+    width: clamp(54px, 14vw, 78px);
+    font-size: clamp(28px, 7vw, 42px);
+  }
+
+  .answer-square-row {
+    gap: 7px;
+  }
+
+  .serial-page .serial-display {
+    width: clamp(150px, 38vw, 210px);
+    height: clamp(88px, 22vw, 124px);
+  }
+
+  .date-input-with-units .date-input-box {
+    width: clamp(68px, 18vw, 88px);
+  }
+
+  .abstraction-split-page .word-card {
+    min-height: clamp(104px, 20dvh, 150px);
+  }
+
+  .orientation-weekday-options {
+    grid-template-columns: repeat(3, minmax(0, clamp(54px, 14vw, 78px)));
+  }
+}

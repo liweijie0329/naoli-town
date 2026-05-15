@@ -44,7 +44,7 @@ const DEFAULT_PLACE_OPTIONS = ["社区中心", "医院", "学校", "公园"];
 const PLACE_SEARCH_TERMS = ["医院", "学校", "社区中心", "大学", "公园", "图书馆", "体育中心", "博物馆"];
 const MIN_PLACE_DISTRACTOR_KM = 10;
 const DRAWING_CONFIRM_NUDGE_MS = 10000;
-const SPEECH_VOLUME = 1;
+const SPEECH_VOLUME = 0.72;
 const MOCA_AUDIO_OFFSET_DB = 30;
 const MOCA_AUDIO_REFERENCE_LEVEL_DB_HL = 65;
 const MOCA_AUDIO_REFERENCE_VOLUME = 0.72;
@@ -1409,6 +1409,7 @@ function renderHearingIntro(screening) {
   const checkLabel = screening.environment.status === "checking"
     ? "检测中..."
     : checked ? "重新检测" : "环境检测";
+  const checkClass = checked ? "secondary hearing-check-button hearing-recheck-button" : "primary big-button hearing-check-button";
   return html`
     <div class="hearing-card hearing-intro-card">
       <div class="hearing-intro-layout">
@@ -1418,7 +1419,7 @@ function renderHearingIntro(screening) {
             <h3><span>请戴好耳机</span><span>保持安静</span></h3>
           </div>
           <div class="hearing-check-row">
-            <button class="primary big-button hearing-check-button" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
+            <button class="${checkClass}" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
               ${checkLabel}
             </button>
             ${screening.environment.status === "not_checked" ? "" : `
@@ -1428,7 +1429,7 @@ function renderHearingIntro(screening) {
             `}
           </div>
           ${canStart ? `<div class="hearing-actions">
-            <button class="primary big-button hearing-start-button" data-action="startHearingCalibration">开始</button>
+            <button class="primary big-button hearing-start-button pulse" data-action="startHearingCalibration">开始</button>
           </div>` : ""}
         </div>
       </div>
@@ -1880,14 +1881,14 @@ function renderChoiceTask(task) {
   const sequence = response.answer.sequence || [];
   const ready = Boolean(response.answer.audioReady);
   const backward = task.id === "digitBackward";
-  const answerPrompt = backward ? "请倒序点击刚刚听到的所有数字" : "请按顺序点击刚刚听到的所有数字";
+  const answerLength = activeDigitItem(task).answer.length;
+  const modeLabel = backward ? "倒序" : "顺序";
   return html`
     <div class="digit-page ${ready ? "ready keypad-split-page" : ""}">
       ${ready ? `
-        <div class="keypad-question-panel">
-          <strong class="digit-answer-prompt">${answerPrompt}</strong>
-          ${backward ? `<p class="digit-example">例：听到 123，您就选择 321</p>` : ""}
-          <div class="digit-answer">${sequence.map((digit) => `<span>${digit}</span>`).join("")}</div>
+        <div class="keypad-question-panel digit-question-panel">
+          <strong class="digit-mode-label">${modeLabel}</strong>
+          ${renderAnswerSquareRow(sequence, answerLength, "digit-answer digit-answer-squares")}
         </div>
         <div class="keypad-panel">
           <div class="keypad digit-keypad">
@@ -1899,6 +1900,15 @@ function renderChoiceTask(task) {
         ${renderAudioWave()}
         ${renderMemoryStartButton()}
       `}
+    </div>
+  `;
+}
+
+function renderAnswerSquareRow(values, count, className = "") {
+  const entries = Array.isArray(values) ? values : String(values || "").split("");
+  return html`
+    <div class="answer-square-row ${className}">
+      ${Array.from({ length: count }, (_, index) => `<span class="answer-square ${entries[index] ? "" : "empty"}">${escapeHtml(entries[index] || " ")}</span>`).join("")}
     </div>
   `;
 }
@@ -1982,12 +1992,16 @@ function renderAbstractionTask(task, step) {
   const value = response.answer[item.key] || "";
   const options = abstractionOptions(response, item);
   return html`
-    <div class="abstraction-page">
-      <div class="word-pair">
-        ${item.words.map((word, index) => `<div class="word-card"><span>${item.emojis[index]}</span><strong>${escapeHtml(word)}</strong></div>`).join("")}
+    <div class="abstraction-page abstraction-split-page">
+      <div class="abstraction-visual-panel">
+        <div class="word-pair">
+          ${item.words.map((word, index) => `<div class="word-card"><span>${item.emojis[index]}</span><strong>${escapeHtml(word)}</strong></div>`).join("")}
+        </div>
       </div>
-      <div class="option-grid abstraction-options">
-        ${options.map((option) => `<button class="option ${value === option ? "picked" : ""} ${item.practice && option === item.answer ? "guided-option" : ""}" data-action="chooseAbstraction" data-key="${item.key}" data-value="${escapeHtml(option)}"${speechAttrs(option, audioKeyForText(option))}>${escapeHtml(option)}${item.practice && option === item.answer ? `<span class="hand-cue">👉</span>` : ""}</button>`).join("")}
+      <div class="abstraction-choice-panel">
+        <div class="option-grid abstraction-options">
+          ${options.map((option) => `<button class="option ${value === option ? "picked" : ""} ${item.practice && option === item.answer ? "guided-option" : ""}" data-action="chooseAbstraction" data-key="${item.key}" data-value="${escapeHtml(option)}"${speechAttrs(option, audioKeyForText(option))}>${escapeHtml(option)}${item.practice && option === item.answer ? `<span class="hand-cue">👉</span>` : ""}</button>`).join("")}
+        </div>
       </div>
       ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
     </div>
@@ -1998,6 +2012,7 @@ function renderOrientationTask(step) {
   const response = getResponse("orientation");
   const prompt = orientationPrompts[step];
   if (prompt.key === "year" || prompt.key === "date") return renderOrientationNumberTask(response, prompt);
+  if (["weekday", "city", "place"].includes(prompt.key)) return renderOrientationChoiceTask(response, prompt);
   const options = orientationOptions(prompt);
   const picked = response.answer.orientationChoices?.[prompt.key] || "";
   return html`
@@ -2010,6 +2025,41 @@ function renderOrientationTask(step) {
       ` : ""}
     </div>
   `;
+}
+
+function renderOrientationChoiceTask(response, prompt) {
+  const options = orientationOptions(prompt);
+  const picked = response.answer.orientationChoices?.[prompt.key] || response.answer[prompt.key] || "";
+  const weekday = prompt.key === "weekday";
+  const answerText = weekday ? weekdayShortLabel(picked) : picked;
+  const optionClass = weekday ? "orientation-weekday-options" : "orientation-text-options";
+  return html`
+    <div class="orientation-page orientation-choice-page orientation-${prompt.key}-page">
+      <div class="orientation-choice-question-panel">
+        <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
+        ${weekday ? `
+          <div class="weekday-answer-line">
+            <span>星期</span>
+            <span class="answer-square orientation-answer-square ${answerText ? "" : "empty"}">${escapeHtml(answerText || " ")}</span>
+          </div>
+        ` : `
+          <div class="orientation-answer-box ${answerText ? "" : "empty"}">${escapeHtml(answerText || " ")}</div>
+        `}
+      </div>
+      <div class="orientation-choice-option-panel">
+        <div class="option-grid orientation-options ${optionClass}">
+          ${options.map((option) => {
+            const label = weekday ? weekdayShortLabel(option.label) : option.label;
+            return `<button class="option ${picked === option.value ? "picked" : ""}" data-action="chooseOrientation" data-key="${prompt.key}" data-value="${escapeHtml(option.value)}"${speechAttrs(option.label, audioKeyForText(option.label))}>${escapeHtml(label)}</button>`;
+          }).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function weekdayShortLabel(value) {
+  return String(value || "").replace(/^星期/, "");
 }
 
 function renderOrientationNumberTask(response, prompt) {
@@ -3851,8 +3901,8 @@ async function skipTask() {
   if (speechTranscribing || isTaskSubmitting()) return;
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
-  if (task.type === "orientation") {
-    await skipOrientationStep(task, response);
+  if (getTaskStepCount(task) > 1) {
+    await skipCurrentTaskStep(task, response);
     return;
   }
   response.answer.skipped = true;
@@ -3886,11 +3936,12 @@ async function skipTask() {
   render();
 }
 
-async function skipOrientationStep(task, response) {
+async function skipCurrentTaskStep(task, response) {
   const step = getTaskStep(task);
-  const prompt = orientationPrompts[step];
-  response.behavior.orientationSkipped = response.behavior.orientationSkipped || {};
-  if (prompt?.key) response.behavior.orientationSkipped[prompt.key] = new Date().toISOString();
+  if (recognizing || recordingAudio || speechRecognitionStartPending || speechRecognitionWanted) stopVoiceInput();
+  if (task.type === "serial7") finishSerialStepTiming(response, step);
+  recordSkippedStep(task, response, step);
+  clearAnswerForSkippedStep(task, response, step);
   ensureBlankAnswerForStep(task, response, step);
   if (step < getTaskStepCount(task) - 1) {
     response.answer.step = step + 1;
@@ -3913,6 +3964,54 @@ async function skipOrientationStep(task, response) {
   requestImmediateInstructionPlayback(tasks[nextIndex]);
   saveDraft();
   render();
+}
+
+function recordSkippedStep(task, response, step) {
+  const key = task.type === "orientation"
+    ? orientationPrompts[step]?.key || `step${step + 1}`
+    : task.items?.[step]?.key || task.sentences?.[step] || `step${step + 1}`;
+  response.behavior.skippedSteps = response.behavior.skippedSteps || {};
+  response.behavior.skippedSteps[key] = new Date().toISOString();
+  if (task.type === "orientation") {
+    response.behavior.orientationSkipped = response.behavior.orientationSkipped || {};
+    response.behavior.orientationSkipped[key] = response.behavior.skippedSteps[key];
+  }
+}
+
+function clearAnswerForSkippedStep(task, response, step) {
+  response.answer = response.answer || {};
+  if (task.type === "naming") {
+    const key = task.items?.[step]?.key;
+    if (key) response.answer[key] = "";
+  }
+  if (task.type === "serial7") {
+    response.answer.values = response.answer.values || ["", "", "", "", ""];
+    response.answer.values[step] = "";
+  }
+  if (task.type === "sentence") {
+    response.answer.transcript = response.answer.transcript || {};
+    response.answer.interimTranscript = response.answer.interimTranscript || {};
+    response.answer.transcript[step] = "";
+    response.answer.interimTranscript[step] = "";
+  }
+  if (task.type === "abstractionChoice") {
+    const key = task.items?.[step]?.key;
+    if (key) response.answer[key] = "";
+  }
+  if (task.type === "orientation") {
+    const key = orientationPrompts[step]?.key;
+    response.answer.orientationChoices = response.answer.orientationChoices || {};
+    if (key) delete response.answer.orientationChoices[key];
+    if (key === "year") response.answer.year = "";
+    if (key === "date") {
+      response.answer.month = "";
+      response.answer.day = "";
+      response.answer.orientationDateActiveField = "month";
+    }
+    if (key === "weekday") response.answer.weekday = "";
+    if (key === "city") response.answer.city = "";
+    if (key === "place") response.answer.place = "";
+  }
 }
 
 function canConfirmTask(task, response) {
@@ -4470,7 +4569,7 @@ function mocaSpeechVolume() {
   if (!Number.isFinite(level)) return SPEECH_VOLUME;
   const volume = MOCA_AUDIO_REFERENCE_VOLUME
     + ((level - MOCA_AUDIO_REFERENCE_LEVEL_DB_HL) / 30) * (1 - MOCA_AUDIO_REFERENCE_VOLUME);
-  return clampSpeech(volume, 0.48, 1);
+  return clampSpeech(volume, 0.45, 0.95);
 }
 
 async function playStaticTtsAudio(audioKey, { playbackId, onStart, done }) {
