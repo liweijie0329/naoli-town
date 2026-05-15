@@ -3062,7 +3062,7 @@ h4 {
 .design-page {
   display: grid;
   gap: 12px;
-  grid-template-rows: auto minmax(260px, 1fr);
+  grid-template-rows: minmax(260px, 1fr);
   padding: 12px;
   overflow: auto;
   background: #f5f8f6;
@@ -3081,15 +3081,6 @@ h4 {
   width: 100%;
   height: 100%;
   border: 0;
-}
-
-.moca-pdf-fallback-image {
-  display: block;
-  width: min(100%, 980px);
-  margin: 0 auto;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 8px 22px rgba(23, 63, 52, 0.12);
 }
 
 .rubric-page-head {
@@ -5960,6 +5951,10 @@ body,
   text-align: center;
 }
 
+.save-status.error {
+  color: #c23b3b;
+}
+
 @keyframes fireworkBurst {
   0% {
     transform: scale(0.15) rotate(0deg);
@@ -6465,4 +6460,46 @@ body,
   font-size: 14px;
   font-weight: 850;
   line-height: 1.15;
+}
+
+.setup-title-row {
+  width: 100%;
+  justify-content: center;
+  gap: clamp(10px, 1.8vw, 18px);
+  flex-wrap: nowrap;
+}
+
+.setup-title-row > div {
+  min-width: 0;
+}
+
+.setup-title-row h1 {
+  white-space: nowrap;
+}
+
+.setup-title-row .setup-voice-button {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: clamp(42px, 5.2dvh, 52px);
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: clamp(16px, 1.7vw, 20px);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .setup-title-row {
+    gap: 8px;
+  }
+
+  .setup-title-row h1 {
+    font-size: clamp(34px, 10vw, 44px);
+  }
+
+  .setup-title-row .setup-voice-button {
+    min-height: 38px;
+    padding: 7px 10px;
+    font-size: 14px;
+  }
 }

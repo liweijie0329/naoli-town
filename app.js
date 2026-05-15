@@ -626,6 +626,7 @@ function createInitialState() {
     permissions: { microphone: "unknown", location: "unknown" },
     voiceProfile: "cartoon",
     sessionSaveStatus: "idle",
+    sessionSaveError: "",
     sessionSavedAt: null,
     setupAttempted: false,
     setupVoiceRecording: false,
@@ -1045,21 +1046,19 @@ function renderSetup() {
     <div class="setup-screen">
       <section class="setup-panel">
         <div class="setup-left">
-          <div class="brand-row">
+          <div class="brand-row setup-title-row">
             <div>
               <h1>脑力闯关</h1>
             </div>
+            <button type="button" class="setup-voice-button ${state.setupVoiceRecording ? "recording" : ""} ${state.setupVoiceTranscribing ? "transcribing" : ""}" data-action="toggleSetupVoice" ${state.setupVoiceTranscribing ? "disabled" : ""}>
+              ${state.setupVoiceRecording ? "正在聆听..." : state.setupVoiceTranscribing ? "正在识别..." : "语音智能填表"}
+            </button>
           </div>
           <div class="setup-grid">
             ${inputField("participant.name", "姓名", state.participant.name, "", "text", isSetupFieldInvalid("name"))}
             ${birthDateField(state.participant.birthYear, isSetupFieldInvalid("birthYear"))}
             ${segmentedField("sex", "性别", state.participant.sex, ["男", "女"], isSetupFieldInvalid("sex"))}
             ${segmentedField("educationLevel", "教育水平", state.participant.educationLevel, educationLevels.filter(Boolean), isSetupFieldInvalid("educationLevel"))}
-          </div>
-          <div class="voice-setup-row">
-            <button type="button" class="setup-voice-button ${state.setupVoiceRecording ? "recording" : ""} ${state.setupVoiceTranscribing ? "transcribing" : ""}" data-action="toggleSetupVoice" ${state.setupVoiceTranscribing ? "disabled" : ""}>
-              ${state.setupVoiceRecording ? "正在聆听..." : state.setupVoiceTranscribing ? "正在识别..." : "语音智能填表"}
-            </button>
           </div>
           <button class="primary setup-start-button pulse" data-action="startSession">
             <span>开始游戏</span>
@@ -1307,7 +1306,7 @@ function renderShell(current) {
           <button class="drawer-item" data-action="navView" data-view="design">评分标准</button>
           <button class="drawer-item" data-action="navView" data-view="admin">后台</button>
           <div class="drawer-spacer"></div>
-          <button class="drawer-item" data-action="goHome">返回首页</button>
+          <button class="drawer-item" data-action="goHome">退出</button>
         </div>
       </aside>
       <main class="page-shell">
@@ -1345,8 +1344,8 @@ function renderTaskNav(task, index) {
 
 function viewTitle() {
   if (state.view === "hearing") return "听力测试";
-  if (state.view === "results") return "闯关结果";
-  if (state.view === "admin") return "后台数据库";
+  if (state.view === "results") return "闯关成功";
+  if (state.view === "admin") return "后台";
   if (state.view === "design") return "评分标准";
   return "当前任务";
 }
@@ -2173,6 +2172,7 @@ function renderResults() {
   const totals = computeTotals();
   const saving = state.sessionSaveStatus === "saving";
   const saved = state.sessionSaveStatus === "saved";
+  const saveFailed = state.sessionSaveStatus === "error";
   return html`
     <section class="single-page results-page">
       <div class="result-hero celebrate final-celebration">
@@ -2184,10 +2184,11 @@ function renderResults() {
         <p>谢谢您的参与！</p>
       </div>
       <div class="control-row results-actions final-results-actions">
-        <button class="primary big-button" data-action="saveSessionFromResults" ${saving || saved ? "disabled" : ""}>${saving ? "正在保存..." : saved ? "已保存" : "保存本次数据"}</button>
         <button class="secondary big-button" data-action="goHome">退出</button>
       </div>
+      ${saving ? `<p class="save-status">正在自动保存...</p>` : ""}
       ${saved ? `<p class="save-status">数据已保存到后台${state.sessionSavedAt ? `：${escapeHtml(new Date(state.sessionSavedAt).toLocaleString())}` : ""}</p>` : ""}
+      ${saveFailed ? `<p class="save-status error">自动保存失败，请进入后台重试。</p>` : ""}
     </section>
   `;
 }
@@ -2246,7 +2247,7 @@ function renderAdmin() {
   return html`
     <section class="single-page admin-page">
       <div class="admin-toolbar">
-        <button class="primary" data-action="loadSessions">刷新数据库</button>
+        <button class="primary" data-action="loadSessions">刷新</button>
         <button class="secondary" data-action="saveSession">保存当前测评</button>
         <button class="secondary" data-action="exportCsv">导出 CSV</button>
       </div>
@@ -2586,7 +2587,6 @@ function prettyJson(value) {
 function renderDesign() {
   return html`
     <section class="single-page design-page">
-      <img class="moca-pdf-fallback-image" src="${MOCA_SHEET_IMAGE}" alt="蒙特利尔认知评估量表MoCA 评分标准" />
       <object class="moca-pdf-frame" data="${MOCA_SCALE_PDF}#toolbar=1&navpanes=0" type="application/pdf" aria-label="蒙特利尔认知评估量表MoCA">
         <iframe src="${MOCA_SCALE_PDF}#toolbar=1&navpanes=0" title="蒙特利尔认知评估量表MoCA"></iframe>
       </object>
@@ -3733,6 +3733,22 @@ async function requestStartupPermissions(options = {}) {
   if (rerender) render();
 }
 
+async function finishSessionAndShowResults() {
+  state.view = "results";
+  playSfx("finish");
+  state.finishedAt = state.finishedAt || new Date().toISOString();
+  render();
+  if (state.sessionSaveStatus === "saving" || state.sessionSaveStatus === "saved") return;
+  try {
+    await saveSession({ stayOnResults: true });
+  } catch (error) {
+    console.warn("Auto-save session failed", error);
+    state.sessionSaveStatus = "error";
+    state.sessionSaveError = error?.message || String(error || "保存失败");
+    render();
+  }
+}
+
 async function nextTask() {
   if (speechTranscribing) return;
   const task = tasks[state.activeTaskIndex];
@@ -3754,9 +3770,8 @@ async function nextTask() {
   if (task.id === "memory1" && !state.memoryWaitStartedAt) state.memoryWaitStartedAt = Date.now();
   const nextIndex = nextTaskIndexAfterSubmit(task);
   if (nextIndex < 0) {
-    state.view = "results";
-    playSfx("finish");
-    state.finishedAt = new Date().toISOString();
+    await finishSessionAndShowResults();
+    return;
   } else {
     state.activeTaskIndex = nextIndex;
     requestImmediateInstructionPlayback(tasks[nextIndex]);
@@ -3788,9 +3803,9 @@ async function skipTask() {
   if (task.id === "memory1" && !state.memoryWaitStartedAt) state.memoryWaitStartedAt = Date.now();
   const nextIndex = nextTaskIndexAfterSubmit(task);
   if (nextIndex < 0) {
-    state.view = "results";
-    playSfx("finish");
-    state.finishedAt = new Date().toISOString();
+    saveDraft();
+    await finishSessionAndShowResults();
+    return;
   } else {
     state.activeTaskIndex = nextIndex;
     requestImmediateInstructionPlayback(tasks[nextIndex]);
@@ -6005,9 +6020,8 @@ async function autoAdvanceVigilance() {
   await submitActiveTask();
   const nextIndex = nextTaskIndexAfterSubmit(task);
   if (nextIndex < 0) {
-    state.view = "results";
-    playSfx("finish");
-    state.finishedAt = new Date().toISOString();
+    await finishSessionAndShowResults();
+    return;
   } else {
     state.activeTaskIndex = nextIndex;
     requestImmediateInstructionPlayback(tasks[nextIndex]);
@@ -6824,6 +6838,7 @@ async function saveSession(options = {}) {
   const { stayOnResults = false } = options;
   state.finishedAt = state.finishedAt || new Date().toISOString();
   state.sessionSaveStatus = "saving";
+  state.sessionSaveError = "";
   if (stayOnResults) render();
   const payload = buildSessionPayload();
   const saved = await requestJson("/api/sessions", {
