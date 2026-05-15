@@ -111,6 +111,8 @@ function openAiRequestBody(payload, model) {
               "评分必须考虑手绘因素：线条抖动、重描、轻微断开、歪斜、大小不一、间距不均、椭圆或近似圆表盘都不应直接扣分。",
               "必须返回严格 JSON，不要 Markdown，不要解释 JSON 以外的文字。",
               "scoreSuggestion 必须是 0 到 maxScore 的整数；confidence 是 0 到 1；requiresHumanReview 固定返回 false。",
+              "criteria 必须列出每个分项的 passed true/false；comment 只写未得分项目，满分时 comment 为空字符串。",
+              "comment 示例：未得分：指针（未看到两根明确指针）。不要在 comment 里解释已得分项目。",
               "立方体：能辨认为三维盒状/立方体、主要边线基本存在、无明显无关多余线、相对边大致平行且长度接近，即可 1 分。",
               "钟表：轮廓、数字、指针三项各 1 分；圆/椭圆/近似圆可给轮廓分，1-12 基本写全且总体顺时针可给数字分。",
               "钟表指针项必须看得到两根明确的指针/线段，并大致表示 11 点 10 分才给 1 分；没有指针、只有一根指针、只有数字/表盘时，指针项固定 0 分，不能凭题目要求或猜测补分。"
@@ -266,6 +268,8 @@ function workersAiPrompt(payload) {
     "必须只输出一个单行 JSON 对象，不要 Markdown，不要解释文字，不要在 JSON 前后添加任何字符。",
     "JSON 字段：scoreSuggestion(integer), confidence(number), rubricMatched(boolean), requiresHumanReview(boolean), comment(string), criteria(array)。criteria 可为空数组。",
     "requiresHumanReview 固定 false。",
+    "criteria 必须列出每个分项的 passed true/false；comment 只写未得分项目，满分时 comment 为空字符串。",
+    "comment 示例：未得分：指针（未看到两根明确指针）。不要在 comment 里解释已得分项目。",
     "立方体：能辨认为三维盒状/立方体、主要边线基本存在、无明显无关多余线、相对边大致平行且长度接近，即可 1 分。",
     "钟表：轮廓、数字、指针三项各 1 分；圆/椭圆/近似圆可给轮廓分，1-12 基本写全且总体顺时针可给数字分。",
     "钟表指针项必须看得到两根明确的指针/线段，并大致表示 11 点 10 分才给 1 分；没有指针、只有一根指针、只有数字/表盘时，指针项固定 0 分，不能凭题目要求或猜测补分。",

@@ -574,6 +574,8 @@ let trailDragStart = null;
 let trailDragPoint = null;
 let viewportRenderTimer = null;
 let drawingIdleTimers = [];
+let pendingAiScoreTaskIds = new Set();
+let backgroundSessionSaveTimer = null;
 let immediateInstructionPlayback = false;
 let setupVoiceRecorder = null;
 
@@ -850,6 +852,9 @@ function resetState() {
   stopHearingTone();
   stopSetupVoiceCapture({ releaseMic: true });
   stopVoiceInput({ releaseMic: true, shouldRender: false });
+  pendingAiScoreTaskIds = new Set();
+  if (backgroundSessionSaveTimer) window.clearTimeout(backgroundSessionSaveTimer);
+  backgroundSessionSaveTimer = null;
   localStorage.removeItem("moca-game-draft");
   state = createInitialState();
   drawingUndoStacks = {};
@@ -1688,7 +1693,7 @@ function isTaskSubmitting(task = tasks[state.activeTaskIndex]) {
 
 function taskSubmittingLabel(task) {
   if (state.taskSubmitting?.label) return state.taskSubmitting.label;
-  return needsAiScore(task) ? "正在评分..." : "请稍等...";
+  return needsBlockingAiScore(task) ? "正在评分..." : "请稍等...";
 }
 
 function renderTask(task) {
@@ -3869,6 +3874,9 @@ async function startNewSession(participant) {
   const adminSessions = state.adminSessions || [];
   state = createInitialState();
   drawingUndoStacks = {};
+  pendingAiScoreTaskIds = new Set();
+  if (backgroundSessionSaveTimer) window.clearTimeout(backgroundSessionSaveTimer);
+  backgroundSessionSaveTimer = null;
   hearingIntroPromptStartedAt = 0;
   state.participant = participant;
   state.adminSessions = adminSessions;
@@ -3916,7 +3924,7 @@ async function submitActiveTaskWithFeedback(task) {
   }
   state.taskSubmitting = {
     taskId: task.id,
-    label: needsAiScore(task) ? "正在评分..." : "请稍等...",
+    label: isAsyncDrawingAiTask(task) ? "保存图片..." : needsBlockingAiScore(task) ? "正在评分..." : "请稍等...",
     startedAt: Date.now()
   };
   render();
@@ -4236,7 +4244,14 @@ async function submitActiveTask() {
   }
   if (task.type === "drawing" || task.type === "trail") response.drawingImage = currentDrawingImage(task.id);
   finishTask(task.id);
-  if (needsAiScore(task)) response.ai = await scoreTaskWithAi(task);
+  if (isAsyncDrawingAiTask(task)) {
+    markDrawingAiPending(task, response);
+    response.score = computeTaskScore(task, response);
+    saveDraft();
+    scheduleDrawingAiScore(task);
+    return;
+  }
+  if (needsBlockingAiScore(task)) response.ai = await scoreTaskWithAi(task);
   response.score = computeTaskScore(task, response);
   saveDraft();
 }
@@ -6559,19 +6574,99 @@ async function scoreTaskWithAi(task) {
   };
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), AI_SCORE_TIMEOUT_MS);
-  const result = await requestJson("/api/ai-score", {
-    method: "POST",
-    signal: controller.signal,
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(payload)
-  }, () => localAiScore(payload));
-  window.clearTimeout(timeout);
+  let result;
+  try {
+    result = await requestJson("/api/ai-score", {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    }, () => localAiScore(payload));
+  } finally {
+    window.clearTimeout(timeout);
+  }
   if (image) response.drawingImage = image;
   return result;
 }
 
 function needsAiScore(task) {
   return ["trail", "drawing", "fluency"].includes(task.type);
+}
+
+function isAsyncDrawingAiTask(task) {
+  return task?.type === "drawing" && ["cube", "clock"].includes(task.id);
+}
+
+function needsBlockingAiScore(task) {
+  return needsAiScore(task) && !isAsyncDrawingAiTask(task);
+}
+
+function markDrawingAiPending(task, response = getResponse(task.id)) {
+  response.ai = {
+    mode: "async-pending",
+    status: "pending",
+    taskId: task.id,
+    scoreSuggestion: null,
+    confidence: 0,
+    requiresHumanReview: false,
+    aiImageScoringConfigured: true,
+    rubricMatched: false,
+    comment: "",
+    criteria: [],
+    queuedAt: new Date().toISOString()
+  };
+  response.behavior.aiScoreStatus = "pending";
+}
+
+function scheduleDrawingAiScore(task) {
+  if (!isAsyncDrawingAiTask(task)) return;
+  const sessionId = state.sessionId;
+  const jobKey = `${sessionId}:${task.id}`;
+  if (pendingAiScoreTaskIds.has(jobKey)) return;
+  pendingAiScoreTaskIds.add(jobKey);
+  runDrawingAiScore(task.id, sessionId, jobKey);
+}
+
+async function runDrawingAiScore(taskId, sessionId, jobKey) {
+  const task = tasks.find((entry) => entry.id === taskId);
+  if (!task) return;
+  const response = getResponse(taskId);
+  try {
+    const result = await scoreTaskWithAi(task);
+    if (state.sessionId !== sessionId) return;
+    response.ai = {
+      ...result,
+      status: "completed",
+      completedAt: new Date().toISOString()
+    };
+    response.behavior.aiScoreStatus = "completed";
+    delete response.behavior.aiScoreError;
+    response.score = computeTaskScore(task, response);
+  } catch (error) {
+    if (state.sessionId !== sessionId) return;
+    response.ai = {
+      mode: "async-error",
+      status: "error",
+      taskId,
+      scoreSuggestion: null,
+      confidence: 0,
+      requiresHumanReview: false,
+      aiImageScoringConfigured: false,
+      rubricMatched: false,
+      comment: "",
+      criteria: [],
+      error: error?.message || String(error || "AI评分失败"),
+      completedAt: new Date().toISOString()
+    };
+    response.behavior.aiScoreStatus = "error";
+    response.behavior.aiScoreError = response.ai.error;
+  } finally {
+    pendingAiScoreTaskIds.delete(jobKey);
+    if (state.sessionId !== sessionId) return;
+    saveDraft();
+    if (state.sessionSaveStatus === "saved" || state.view === "results" || state.view === "admin") scheduleBackgroundSessionSave();
+    render();
+  }
 }
 
 function clientAutoScoreForAi(task, response) {
@@ -6592,7 +6687,8 @@ function drawingAiRubric(task) {
     instruction: "请只根据用户画布图片评分，按照 MoCA 中文量表分项给出 scoreSuggestion；评分时要考虑老年人手绘误差，不要因为线条抖动、轻微歪斜、椭圆形表盘、数字大小不一或间距不均而扣分。但钟表指针项必须看到两根明确指针/线段才可给分，不得凭猜测补出不存在的指针。",
     outputContract: {
       scoreSuggestion: "整数，范围 0 到 maxScore",
-      criteria: "逐项给 true/false，并说明图片中能直接观察到的证据",
+      comment: "只写未得分项目；满分时留空字符串。例如：未得分：指针（未看到两根明确指针）。",
+      criteria: "必须逐项给 true/false，并说明图片中能直接观察到的证据",
       confidence: "0 到 1",
       rubricMatched: "所有给分条件都来自本 rubric 时为 true"
     },
@@ -7077,10 +7173,39 @@ function orientationAnswerParts(answer = {}) {
 
 function drawingScoreReason(task, response, score) {
   if (task.type !== "drawing" && task.type !== "trail") return "";
-  if (response.ai?.comment) return response.ai.comment;
+  if (response.ai?.status === "pending") return "";
+  if (task.type === "drawing") {
+    const missing = missingDrawingCriteria(task, response);
+    if (score < task.maxScore && missing.length) return `未得分：${missing.map(formatMissingCriterion).join("；")}`;
+    if (score < task.maxScore && response.ai?.comment) return normalizeMissingScoreComment(response.ai.comment);
+  }
   if (task.type === "trail" && score < task.maxScore) return "连线顺序不完整、顺序错误或出现交叉线。";
   if (task.type === "drawing" && score < task.maxScore) return "图片 AI 按 MoCA 标准判为未满足全部给分条件。";
   return "";
+}
+
+function missingDrawingCriteria(task, response) {
+  const criteria = Array.isArray(response.ai?.criteria) ? response.ai.criteria : [];
+  if (!criteria.length) return [];
+  const rubric = DRAWING_AI_RUBRICS[task.drawingKind] || [];
+  const labels = Object.fromEntries(rubric.map((item) => [item.key, item.label]));
+  return criteria
+    .filter((item) => item && item.passed === false)
+    .map((item) => ({
+      label: item.label || labels[item.key] || item.key || "未通过项",
+      evidence: item.evidence || ""
+    }));
+}
+
+function formatMissingCriterion(item) {
+  const evidence = String(item.evidence || "").trim().replace(/^未得分[:：]\s*/, "");
+  return evidence ? `${item.label}（${evidence}）` : item.label;
+}
+
+function normalizeMissingScoreComment(comment) {
+  const text = String(comment || "").trim();
+  if (!text) return "";
+  return text.startsWith("未得分") ? text : `未得分：${text}`;
 }
 
 function hasCompletedHearingScreening(screening) {
@@ -7147,6 +7272,43 @@ function buildSessionPayload({ includeAudioBlobs = false } = {}) {
       };
     })
   };
+}
+
+function scheduleBackgroundSessionSave(delayMs = 600) {
+  if (backgroundSessionSaveTimer) window.clearTimeout(backgroundSessionSaveTimer);
+  backgroundSessionSaveTimer = window.setTimeout(() => {
+    backgroundSessionSaveTimer = null;
+    saveSessionInBackground();
+  }, delayMs);
+}
+
+async function saveSessionInBackground() {
+  if (state.sessionSaveStatus === "saving") {
+    scheduleBackgroundSessionSave(1200);
+    return;
+  }
+  try {
+    const payload = buildSessionPayload();
+    const saved = await requestJson("/api/sessions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    }, () => localSaveSession(payload));
+    const savedDetail = { ...payload, ...saved, itemResponses: payload.itemResponses };
+    state.sessionId = savedDetail.id;
+    state.sessionSaveStatus = "saved";
+    state.sessionSavedAt = savedDetail.savedAt || new Date().toISOString();
+    cacheSessionDetail(savedDetail);
+    upsertAdminSessionSummary(savedDetail);
+    if (state.selectedSession?.id === savedDetail.id) {
+      state.selectedSession = savedDetail;
+      state.selectedSessionLoading = false;
+    }
+  } catch (error) {
+    console.warn("Background session save failed", error);
+    state.sessionSaveStatus = "error";
+    state.sessionSaveError = error?.message || String(error || "保存失败");
+  }
 }
 
 async function saveSession(options = {}) {
