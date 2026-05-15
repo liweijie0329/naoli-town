@@ -1085,15 +1085,24 @@ function birthDateField(value, invalid = false) {
     <div class="field birth-date-field ${invalid ? "invalid" : ""}">
       <span>出生日期</span>
       <div class="birth-date-selects">
-        <select data-birth-part="year" aria-label="出生年份">
-          ${years.map((year) => `<option value="${year}" ${year === parts.year ? "selected" : ""}>${year}年</option>`).join("")}
-        </select>
-        <select data-birth-part="month" aria-label="出生月份">
-          ${months.map((month) => `<option value="${month}" ${month === parts.month ? "selected" : ""}>${Number(month)}月</option>`).join("")}
-        </select>
-        <select data-birth-part="day" aria-label="出生日期">
-          ${days.map((day) => `<option value="${day}" ${day === parts.day ? "selected" : ""}>${Number(day)}日</option>`).join("")}
-        </select>
+        <label class="birth-date-unit-field birth-date-year-field">
+          <select data-birth-part="year" aria-label="出生年份">
+            ${years.map((year) => `<option value="${year}" ${year === parts.year ? "selected" : ""}>${year}</option>`).join("")}
+          </select>
+          <span>年</span>
+        </label>
+        <label class="birth-date-unit-field">
+          <select data-birth-part="month" aria-label="出生月份">
+            ${months.map((month) => `<option value="${month}" ${month === parts.month ? "selected" : ""}>${Number(month)}</option>`).join("")}
+          </select>
+          <span>月</span>
+        </label>
+        <label class="birth-date-unit-field">
+          <select data-birth-part="day" aria-label="出生日期">
+            ${days.map((day) => `<option value="${day}" ${day === parts.day ? "selected" : ""}>${Number(day)}</option>`).join("")}
+          </select>
+          <span>日</span>
+        </label>
       </div>
     </div>
   `;
