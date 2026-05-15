@@ -6541,24 +6541,37 @@ body,
 }
 
 .setup-grid {
-  grid-template-columns: minmax(0, 1.35fr) minmax(150px, 0.65fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .participant-name-field,
+.birth-date-field,
+.sex-field,
 .education-field {
   grid-column: 1 / -1;
 }
 
-.birth-date-field {
-  grid-column: 1;
-}
-
-.sex-field {
-  grid-column: 2;
-}
-
 .sex-field .segmented-options {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (orientation: landscape) and (max-height: 620px) and (min-width: 720px) {
+  .setup-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(150px, 0.65fr);
+  }
+
+  .participant-name-field,
+  .education-field {
+    grid-column: 1 / -1;
+  }
+
+  .birth-date-field {
+    grid-column: 1;
+  }
+
+  .sex-field {
+    grid-column: 2;
+  }
 }
 
 .hearing-copy h3 {
