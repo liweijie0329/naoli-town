@@ -54,6 +54,7 @@ const LOCAL_DEV_API_ORIGIN = "http://127.0.0.1:5178";
 const API_ORIGIN = location.protocol === "file:" ? LOCAL_DEV_API_ORIGIN : "";
 const ASR_ENDPOINT = `${API_ORIGIN}/api/asr`;
 const ASR_TIMEOUT_MS = 90000;
+const AI_SCORE_TIMEOUT_MS = 45000;
 const FLUENCY_LIVE_ASR_INTERVAL_MS = 5000;
 const FLUENCY_LIVE_ASR_MIN_CHUNKS = 12;
 const PREFER_CLOUDFLARE_ASR = true;
@@ -80,7 +81,7 @@ const HEARING_SIDES = [
   { key: "left", label: "左耳", shortLabel: "左" }
 ];
 const HEARING_PRIMARY_FREQUENCIES = [500, 1000, 2000, 4000];
-const HEARING_TEST_FREQUENCIES = [1000, 2000, 4000, 500, 8000];
+const HEARING_TEST_FREQUENCIES = [500, 1000, 2000, 4000, 8000];
 const HEARING_LEVELS_DB_HL = [35, 45, 55, 65];
 const HEARING_TONE_DURATION_MS = 1000;
 const HEARING_FADE_SECONDS = 0.035;
@@ -623,6 +624,7 @@ function createInitialState() {
     memoryWaitStartedAt: null,
     resumeAfterMemory2Index: null,
     playedInstructionKeys: {},
+    taskSubmitting: null,
     permissions: { microphone: "unknown", location: "unknown" },
     voiceProfile: "cartoon",
     sessionSaveStatus: "idle",
@@ -1055,10 +1057,10 @@ function renderSetup() {
             </button>
           </div>
           <div class="setup-grid">
-            ${inputField("participant.name", "姓名", state.participant.name, "", "text", isSetupFieldInvalid("name"))}
+            ${inputField("participant.name", "姓名", state.participant.name, "", "text", isSetupFieldInvalid("name"), "participant-name-field")}
             ${birthDateField(state.participant.birthYear, isSetupFieldInvalid("birthYear"))}
-            ${segmentedField("sex", "性别", state.participant.sex, ["男", "女"], isSetupFieldInvalid("sex"))}
-            ${segmentedField("educationLevel", "教育水平", state.participant.educationLevel, educationLevels.filter(Boolean), isSetupFieldInvalid("educationLevel"))}
+            ${segmentedField("sex", "性别", state.participant.sex, ["男", "女"], isSetupFieldInvalid("sex"), "sex-field")}
+            ${segmentedField("educationLevel", "教育水平", state.participant.educationLevel, educationLevels.filter(Boolean), isSetupFieldInvalid("educationLevel"), "education-field")}
           </div>
           <button class="primary setup-start-button pulse" data-action="startSession">
             <span>开始游戏</span>
@@ -1244,9 +1246,9 @@ function parseRegistrationVoiceText(text) {
   });
 }
 
-function inputField(path, label, value, placeholder, type = "text", invalid = false) {
+function inputField(path, label, value, placeholder, type = "text", invalid = false, className = "") {
   return html`
-    <label class="field ${invalid ? "invalid" : ""}">
+    <label class="field ${className} ${invalid ? "invalid" : ""}">
       <span>${label}</span>
       <input data-bind="${path}" type="${type}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}" />
     </label>
@@ -1264,10 +1266,10 @@ function selectField(path, label, value, options, invalid = false) {
   `;
 }
 
-function segmentedField(key, label, value, options, invalid = false) {
+function segmentedField(key, label, value, options, invalid = false, className = "") {
   const extraClass = options.length > 2 ? "edu-segment-options" : "";
   return html`
-    <div class="field segmented-field ${invalid ? "invalid" : ""}">
+    <div class="field segmented-field ${className} ${invalid ? "invalid" : ""}">
       <span>${label}</span>
       <div class="segmented-options ${extraClass}">
         ${options.map((option) => `<button type="button" class="segment-option ${value === option ? "picked" : ""}" data-action="chooseParticipant" data-key="${key}" data-value="${escapeHtml(option)}"${speechAttrs(option, setupAudioKeyForText(option))}>${escapeHtml(option)}</button>`).join("")}
@@ -1404,10 +1406,10 @@ function renderHearingIntro(screening) {
         <div class="hearing-hero-icon"><span class="headphone-icon"></span></div>
         <div class="hearing-intro-main">
           <div class="hearing-copy">
-            <h3>请戴好耳机，保持安静</h3>
+            <h3><span>请戴好耳机</span><span>保持安静</span></h3>
           </div>
           <div class="hearing-check-row">
-            <button class="utility-button hearing-check-button" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
+            <button class="primary big-button hearing-check-button" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
               ${checkLabel}
             </button>
             ${screening.environment.status === "not_checked" ? "" : `
@@ -1507,9 +1509,10 @@ function renderHearingResponseButtons(action, screening) {
 
 function renderHearingPlayButton(stimulus, screening) {
   const busy = Boolean(screening.currentTonePlaying);
-  const label = busy ? "请听" : screening.currentTonePlayed ? "再听一次" : "播放";
+  const played = Boolean(screening.currentTonePlayed);
+  const label = busy ? "请听" : played ? "已播放" : "播放";
   return html`
-    <button class="primary circle-button sound-button hearing-play-button ${busy ? "" : "pulse"}" data-action="playHearingTone" data-ear="${stimulus.ear}" data-frequency="${stimulus.frequencyHz}" data-level="${stimulus.levelDbHl}" data-context="${stimulus.context}" ${busy ? "disabled" : ""}>
+    <button class="primary circle-button sound-button hearing-play-button ${busy || played ? "" : "pulse"}" data-action="playHearingTone" data-ear="${stimulus.ear}" data-frequency="${stimulus.frequencyHz}" data-level="${stimulus.levelDbHl}" data-context="${stimulus.context}" ${busy || played ? "disabled" : ""}>
       ${label}
     </button>
   `;
@@ -1529,7 +1532,7 @@ function renderHearingSummary(screening) {
         `).join("")}
       </div>
       <div class="hearing-summary-actions">
-        <button class="primary big-button hearing-continue-button" data-action="enterCognitionTest">继续</button>
+        <button class="primary big-button hearing-continue-button pulse" data-action="enterCognitionTest">继续</button>
       </div>
       <button class="hearing-retest-link" data-action="restartHearingCalibration">重测</button>
     </div>
@@ -1659,9 +1662,18 @@ function thresholdValueForSummary(entry) {
   return Number.isFinite(value) ? value : null;
 }
 
+function isTaskSubmitting(task = tasks[state.activeTaskIndex]) {
+  return Boolean(task?.id && state.taskSubmitting?.taskId === task.id);
+}
+
+function taskSubmittingLabel(task) {
+  if (state.taskSubmitting?.label) return state.taskSubmitting.label;
+  return needsAiScore(task) ? "正在评分..." : "请稍等...";
+}
+
 function renderTask(task) {
   const step = getTaskStep(task);
-  const waitAttr = speechTranscribing ? "disabled" : "";
+  const waitAttr = speechTranscribing || isTaskSubmitting(task) ? "disabled" : "";
   return html`
     <section class="single-page task-page">
       <div class="task-workspace">${renderTaskWorkspace(task, step)}</div>
@@ -1675,33 +1687,35 @@ function renderTaskActions(task, step) {
   const secondary = taskActionSecondaryButtons(task);
   const showConfirm = shouldShowConfirmButton(task);
   if (!secondary && !showConfirm) return `<div class="task-actions spacer"></div>`;
+  const submitting = isTaskSubmitting(task);
   const confirmClass = `confirm-button ${shouldNudgeConfirm(task) ? "attention-nudge" : ""}`;
   return html`
     <div class="task-actions">
       <div class="task-actions-left">${secondary || ""}</div>
-      ${showConfirm ? `<button class="${confirmClass}" data-action="nextTask" ${speechTranscribing ? "disabled" : ""}>${confirmLabel(task, step)}</button>` : ""}
+      ${showConfirm ? `<button class="${confirmClass}" data-action="nextTask" ${speechTranscribing || submitting ? "disabled" : ""}>${submitting ? taskSubmittingLabel(task) : confirmLabel(task, step)}</button>` : ""}
       <div class="task-actions-right"></div>
     </div>
   `;
 }
 
 function taskActionSecondaryButtons(task) {
+  const disabled = isTaskSubmitting(task) ? "disabled" : "";
   if (task.type === "trail") return `
-    <button class="utility-button" data-action="undoTrail">撤销</button>
-    <button class="utility-button" data-action="clearTrail">重画</button>
+    <button class="utility-button" data-action="undoTrail" ${disabled}>撤销</button>
+    <button class="utility-button" data-action="clearTrail" ${disabled}>重画</button>
   `;
-  if (task.type === "drawing") return `<button class="utility-button" data-action="clearDrawing">重画</button>`;
-  if (task.type === "choice" && getResponse(task.id).answer.audioReady) return `<button class="utility-button" data-action="backspaceDigit">删除</button>`;
-  if (task.type === "serial7") return `<button class="utility-button" data-action="backspaceSerial">删除</button>`;
+  if (task.type === "drawing") return `<button class="utility-button" data-action="clearDrawing" ${disabled}>重画</button>`;
+  if (task.type === "choice" && getResponse(task.id).answer.audioReady) return `<button class="utility-button" data-action="backspaceDigit" ${disabled}>删除</button>`;
+  if (task.type === "serial7") return `<button class="utility-button" data-action="backspaceSerial" ${disabled}>删除</button>`;
   if (task.type === "orientation") {
     const prompt = orientationPrompts[getTaskStep(task)];
-    if (prompt?.key === "year") return `<button class="utility-button" data-action="backspaceOrientation" data-field="year">删除</button>`;
+    if (prompt?.key === "year") return `<button class="utility-button" data-action="backspaceOrientation" data-field="year" ${disabled}>删除</button>`;
     if (prompt?.key === "date") {
       const field = getResponse("orientation").answer.orientationDateActiveField || "month";
-      return `<button class="utility-button" data-action="backspaceOrientation" data-field="${field}">删除</button>`;
+      return `<button class="utility-button" data-action="backspaceOrientation" data-field="${field}" ${disabled}>删除</button>`;
     }
   }
-  if (task.type === "memory" && task.trial === 1 && getResponse(task.id).answer.audioReady) return `<button class="utility-button replay-button" data-action="playCurrentAudio">再听一遍</button>`;
+  if (task.type === "memory" && task.trial === 1 && getResponse(task.id).answer.audioReady) return `<button class="utility-button replay-button" data-action="playCurrentAudio" ${disabled}>再听一遍</button>`;
   return "";
 }
 
@@ -1807,7 +1821,9 @@ function renderNamingTask(task, step) {
   const item = task.items[step];
   return html`
     <div class="naming-page">
-      <div class="animal-emoji" role="img" aria-label="${escapeHtml(item.answer)}">${animalEmojis[item.key]}</div>
+      <div class="animal-visual-panel">
+        <div class="animal-emoji" role="img" aria-label="${escapeHtml(item.answer)}">${animalEmojis[item.key]}</div>
+      </div>
       <div class="animal-side">
         <h4>这是什么动物？</h4>
         <div class="option-grid">
@@ -1857,13 +1873,17 @@ function renderChoiceTask(task) {
   const backward = task.id === "digitBackward";
   const answerPrompt = backward ? "请倒序点击刚刚听到的所有数字" : "请按顺序点击刚刚听到的所有数字";
   return html`
-    <div class="digit-page ${ready ? "ready" : ""}">
+    <div class="digit-page ${ready ? "ready keypad-split-page" : ""}">
       ${ready ? `
-        <strong class="digit-answer-prompt">${answerPrompt}</strong>
-        ${backward ? `<p class="digit-example">例：听到 123，您就选择 321</p>` : ""}
-        <div class="digit-answer">${sequence.map((digit) => `<span>${digit}</span>`).join("")}</div>
-        <div class="keypad digit-keypad">
-          ${renderKeypadDigits("appendDigit")}
+        <div class="keypad-question-panel">
+          <strong class="digit-answer-prompt">${answerPrompt}</strong>
+          ${backward ? `<p class="digit-example">例：听到 123，您就选择 321</p>` : ""}
+          <div class="digit-answer">${sequence.map((digit) => `<span>${digit}</span>`).join("")}</div>
+        </div>
+        <div class="keypad-panel">
+          <div class="keypad digit-keypad">
+            ${renderKeypadDigits("appendDigit")}
+          </div>
         </div>
       ` : `
         ${backward ? `<p class="digit-example">例：听到 123，您就选择 321</p>` : ""}
@@ -1897,11 +1917,15 @@ function renderSerial7Task(step) {
   const subtractBy = serialSubtractionNumber();
   const question = step === 0 ? `100减${subtractBy}等于多少？` : `再减${subtractBy}，等于多少？`;
   return html`
-    <div class="serial-page">
-      <div class="math-question">${question}</div>
-      <div class="serial-display">${escapeHtml(values[step] || " ")}</div>
-      <div class="keypad serial-keypad">
-        ${renderKeypadDigits("inputSerialDigit")}
+    <div class="serial-page keypad-split-page">
+      <div class="keypad-question-panel">
+        <div class="math-question">${question}</div>
+        <div class="serial-display">${escapeHtml(values[step] || " ")}</div>
+      </div>
+      <div class="keypad-panel">
+        <div class="keypad serial-keypad">
+          ${renderKeypadDigits("inputSerialDigit")}
+        </div>
       </div>
     </div>
   `;
@@ -1983,31 +2007,39 @@ function renderOrientationNumberTask(response, prompt) {
   if (prompt.key === "year") {
     const value = response.answer.year || "";
     return html`
-      <div class="orientation-page orientation-number-page">
-        <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
-        ${renderYearDigitBoxes(value)}
-        <div class="keypad orientation-keypad">
-          ${renderOrientationKeypad("year")}
+      <div class="orientation-page orientation-number-page keypad-split-page">
+        <div class="keypad-question-panel">
+          <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
+          ${renderYearDigitBoxes(value)}
+        </div>
+        <div class="keypad-panel">
+          <div class="keypad orientation-keypad">
+            ${renderOrientationKeypad("year")}
+          </div>
         </div>
       </div>
     `;
   }
   const activeField = response.answer.orientationDateActiveField || "month";
   return html`
-    <div class="orientation-page orientation-number-page">
-      <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
-      <div class="date-input-pair date-input-with-units">
-        <button class="date-input-box ${activeField === "month" ? "active" : ""}" data-action="setOrientationDateField" data-field="month">
-          <strong>${escapeHtml(response.answer.month || " ")}</strong>
-        </button>
-        <span class="date-unit">月</span>
-        <button class="date-input-box ${activeField === "day" ? "active" : ""}" data-action="setOrientationDateField" data-field="day">
-          <strong>${escapeHtml(response.answer.day || " ")}</strong>
-        </button>
-        <span class="date-unit">号</span>
+    <div class="orientation-page orientation-number-page keypad-split-page">
+      <div class="keypad-question-panel">
+        <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
+        <div class="date-input-pair date-input-with-units">
+          <button class="date-input-box ${activeField === "month" ? "active" : ""}" data-action="setOrientationDateField" data-field="month">
+            <strong>${escapeHtml(response.answer.month || " ")}</strong>
+          </button>
+          <span class="date-unit">月</span>
+          <button class="date-input-box ${activeField === "day" ? "active" : ""}" data-action="setOrientationDateField" data-field="day">
+            <strong>${escapeHtml(response.answer.day || " ")}</strong>
+          </button>
+          <span class="date-unit">号</span>
+        </div>
       </div>
-      <div class="keypad orientation-keypad">
-        ${renderOrientationKeypad(activeField)}
+      <div class="keypad-panel">
+        <div class="keypad orientation-keypad">
+          ${renderOrientationKeypad(activeField)}
+        </div>
       </div>
     </div>
   `;
@@ -2184,7 +2216,7 @@ function renderResults() {
         <p>谢谢您的参与！</p>
       </div>
       <div class="control-row results-actions final-results-actions">
-        <button class="secondary big-button" data-action="goHome">退出</button>
+        <button class="secondary big-button" data-action="goHome" ${saved ? "" : "disabled"}>退出</button>
       </div>
       ${saving ? `<p class="save-status">正在自动保存...</p>` : ""}
       ${saved ? `<p class="save-status">数据已保存到后台${state.sessionSavedAt ? `：${escapeHtml(new Date(state.sessionSavedAt).toLocaleString())}` : ""}</p>` : ""}
@@ -2587,9 +2619,7 @@ function prettyJson(value) {
 function renderDesign() {
   return html`
     <section class="single-page design-page">
-      <object class="moca-pdf-frame" data="${MOCA_SCALE_PDF}#toolbar=1&navpanes=0" type="application/pdf" aria-label="蒙特利尔认知评估量表MoCA">
-        <iframe src="${MOCA_SCALE_PDF}#toolbar=1&navpanes=0" title="蒙特利尔认知评估量表MoCA"></iframe>
-      </object>
+      <iframe class="moca-pdf-frame" src="${MOCA_SCALE_PDF}#toolbar=0&navpanes=0&scrollbar=1" title="蒙特利尔认知评估量表MoCA" loading="lazy"></iframe>
     </section>
   `;
 }
@@ -3749,8 +3779,33 @@ async function finishSessionAndShowResults() {
   }
 }
 
+async function submitActiveTaskWithFeedback(task) {
+  if (task.type === "drawing" || task.type === "trail") {
+    const image = captureCanvas(task.id);
+    if (image) getResponse(task.id).drawingImage = image;
+  }
+  state.taskSubmitting = {
+    taskId: task.id,
+    label: needsAiScore(task) ? "正在评分..." : "请稍等...",
+    startedAt: Date.now()
+  };
+  render();
+  try {
+    await submitActiveTask();
+    return true;
+  } catch (error) {
+    console.error("Submit task failed", error);
+    const response = getResponse(task.id);
+    response.behavior.submitError = error?.message || String(error || "提交失败");
+    response.behavior.selectionWarning = "提交较慢或失败，请稍后再点确定。";
+    return false;
+  } finally {
+    if (state.taskSubmitting?.taskId === task.id) state.taskSubmitting = null;
+  }
+}
+
 async function nextTask() {
-  if (speechTranscribing) return;
+  if (speechTranscribing || isTaskSubmitting()) return;
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
   const step = getTaskStep(task);
@@ -3766,7 +3821,11 @@ async function nextTask() {
     render();
     return;
   }
-  await submitActiveTask();
+  const submitted = await submitActiveTaskWithFeedback(task);
+  if (!submitted) {
+    render();
+    return;
+  }
   if (task.id === "memory1" && !state.memoryWaitStartedAt) state.memoryWaitStartedAt = Date.now();
   const nextIndex = nextTaskIndexAfterSubmit(task);
   if (nextIndex < 0) {
@@ -3780,9 +3839,13 @@ async function nextTask() {
 }
 
 async function skipTask() {
-  if (speechTranscribing) return;
+  if (speechTranscribing || isTaskSubmitting()) return;
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
+  if (task.type === "orientation") {
+    await skipOrientationStep(task, response);
+    return;
+  }
   response.answer.skipped = true;
   response.behavior.skippedAt = new Date().toISOString();
   if (recognizing || recordingAudio || speechRecognitionStartPending || speechRecognitionWanted) stopVoiceInput();
@@ -3810,6 +3873,35 @@ async function skipTask() {
     state.activeTaskIndex = nextIndex;
     requestImmediateInstructionPlayback(tasks[nextIndex]);
   }
+  saveDraft();
+  render();
+}
+
+async function skipOrientationStep(task, response) {
+  const step = getTaskStep(task);
+  const prompt = orientationPrompts[step];
+  response.behavior.orientationSkipped = response.behavior.orientationSkipped || {};
+  if (prompt?.key) response.behavior.orientationSkipped[prompt.key] = new Date().toISOString();
+  ensureBlankAnswerForStep(task, response, step);
+  if (step < getTaskStepCount(task) - 1) {
+    response.answer.step = step + 1;
+    requestImmediateInstructionPlayback(task, response.answer.step);
+    saveDraft();
+    render();
+    return;
+  }
+  const submitted = await submitActiveTaskWithFeedback(task);
+  if (!submitted) {
+    render();
+    return;
+  }
+  const nextIndex = nextTaskIndexAfterSubmit(task);
+  if (nextIndex < 0) {
+    await finishSessionAndShowResults();
+    return;
+  }
+  state.activeTaskIndex = nextIndex;
+  requestImmediateInstructionPlayback(tasks[nextIndex]);
   saveDraft();
   render();
 }
@@ -6246,11 +6338,15 @@ async function scoreTaskWithAi(task) {
     maxScore: task.maxScore,
     clientAutoScore: clientAutoScoreForAi(task, response)
   };
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), AI_SCORE_TIMEOUT_MS);
   const result = await requestJson("/api/ai-score", {
     method: "POST",
+    signal: controller.signal,
     headers: { "content-type": "application/json" },
     body: JSON.stringify(payload)
   }, () => localAiScore(payload));
+  window.clearTimeout(timeout);
   if (image) response.drawingImage = image;
   return result;
 }

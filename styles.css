@@ -6503,3 +6503,229 @@ body,
     font-size: 14px;
   }
 }
+
+.setup-grid {
+  grid-template-columns: minmax(0, 1.35fr) minmax(150px, 0.65fr);
+}
+
+.participant-name-field,
+.education-field {
+  grid-column: 1 / -1;
+}
+
+.birth-date-field {
+  grid-column: 1;
+}
+
+.sex-field {
+  grid-column: 2;
+}
+
+.sex-field .segmented-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hearing-copy h3 {
+  display: grid;
+  gap: 0.08em;
+  justify-items: center;
+}
+
+.hearing-check-button {
+  min-width: clamp(210px, 24vw, 280px);
+  min-height: clamp(68px, 8dvh, 84px);
+  border-radius: 8px;
+  font-size: clamp(24px, 3vw, 34px);
+}
+
+.hearing-continue-button {
+  min-width: min(460px, 88vw);
+  min-height: clamp(96px, 13dvh, 124px);
+  box-shadow:
+    0 8px 0 var(--leaf-dark),
+    0 18px 34px rgba(34, 169, 107, 0.22);
+}
+
+.final-results-actions .big-button:disabled,
+.confirm-button:disabled {
+  background: #d9dfdc;
+  color: #7a8780;
+  box-shadow: 0 4px 0 #b7c1bc;
+  opacity: 0.86;
+}
+
+.naming-page {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  justify-items: stretch;
+  gap: clamp(18px, 3vw, 36px);
+  padding: clamp(18px, 3dvh, 34px) clamp(20px, 4vw, 48px);
+}
+
+.animal-visual-panel {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.naming-page .animal-emoji {
+  width: min(100%, 440px, 66vmin);
+  max-height: 100%;
+  font-size: clamp(160px, 28vw, 330px);
+}
+
+.naming-page .animal-side {
+  display: grid;
+  align-content: center;
+  gap: clamp(16px, 2.4dvh, 26px);
+  width: 100%;
+  height: 100%;
+}
+
+.naming-page .animal-side h4 {
+  margin: 0;
+  font-size: clamp(30px, 4.2vw, 52px);
+  line-height: 1.1;
+  text-align: center;
+}
+
+.naming-page .option-grid {
+  grid-template-columns: minmax(0, 1fr);
+  width: min(520px, 100%);
+  justify-self: center;
+}
+
+.naming-page .option {
+  min-height: clamp(68px, 10dvh, 92px);
+  font-size: clamp(24px, 3vw, 34px);
+}
+
+.keypad-split-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  justify-items: stretch;
+  align-content: stretch;
+  gap: clamp(16px, 3vw, 34px);
+  overflow: hidden;
+}
+
+.keypad-question-panel,
+.keypad-panel {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  align-content: center;
+  justify-items: center;
+  gap: clamp(14px, 2.4dvh, 24px);
+}
+
+.keypad-question-panel {
+  padding: clamp(8px, 1.6vw, 18px);
+}
+
+.keypad-panel {
+  padding: clamp(8px, 1.6vw, 18px);
+}
+
+.keypad-panel .keypad {
+  width: min(520px, 100%);
+  height: min(100%, 460px);
+  grid-template-columns: repeat(3, minmax(68px, 1fr));
+  grid-auto-rows: minmax(58px, 1fr);
+  gap: clamp(10px, 1.6vw, 16px);
+}
+
+.keypad-panel .keypad button,
+.keypad-panel .keypad-spacer {
+  height: 100%;
+  min-height: 0;
+}
+
+.keypad-split-page .digit-answer-prompt,
+.keypad-split-page .math-question,
+.keypad-split-page .orientation-question {
+  max-width: min(520px, 94%);
+  text-align: center;
+}
+
+.keypad-split-page .digit-answer,
+.keypad-split-page .serial-display,
+.keypad-split-page .year-digit-row,
+.keypad-split-page .date-input-pair {
+  max-width: min(520px, 96%);
+}
+
+@media (max-width: 560px) {
+  .setup-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .participant-name-field,
+  .birth-date-field,
+  .sex-field,
+  .education-field {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (orientation: portrait), (max-width: 760px) {
+  .naming-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(120px, 0.45fr) minmax(0, 1fr);
+  }
+
+  .naming-page .animal-emoji {
+    width: min(240px, 58vw);
+    font-size: clamp(96px, 28vw, 170px);
+  }
+
+  .naming-page .option {
+    min-height: 56px;
+  }
+
+  .keypad-split-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 0.42fr) minmax(0, 0.58fr);
+    gap: 8px;
+  }
+
+  .keypad-question-panel,
+  .keypad-panel {
+    gap: 8px;
+    padding: 6px;
+  }
+
+  .keypad-panel .keypad {
+    width: min(430px, 100%);
+    height: min(100%, 350px);
+    grid-template-columns: repeat(3, minmax(54px, 1fr));
+  }
+}
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .keypad-split-page {
+    gap: 10px;
+  }
+
+  .keypad-question-panel,
+  .keypad-panel {
+    gap: 8px;
+    padding: 4px;
+  }
+
+  .keypad-panel .keypad {
+    height: min(100%, 300px);
+    grid-template-columns: repeat(3, minmax(48px, 1fr));
+    gap: 8px;
+  }
+
+  .naming-page .animal-emoji {
+    width: min(100%, 280px, 58vmin);
+    font-size: clamp(112px, 24vw, 220px);
+  }
+}
