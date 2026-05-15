@@ -7175,3 +7175,20 @@ body,
     gap: 8px;
   }
 }
+
+.drawer-panel {
+  align-items: stretch;
+}
+
+.drawer-task-list {
+  width: 100%;
+  padding-right: 0;
+}
+
+.drawer-item,
+.drawer-hearing-link,
+.drawer-section-toggle,
+.drawer-task {
+  box-sizing: border-box;
+  width: 100%;
+}

@@ -114,6 +114,7 @@ const HEARING_PROMPT_AUDIO_KEYS = {
     left: "hearing:channel:left"
   }
 };
+const HEARING_INTRO_PROMPT_TEXT = "请戴上耳机，保持安静。";
 
 const TRADITIONAL_PHRASE_REPLACEMENTS = [
   ["甚麼", "什么"],
@@ -517,6 +518,7 @@ let activeRubricItem = null;
 let activeCanvas = null;
 let activeCtx = null;
 let drawing = false;
+let drawingUndoStacks = {};
 let menuOpen = false;
 let cognitionMenuOpen = false;
 let setupPromptAttempted = false;
@@ -844,6 +846,7 @@ function resetState() {
   stopVoiceInput({ releaseMic: true, shouldRender: false });
   localStorage.removeItem("moca-game-draft");
   state = createInitialState();
+  drawingUndoStacks = {};
   menuOpen = false;
   cognitionMenuOpen = false;
   resetSetupPromptPlayback();
@@ -1373,7 +1376,7 @@ function hearingHeaderPrompt() {
   const screening = state.hearingScreening || createHearingScreeningState();
   if (screening.phase === "summary") return "完成后进入正式测试";
   if (screening.phase === "practice" || screening.phase === "test") return "播放后选择";
-  return "请戴好耳机，保持安静";
+  return "请戴上耳机，保持安静";
 }
 
 function hearingProgressPercent() {
@@ -1416,7 +1419,7 @@ function renderHearingIntro(screening) {
         <div class="hearing-hero-icon"><span class="headphone-icon"></span></div>
         <div class="hearing-intro-main">
           <div class="hearing-copy">
-            <h3><span>请戴好耳机</span><span>保持安静</span></h3>
+            <h3><span>请戴上耳机</span><span>保持安静</span></h3>
           </div>
           <div class="hearing-check-row">
             <button class="${checkClass}" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
@@ -1714,7 +1717,10 @@ function taskActionSecondaryButtons(task) {
     <button class="utility-button" data-action="undoTrail" ${disabled}>撤销</button>
     <button class="utility-button" data-action="clearTrail" ${disabled}>重画</button>
   `;
-  if (task.type === "drawing") return `<button class="utility-button" data-action="clearDrawing" ${disabled}>重画</button>`;
+  if (task.type === "drawing") return `
+    <button class="utility-button" data-action="undoDrawing" ${disabled}>撤销</button>
+    <button class="utility-button" data-action="clearDrawing" ${disabled}>重画</button>
+  `;
   if (task.type === "choice" && getResponse(task.id).answer.audioReady) return `<button class="utility-button" data-action="backspaceDigit" ${disabled}>删除</button>`;
   if (task.type === "serial7") return `<button class="utility-button" data-action="backspaceSerial" ${disabled}>删除</button>`;
   if (task.type === "orientation") {
@@ -2789,6 +2795,7 @@ function setupFreeCanvas(task) {
   canvas.onpointerdown = (event) => {
     drawing = true;
     markDrawingInteraction(task);
+    rememberDrawingUndoState(task.id);
     canvas.setPointerCapture(event.pointerId);
     const point = canvasPoint(event, canvas);
     const response = getResponse(task.id);
@@ -2816,6 +2823,35 @@ function setupFreeCanvas(task) {
   startDrawingIdleHints(task);
 }
 
+function rememberDrawingUndoState(taskId) {
+  drawingUndoStacks[taskId] = drawingUndoStacks[taskId] || [];
+  drawingUndoStacks[taskId].push(state.drawings[taskId] || null);
+}
+
+function undoDrawing(task) {
+  if (!task || task.type !== "drawing") return;
+  const stack = drawingUndoStacks[task.id] || [];
+  if (!stack.length) return;
+  const response = getResponse(task.id);
+  const previous = stack.pop();
+  response.behavior.undoCount = Number(response.behavior.undoCount || 0) + 1;
+  response.behavior.strokes = Math.max(0, Number(response.behavior.strokes || 0) - 1);
+  delete response.ai;
+  delete response.behavior.submitError;
+  delete response.behavior.selectionWarning;
+  if (previous) {
+    state.drawings[task.id] = previous;
+    response.drawingImage = previous;
+  } else {
+    delete state.drawings[task.id];
+    delete response.drawingImage;
+    response.behavior.strokes = 0;
+    delete response.behavior.firstInteractionAt;
+  }
+  saveDraft();
+  render();
+}
+
 function startDrawingIdleHints(task) {
   if (!shouldStartDrawingIdleHints(task)) return;
   drawingIdleTimers.push(window.setTimeout(() => nudgeDrawingConfirm(task), DRAWING_CONFIRM_NUDGE_MS));
@@ -2838,6 +2874,8 @@ function nudgeDrawingConfirm(task) {
 function markDrawingInteraction(task) {
   const response = getResponse(task.id);
   if (!response.behavior.firstInteractionAt) response.behavior.firstInteractionAt = new Date().toISOString();
+  delete response.drawingImage;
+  delete response.ai;
   delete response.behavior.confirmNudge;
   stopDrawingIdleTimers();
   document.querySelector(".confirm-button")?.classList.remove("attention-nudge");
@@ -3136,6 +3174,22 @@ function captureCanvas(taskId) {
   if (!canvas) return state.drawings[taskId] || null;
   const image = canvasToCompactDataUrl(canvas);
   state.drawings[taskId] = image;
+  return image;
+}
+
+function refreshDrawingImage(taskId) {
+  const image = captureCanvas(taskId);
+  if (image) getResponse(taskId).drawingImage = image;
+  return image;
+}
+
+function currentDrawingImage(taskId) {
+  const response = getResponse(taskId);
+  const image = response.drawingImage || state.drawings[taskId] || captureCanvas(taskId);
+  if (image) {
+    response.drawingImage = image;
+    state.drawings[taskId] = image;
+  }
   return image;
 }
 
@@ -3510,7 +3564,7 @@ root.addEventListener("click", async (event) => {
   const buttonSpeech = buttonSpeechData(target);
   if (action === "startSession") playSfx("start");
   else if (["skipTask", "nextTask", "skipLogin", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
-  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu"].includes(action)) playSfx("pick");
+  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu"].includes(action)) playSfx("pick");
 
   if (action !== "tapVigilance") stopAudioPlayback();
   if (buttonSpeech) speakButtonSelection(buttonSpeech);
@@ -3671,13 +3725,19 @@ root.addEventListener("click", async (event) => {
   if (action === "stopFluency") stopFluency();
   if (action === "clearDrawing") {
     delete state.drawings[current.id];
+    drawingUndoStacks[current.id] = [];
     const response = getResponse(current.id);
     delete response.drawingImage;
     delete response.ai;
     response.behavior.strokes = 0;
+    response.behavior.undoCount = 0;
     delete response.behavior.confirmNudge;
     delete response.behavior.firstInteractionAt;
     render();
+  }
+  if (action === "undoDrawing") {
+    undoDrawing(current);
+    return;
   }
   if (action === "undoTrail") {
     state.trail.edges = state.trail.edges || [];
@@ -3801,6 +3861,7 @@ root.addEventListener("change", (event) => {
 async function startNewSession(participant) {
   const adminSessions = state.adminSessions || [];
   state = createInitialState();
+  drawingUndoStacks = {};
   state.participant = participant;
   state.adminSessions = adminSessions;
   state.startedAt = new Date().toISOString();
@@ -3810,7 +3871,7 @@ async function startNewSession(participant) {
   cognitionMenuOpen = false;
   render();
   void requestStartupPermissions();
-  queueHearingPrompt();
+  queueHearingPrompt(850);
 }
 
 async function requestStartupPermissions(options = {}) {
@@ -3840,8 +3901,7 @@ async function finishSessionAndShowResults() {
 
 async function submitActiveTaskWithFeedback(task) {
   if (task.type === "drawing" || task.type === "trail") {
-    const image = captureCanvas(task.id);
-    if (image) getResponse(task.id).drawingImage = image;
+    refreshDrawingImage(task.id);
   }
   state.taskSubmitting = {
     taskId: task.id,
@@ -3918,7 +3978,7 @@ async function skipTask() {
     window.clearTimeout(vigilanceAutoAdvanceTimer);
     vigilanceAutoAdvanceTimer = null;
   }
-  if (task.type === "drawing" || task.type === "trail") response.drawingImage = captureCanvas(task.id);
+  if (task.type === "drawing" || task.type === "trail") response.drawingImage = currentDrawingImage(task.id);
   finishTask(task.id);
   response.ai = { mode: "skipped", taskId: task.id, scoreSuggestion: 0, confidence: 1, requiresHumanReview: false };
   response.score = 0;
@@ -4163,7 +4223,7 @@ async function submitActiveTask() {
     window.clearTimeout(vigilanceAutoAdvanceTimer);
     vigilanceAutoAdvanceTimer = null;
   }
-  if (task.type === "drawing" || task.type === "trail") response.drawingImage = captureCanvas(task.id);
+  if (task.type === "drawing" || task.type === "trail") response.drawingImage = currentDrawingImage(task.id);
   finishTask(task.id);
   if (needsAiScore(task)) response.ai = await scoreTaskWithAi(task);
   response.score = computeTaskScore(task, response);
@@ -4346,6 +4406,15 @@ function playSetupPrompt() {
 }
 
 function playHearingPrompt() {
+  const screening = normalizeHearingScreening(state.hearingScreening);
+  if (screening.phase === "intro") {
+    return speakText(HEARING_INTRO_PROMPT_TEXT, {
+      rate: 0.82,
+      pitch: 1.18,
+      purpose: "instruction",
+      audioKey: null
+    });
+  }
   const key = hearingPromptAudioKey();
   if (key) return playStaticPrompt(key, "instruction");
   return Promise.resolve(false);
@@ -6434,8 +6503,8 @@ function localAiScore(payload) {
 }
 
 async function scoreTaskWithAi(task) {
-  const image = task.type === "drawing" || task.type === "trail" ? captureCanvas(task.id) : null;
   const response = getResponse(task.id);
+  const image = task.type === "drawing" || task.type === "trail" ? currentDrawingImage(task.id) : null;
   const payload = {
     taskId: task.id,
     taskType: task.type,
