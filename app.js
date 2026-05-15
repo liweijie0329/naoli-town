@@ -184,13 +184,18 @@ const SFX_SOURCES = {
   finish: "./assets/sfx/finish.mp3",
   success: "./assets/sfx/success.mp3"
 };
+const SFX_VOLUME = {
+  nav: 0.045,
+  start: 0.045,
+  recordStart: 0.05
+};
 
 function playSfx(name) {
   if (["pick", "success", "finish"].includes(name)) return;
   const src = SFX_SOURCES[name];
   if (!src) return;
   const audio = new Audio(src);
-  audio.volume = 0.18;
+  audio.volume = SFX_VOLUME[name] ?? 0.04;
   audio.play().catch(() => {});
 }
 
@@ -524,6 +529,7 @@ let cognitionMenuOpen = false;
 let setupPromptAttempted = false;
 let setupPromptPlayed = false;
 let setupPromptRetryPending = false;
+let hearingIntroPromptStartedAt = 0;
 let playState = "开始";
 let voiceState = "待说";
 let speechRecognition = null;
@@ -850,6 +856,7 @@ function resetState() {
   menuOpen = false;
   cognitionMenuOpen = false;
   resetSetupPromptPlayback();
+  hearingIntroPromptStartedAt = 0;
   playState = "开始";
   voiceState = "待说";
   speechTranscribing = false;
@@ -3862,6 +3869,7 @@ async function startNewSession(participant) {
   const adminSessions = state.adminSessions || [];
   state = createInitialState();
   drawingUndoStacks = {};
+  hearingIntroPromptStartedAt = 0;
   state.participant = participant;
   state.adminSessions = adminSessions;
   state.startedAt = new Date().toISOString();
@@ -3870,8 +3878,11 @@ async function startNewSession(participant) {
   state.view = "hearing";
   cognitionMenuOpen = false;
   render();
-  void requestStartupPermissions();
-  queueHearingPrompt(850);
+  playHearingIntroPromptNow();
+  queueHearingIntroFallback();
+  window.setTimeout(() => {
+    if (state.view === "hearing") void requestStartupPermissions();
+  }, 2800);
 }
 
 async function requestStartupPermissions(options = {}) {
@@ -4407,17 +4418,45 @@ function playSetupPrompt() {
 
 function playHearingPrompt() {
   const screening = normalizeHearingScreening(state.hearingScreening);
-  if (screening.phase === "intro") {
-    return speakText(HEARING_INTRO_PROMPT_TEXT, {
-      rate: 0.82,
-      pitch: 1.18,
-      purpose: "instruction",
-      audioKey: null
-    });
-  }
+  if (screening.phase === "intro") return playHearingIntroPromptNow();
   const key = hearingPromptAudioKey();
   if (key) return playStaticPrompt(key, "instruction");
   return Promise.resolve(false);
+}
+
+function playHearingIntroPromptNow() {
+  if (!("speechSynthesis" in window)) return playStaticPrompt(HEARING_PROMPT_AUDIO_KEYS.intro, "instruction");
+  const playbackId = beginAudioPlayback();
+  const speechParams = speechParamsFor(0.82, 1.18);
+  startPlaybackUi(playbackId, "instruction");
+  let finished = false;
+  const finish = () => {
+    if (playbackId !== speechPlaybackId || finished) return;
+    finished = true;
+    clearSpeechTextFallbackTimer();
+    playState = "开始";
+    speechPlaybackPurpose = null;
+    render();
+  };
+  speechTextFallbackTimer = window.setTimeout(finish, browserSpeechFallbackMs(HEARING_INTRO_PROMPT_TEXT));
+  speakTextWithBrowser(HEARING_INTRO_PROMPT_TEXT, {
+    playbackId,
+    speechParams,
+    onStart: () => {
+      hearingIntroPromptStartedAt = Date.now();
+    },
+    finish
+  });
+  return Promise.resolve(true);
+}
+
+function queueHearingIntroFallback(delayMs = 1200) {
+  window.setTimeout(() => {
+    const screening = normalizeHearingScreening(state.hearingScreening);
+    if (state.view !== "hearing" || screening.phase !== "intro") return;
+    if (Date.now() - hearingIntroPromptStartedAt < 4000) return;
+    playStaticPrompt(HEARING_PROMPT_AUDIO_KEYS.intro, "instruction");
+  }, delayMs);
 }
 
 function hearingPromptAudioKey(screening = state.hearingScreening) {
@@ -4431,7 +4470,10 @@ function hearingPromptAudioKey(screening = state.hearingScreening) {
 
 function queueHearingPrompt(delayMs = 180) {
   window.setTimeout(() => {
-    if (state.view === "hearing") playHearingPrompt();
+    if (state.view !== "hearing") return;
+    const intro = normalizeHearingScreening(state.hearingScreening).phase === "intro";
+    playHearingPrompt();
+    if (intro) queueHearingIntroFallback();
   }, delayMs);
 }
 
