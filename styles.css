@@ -7028,6 +7028,15 @@ body,
   color: transparent;
 }
 
+.orientation-location-hint {
+  max-width: min(520px, 92%);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: center;
+}
+
 .orientation-choice-option-panel .orientation-options {
   width: min(520px, 100%);
 }

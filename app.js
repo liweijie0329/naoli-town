@@ -61,6 +61,7 @@ const MOCA_AUDIO_REFERENCE_LEVEL_DB_HL = 65;
 const MOCA_AUDIO_REFERENCE_VOLUME = 0.72;
 const MOCA_AUDIO_MAX_LEVEL_DB_HL = 95;
 const STATIC_TTS_MANIFEST_SRC = "./assets/audio/manifest.json";
+const STATIC_AUDIO_BUFFER_CACHE_LIMIT = 96;
 const LOCAL_DEV_API_ORIGIN = "http://127.0.0.1:5178";
 const API_ORIGIN = location.protocol === "file:" ? LOCAL_DEV_API_ORIGIN : "";
 const ASR_ENDPOINT = `${API_ORIGIN}/api/asr`;
@@ -567,6 +568,9 @@ let activeSpeechAudio = null;
 let activeHearingTone = null;
 let staticTtsManifest = null;
 let staticTtsManifestPromise = null;
+let staticAudioPreloadTimer = null;
+const staticAudioBufferCache = new Map();
+const staticAudioBufferPromiseCache = new Map();
 let instructionTimer = null;
 let speechPlaybackPurpose = null;
 let speechAudioContext = null;
@@ -1095,6 +1099,7 @@ function render() {
   if (state.view === "setup") {
     root.innerHTML = renderSetup();
     queueSetupPrompt();
+    queueVisibleSpeechAudioPreload();
     return;
   }
 
@@ -1106,6 +1111,7 @@ function render() {
     setupCurrentTask(current);
     scheduleTaskInstruction(current);
   }
+  queueVisibleSpeechAudioPreload();
 }
 
 function renderSetup() {
@@ -2117,6 +2123,7 @@ function renderOrientationChoiceTask(response, prompt) {
     <div class="orientation-page orientation-choice-page orientation-${prompt.key}-page">
       <div class="orientation-choice-question-panel">
         <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
+        ${renderOrientationLocationHint(response, prompt.key)}
         ${weekday ? `
           <div class="weekday-answer-line">
             <span>星期</span>
@@ -2136,6 +2143,23 @@ function renderOrientationChoiceTask(response, prompt) {
       </div>
     </div>
   `;
+}
+
+function renderOrientationLocationHint(response, key) {
+  if (!["city", "place"].includes(key)) return "";
+  const text = orientationLocationHintText(response);
+  return text ? `<small class="orientation-location-hint">${escapeHtml(text)}</small>` : "";
+}
+
+function orientationLocationHintText(response) {
+  const location = response.behavior.location;
+  if (!location) return "当前定位：正在获取";
+  if (location.error) return `当前定位：${location.error}`;
+  const city = normalizeCityName(location.city || response.answer.expectedCity || "");
+  const place = placeCategoryName(location.place || response.answer.expectedPlace || location.address || "");
+  if (city || place) return `当前定位：${[city, place].filter(Boolean).join(" · ")}`;
+  if (Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude))) return "当前定位：已获取坐标，正在解析地址";
+  return "当前定位：正在获取";
 }
 
 function weekdayShortLabel(value) {
@@ -3883,7 +3907,7 @@ function buttonSpeechData(target) {
 
 function speakButtonSelection({ text, audioKey, action }) {
   if (state.view === "setup" || state.view === "hearing") {
-    speakText(text, { audioKey, rate: 0.82, pitch: 1.1, purpose: "option", staticOnly: true });
+    speakText(text, { audioKey, rate: 0.82, pitch: 1.1, purpose: "option", staticOnly: true, preferBuffer: true });
     return;
   }
   const task = tasks[state.activeTaskIndex];
@@ -3891,7 +3915,7 @@ function speakButtonSelection({ text, audioKey, action }) {
   const response = getResponse(task.id);
   response.behavior.optionAudioPlayback = response.behavior.optionAudioPlayback || [];
   response.behavior.optionAudioPlayback.push({ text, audioKey, action, at: new Date().toISOString() });
-  speakText(text, { audioKey, rate: 0.82, pitch: 1.1, purpose: "option" });
+  speakText(text, { audioKey, rate: 0.82, pitch: 1.1, purpose: "option", preferBuffer: true });
 }
 
 root.addEventListener("pointerdown", (event) => {
@@ -4606,7 +4630,7 @@ async function playStaticPrompt(audioKey, purpose = "speech") {
 }
 
 async function speakText(text, options = {}) {
-  const { rate = 0.82, pitch = 1.18, done, onStart, fallbackMs = 0, purpose = "speech", audioKey = null, staticOnly = false } = options;
+  const { rate = 0.82, pitch = 1.18, done, onStart, fallbackMs = 0, purpose = "speech", audioKey = null, staticOnly = false, preferBuffer = false } = options;
   const playbackId = beginAudioPlayback();
   const speechParams = speechParamsFor(rate, pitch);
   startPlaybackUi(playbackId, purpose);
@@ -4625,7 +4649,8 @@ async function speakText(text, options = {}) {
   const staticAudioStarted = await playStaticTtsAudio(audioKey, {
     playbackId,
     onStart,
-    done: finish
+    done: finish,
+    preferBuffer
   });
   if (staticAudioStarted) return;
   if (playbackId !== speechPlaybackId || finished) return;
@@ -4791,9 +4816,13 @@ function mocaSpeechVolume() {
   return clampSpeech(volume, 0.45, 0.95);
 }
 
-async function playStaticTtsAudio(audioKey, { playbackId, onStart, done }) {
+async function playStaticTtsAudio(audioKey, { playbackId, onStart, done, preferBuffer = false }) {
   if (!audioKey) return false;
   try {
+    if (preferBuffer) {
+      const bufferStarted = await playStaticTtsBuffer(audioKey, { playbackId, onStart, done });
+      if (bufferStarted) return true;
+    }
     const url = await staticTtsAudioUrl(audioKey);
     if (!url) return false;
     if (playbackId !== speechPlaybackId) return true;
@@ -4801,6 +4830,31 @@ async function playStaticTtsAudio(audioKey, { playbackId, onStart, done }) {
   } catch {
     return false;
   }
+}
+
+async function playStaticTtsBuffer(audioKey, { playbackId, onStart, done }) {
+  const url = await staticTtsAudioUrl(audioKey);
+  if (!url) return false;
+  const context = await resumeSpeechAudioContext();
+  if (!context) return false;
+  const buffer = await loadCachedSpeechAudioBuffer(url, context);
+  if (playbackId !== speechPlaybackId) return true;
+  stopStaticSpeechSources();
+  const source = context.createBufferSource();
+  const gain = context.createGain();
+  source.buffer = buffer;
+  gain.gain.value = mocaSpeechVolume();
+  source.connect(gain);
+  gain.connect(context.destination);
+  activeSpeechBufferSources.push(source);
+  source.onended = () => {
+    if (playbackId !== speechPlaybackId) return;
+    activeSpeechBufferSources = activeSpeechBufferSources.filter((entry) => entry !== source);
+    if (done) done();
+  };
+  if (onStart) onStart();
+  source.start(context.currentTime + 0.01);
+  return true;
 }
 
 async function staticTtsAudioUrl(audioKey) {
@@ -4826,6 +4880,29 @@ async function loadStaticTtsManifest() {
   return staticTtsManifestPromise;
 }
 
+function queueVisibleSpeechAudioPreload() {
+  window.clearTimeout(staticAudioPreloadTimer);
+  staticAudioPreloadTimer = window.setTimeout(preloadVisibleSpeechAudio, 80);
+}
+
+async function preloadVisibleSpeechAudio() {
+  staticAudioPreloadTimer = null;
+  const keys = [...new Set([...root.querySelectorAll("[data-audio-key]")]
+    .map((element) => element.dataset.audioKey)
+    .filter(Boolean))]
+    .slice(0, 16);
+  if (!keys.length) return;
+  await Promise.allSettled(keys.map((key) => preloadStaticTtsAudio(key)));
+}
+
+async function preloadStaticTtsAudio(audioKey) {
+  const url = await staticTtsAudioUrl(audioKey);
+  if (!url || staticAudioBufferCache.has(url)) return;
+  const context = await speechAudioContextForDecode();
+  if (!context) return;
+  await loadCachedSpeechAudioBuffer(url, context).catch(() => null);
+}
+
 async function playStaticItemSequence(items, { audioKeyPrefix, audioKeys, gapMs, playbackId, onItemStart, done }) {
   const keys = items.map((_, index) => audioKeys[index] || (audioKeyPrefix ? `${audioKeyPrefix}:${index}` : null));
   if (!keys.every(Boolean)) return false;
@@ -4836,7 +4913,7 @@ async function playStaticItemSequence(items, { audioKeyPrefix, audioKeys, gapMs,
   if (!urls.every(Boolean)) return false;
   let buffers;
   try {
-    buffers = await Promise.all(urls.map((url) => loadSpeechAudioBuffer(url, context)));
+    buffers = await Promise.all(urls.map((url) => loadCachedSpeechAudioBuffer(url, context)));
   } catch {
     return false;
   }
@@ -4869,17 +4946,49 @@ async function playStaticItemSequence(items, { audioKeyPrefix, audioKeys, gapMs,
 }
 
 async function resumeSpeechAudioContext() {
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) return null;
-  speechAudioContext = speechAudioContext || new AudioContextClass();
-  if (speechAudioContext.state === "suspended") {
+  const context = await speechAudioContextForDecode();
+  if (!context) return null;
+  if (context.state === "suspended") {
     try {
-      await speechAudioContext.resume();
+      await context.resume();
     } catch {
       return null;
     }
   }
+  return context;
+}
+
+async function speechAudioContextForDecode() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+  speechAudioContext = speechAudioContext || new AudioContextClass();
   return speechAudioContext;
+}
+
+async function loadCachedSpeechAudioBuffer(url, context) {
+  if (staticAudioBufferCache.has(url)) return staticAudioBufferCache.get(url);
+  if (!staticAudioBufferPromiseCache.has(url)) {
+    staticAudioBufferPromiseCache.set(url, loadSpeechAudioBuffer(url, context)
+      .then((buffer) => {
+        rememberStaticAudioBuffer(url, buffer);
+        staticAudioBufferPromiseCache.delete(url);
+        return buffer;
+      })
+      .catch((error) => {
+        staticAudioBufferPromiseCache.delete(url);
+        throw error;
+      }));
+  }
+  return staticAudioBufferPromiseCache.get(url);
+}
+
+function rememberStaticAudioBuffer(url, buffer) {
+  if (staticAudioBufferCache.has(url)) staticAudioBufferCache.delete(url);
+  staticAudioBufferCache.set(url, buffer);
+  while (staticAudioBufferCache.size > STATIC_AUDIO_BUFFER_CACHE_LIMIT) {
+    const oldestKey = staticAudioBufferCache.keys().next().value;
+    staticAudioBufferCache.delete(oldestKey);
+  }
 }
 
 async function loadSpeechAudioBuffer(url, context) {
