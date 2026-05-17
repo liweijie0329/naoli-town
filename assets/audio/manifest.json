@@ -2760,7 +2760,7 @@
     },
     "setup:intro": {
       "src": "assets/audio/setup-intro.mp3",
-      "text": "请填写姓名、出生日期、性别和教育水平。也可以点击语音智能填表，说出这些信息。",
+      "text": "请填写姓名、出生日期、性别和教育水平。",
       "profile": "gentle",
       "speedRatio": 1,
       "provider": "doubao-v3",

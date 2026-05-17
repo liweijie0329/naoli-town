@@ -18,6 +18,7 @@ syncVigilanceDigits();
 syncDigitBanks();
 syncDigitPad();
 syncSerialSubtractionPrompts();
+syncStaticTextOptions();
 
 const nextText = `${JSON.stringify(ttsSource, null, 2)}\n`;
 
@@ -96,6 +97,22 @@ function syncSerialSubtractionPrompts() {
   }
 }
 
+function syncStaticTextOptions() {
+  upsertEntry("setup:intro", {
+    text: extractStringConstant("SETUP_PROMPT_TEXT")
+  });
+  const values = new Set([
+    extractStringConstant("DEFAULT_CITY"),
+    extractStringConstant("DEFAULT_PLACE"),
+    ...extractStringArrayConstant("CITY_DISTRACTORS"),
+    ...extractStringArrayConstant("PLACE_DISTRACTOR_POOL"),
+    ...extractStringArrayConstant("PLACE_CORRECT_CATEGORIES")
+  ].filter(Boolean));
+  values.forEach((text) => {
+    upsertEntry(`text:${textKey(text)}`, { text });
+  });
+}
+
 function upsertEntry(key, values) {
   const entry = entries.find((item) => item.key === key);
   if (!entry) {
@@ -113,6 +130,22 @@ function upsertEntry(key, values) {
 
 function digitSequenceText(value) {
   return String(value).split("").join(" ");
+}
+
+function textKey(text) {
+  let hash = 2166136261;
+  Array.from(String(text || "")).forEach((char) => {
+    hash ^= char.codePointAt(0);
+    hash = Math.imul(hash, 16777619);
+  });
+  return (hash >>> 0).toString(36);
+}
+
+function extractStringConstant(name) {
+  const pattern = new RegExp(`const\\s+${name}\\s*=\\s*"([^"]*)"\\s*;`);
+  const match = appSource.match(pattern);
+  if (!match) throw new Error(`无法在 app.js 中找到 ${name}。`);
+  return JSON.parse(`"${match[1]}"`);
 }
 
 function extractSplitStringConstant(name) {

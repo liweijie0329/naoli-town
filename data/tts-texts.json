@@ -1396,7 +1396,7 @@
     },
     {
       "key": "setup:intro",
-      "text": "请填写姓名、出生日期、性别和教育水平。也可以点击语音智能填表，说出这些信息。"
+      "text": "请填写姓名、出生日期、性别和教育水平。"
     },
     {
       "key": "setup:option:e0japi",
@@ -1453,6 +1453,62 @@
     {
       "key": "hearing:summary",
       "text": "听力测试完成。请点击继续，进入认知测试。"
+    },
+    {
+      "key": "text:u2djc8",
+      "text": "重庆市"
+    },
+    {
+      "key": "text:1o0vgt1",
+      "text": "长沙市"
+    },
+    {
+      "key": "text:cvpgss",
+      "text": "郑州市"
+    },
+    {
+      "key": "text:bidbuk",
+      "text": "合肥市"
+    },
+    {
+      "key": "text:1iuyrwm",
+      "text": "福州市"
+    },
+    {
+      "key": "text:wj4tsg",
+      "text": "济南市"
+    },
+    {
+      "key": "text:1s3fomw",
+      "text": "宁波市"
+    },
+    {
+      "key": "text:2wu0iw",
+      "text": "无锡市"
+    },
+    {
+      "key": "text:xt2ugp",
+      "text": "商场"
+    },
+    {
+      "key": "text:1wk2vdy",
+      "text": "超市"
+    },
+    {
+      "key": "text:n55b5s",
+      "text": "车站"
+    },
+    {
+      "key": "text:1de650f",
+      "text": "银行"
+    },
+    {
+      "key": "text:hjf223",
+      "text": "药店"
+    },
+    {
+      "key": "text:1xl3g8j",
+      "text": "菜市场"
     }
   ]
 }

@@ -26,6 +26,8 @@ const DIGIT_BACKWARD_BANK = [
 ].map((stimulus, index) => ({ id: String(index + 1).padStart(2, "0"), stimulus, answer: stimulus.split("").reverse().join("") }));
 const MEMORY_WAIT_MS = 5 * 60 * 1000;
 const LOCAL_SESSIONS_KEY = "moca-game-local-sessions";
+const ADMIN_PASSWORD = "123";
+const SETUP_PROMPT_TEXT = "请填写姓名、出生日期、性别和教育水平。";
 const LOGO_SRC = "./assets/logo.svg";
 const MOCA_SHEET_IMAGE = "./assets/moca/moca-page.png";
 const MOCA_SCALE_PDF = "./assets/moca/moca-scale.pdf";
@@ -38,9 +40,18 @@ const ABSTRACTION_DISTRACTORS_BY_SUFFIX = {
   用的: ["吃饭用的", "写字用的", "做饭用的", "清洁用的", "照明用的", "穿戴用的", "娱乐用的", "装东西用的"],
   仪器: ["医疗仪器", "音乐仪器", "照明仪器", "通信仪器", "厨房仪器", "运动仪器", "教学仪器", "摄影仪器"]
 };
-const CITY_DISTRACTORS = ["北京市", "上海市", "杭州市", "苏州市", "广州市", "深圳市", "成都市", "武汉市", "西安市", "青岛市", "厦门市", "天津市"];
-const DEFAULT_CITY_OPTIONS = ["杭州市", "上海市", "南京市", "西安市"];
-const DEFAULT_PLACE_OPTIONS = ["社区中心", "医院", "学校", "公园"];
+const DEFAULT_CITY = "南京市";
+const DEFAULT_PLACE = "社区中心";
+const CITY_DISTRACTORS = [
+  "北京市", "上海市", "杭州市", "苏州市", "广州市",
+  "深圳市", "成都市", "武汉市", "西安市", "青岛市",
+  "厦门市", "天津市", "重庆市", "长沙市", "郑州市",
+  "合肥市", "福州市", "济南市", "宁波市", "无锡市"
+];
+const DEFAULT_CITY_OPTIONS = ["杭州市", "上海市", DEFAULT_CITY, "西安市"];
+const PLACE_DISTRACTOR_POOL = ["医院", "学校", "社区中心", "公园", "商场", "超市", "图书馆", "体育中心", "博物馆", "车站"];
+const PLACE_CORRECT_CATEGORIES = [...PLACE_DISTRACTOR_POOL, "银行", "药店", "菜市场"];
+const DEFAULT_PLACE_OPTIONS = [DEFAULT_PLACE, "医院", "学校", "公园"];
 const PLACE_SEARCH_TERMS = ["医院", "学校", "社区中心", "大学", "公园", "图书馆", "体育中心", "博物馆"];
 const MIN_PLACE_DISTRACTOR_KM = 10;
 const DRAWING_CONFIRM_NUDGE_MS = 10000;
@@ -303,7 +314,7 @@ const tasks = [
     modality: "拖拽连线",
     prompt: "请从一个圆圈拖线连到另一个圆圈，按数字和汉字交替上升的规则完成。",
     instruction: "请按数字和汉字交替上升的规则，把所有圆圈用一条线连起来。每次从当前圆圈拖到下一个圆圈。",
-    scoring: "完全按照 1-甲-2-乙-3-丙-4-丁-5-戊，且没有任何交叉线，给 1 分；出现任何错误且未立刻自我纠正，给 0 分。"
+    scoring: "最终连线序列只要包含 1-甲-2-乙-3-丙-4-丁-5-戊 的正确顺序，即给 1 分；重复点击同一节点不扣分，撤销或重画后按最后留下的序列判分。"
   },
   {
     id: "cube",
@@ -474,7 +485,7 @@ const rubricGroups = [
   {
     title: "视空间与执行功能",
     items: [
-      { title: "交替连线测验", prompt: "请您按照从数字到汉字并逐渐升高的顺序画一条连线。从 1 连向甲，再连向 2，并一直连下去，到戊结束。", scoring: "完全按照 1-甲-2-乙-3-丙-4-丁-5-戊 的顺序进行连线且没有任何交叉线时给 1 分。出现任何错误而没有立刻自我纠正时，给 0 分。", image: true },
+      { title: "交替连线测验", prompt: "请您按照从数字到汉字并逐渐升高的顺序画一条连线。从 1 连向甲，再连向 2，并一直连下去，到戊结束。", scoring: "最终连线序列包含 1-甲-2-乙-3-丙-4-丁-5-戊 的正确顺序即给 1 分。重复点击同一节点不扣分，撤销或重画后按最后留下的序列判分。", image: true },
       { title: "复制立方体", prompt: "请您照着这幅图在下面的空白处再画一遍，并尽可能精确。", scoring: "符合下列标准时给 1 分：图形可辨认为三维结构；主要线条基本存在；无明显无关多余线；相对边大致平行且长度接近。允许手绘线条抖动、重描、轻微断开、角度不完美或小幅长度偏差。", image: true },
       { title: "画钟表", prompt: "请您在此处画一个钟表，填上所有的数字并指示出 11 点 10 分。", scoring: "轮廓 1 分：圆、椭圆或近似圆均可，允许轻微缺陷。数字 1 分：1-12 基本写全、可辨认、总体顺时针分布即可，允许歪斜、大小不一、间距不均。指针 1 分：必须看得到两根指针并大致表示 11 点 10 分，时针短于分针；没有指针或只有一根指针时，指针项为 0 分。", image: true }
     ]
@@ -521,11 +532,14 @@ let state = createInitialState();
 const sessionDetailCache = new Map();
 let activeRubricItem = null;
 let activeCanvas = null;
+let activeCanvasTaskId = null;
 let activeCtx = null;
 let drawing = false;
 let drawingUndoStacks = {};
 let menuOpen = false;
 let cognitionMenuOpen = false;
+let protectedViewsUnlocked = false;
+let manualTranscriptComposing = false;
 let setupPromptAttempted = false;
 let setupPromptPlayed = false;
 let setupPromptRetryPending = false;
@@ -755,21 +769,42 @@ function trailEdgesFromSequence(sequence = []) {
 function summarizeTrailEdges(edges = []) {
   const sequence = [];
   let errors = 0;
-  let correctStep = 0;
   const normalizedEdges = edges
     .filter((edge) => edge?.from && edge?.to && edge.from !== edge.to)
     .map((edge) => {
-      const expectedFrom = TRAIL_EXPECTED[correctStep];
-      const expectedTo = TRAIL_EXPECTED[correctStep + 1];
-      const correct = edge.from === expectedFrom && edge.to === expectedTo;
-      if (correct) correctStep += 1;
-      else errors += 1;
       if (!sequence.length) sequence.push(edge.from);
       else if (sequence[sequence.length - 1] !== edge.from) sequence.push(edge.from);
       sequence.push(edge.to);
-      return { ...edge, correct };
+      return { ...edge, correct: false };
     });
+  const progressByEdge = trailProgressByEdge(normalizedEdges);
+  normalizedEdges.forEach((edge, index) => {
+    edge.correct = Boolean(progressByEdge[index]);
+    if (!edge.correct) errors += 1;
+  });
+  const correctStep = Math.max(0, trailSubsequenceProgress(sequence) - 1);
   return { edges: normalizedEdges, sequence, errors, correctStep };
+}
+
+function trailProgressByEdge(edges = []) {
+  let progress = 0;
+  return edges.map((edge) => {
+    const before = progress;
+    progress = trailSubsequenceProgress([edge.from, edge.to], progress);
+    return progress > before;
+  });
+}
+
+function trailSubsequenceProgress(sequence = [], startIndex = 0) {
+  let expectedIndex = Math.max(0, Math.min(TRAIL_EXPECTED.length, Number(startIndex) || 0));
+  sequence.forEach((label) => {
+    if (label === TRAIL_EXPECTED[expectedIndex]) expectedIndex += 1;
+  });
+  return expectedIndex;
+}
+
+function trailContainsExpectedSequence(sequence = state.trail.sequence || []) {
+  return trailSubsequenceProgress(sequence) >= TRAIL_EXPECTED.length;
 }
 
 function rebuildTrailFromEdges() {
@@ -860,6 +895,8 @@ function resetState() {
   drawingUndoStacks = {};
   menuOpen = false;
   cognitionMenuOpen = false;
+  protectedViewsUnlocked = false;
+  manualTranscriptComposing = false;
   resetSetupPromptPlayback();
   hearingIntroPromptStartedAt = 0;
   playState = "开始";
@@ -1042,6 +1079,8 @@ function render() {
   saveDraft();
   stopTrailGuide();
   stopDrawingIdleTimers();
+  activeCanvas = null;
+  activeCanvasTaskId = null;
   if (state.view === "setup") {
     root.innerHTML = renderSetup();
     queueSetupPrompt();
@@ -1067,9 +1106,6 @@ function renderSetup() {
             <div>
               <h1>脑力闯关</h1>
             </div>
-            <button type="button" class="setup-voice-button ${state.setupVoiceRecording ? "recording" : ""} ${state.setupVoiceTranscribing ? "transcribing" : ""}" data-action="toggleSetupVoice" ${state.setupVoiceTranscribing ? "disabled" : ""}>
-              ${state.setupVoiceRecording ? "正在聆听..." : state.setupVoiceTranscribing ? "正在识别..." : "语音智能填表"}
-            </button>
           </div>
           <div class="setup-grid">
             ${inputField("participant.name", "姓名", state.participant.name, "", "text", isSetupFieldInvalid("name"), "participant-name-field")}
@@ -1374,6 +1410,21 @@ function viewTitle() {
   if (state.view === "admin") return "后台";
   if (state.view === "design") return "评分标准";
   return "当前任务";
+}
+
+function isProtectedView(view) {
+  return view === "admin" || view === "design";
+}
+
+function ensureProtectedViewAccess() {
+  if (protectedViewsUnlocked) return true;
+  const password = window.prompt("请输入管理员密码");
+  if (password === ADMIN_PASSWORD) {
+    protectedViewsUnlocked = true;
+    return true;
+  }
+  if (password !== null) window.alert("密码错误");
+  return false;
 }
 
 function renderMainView(current) {
@@ -2777,6 +2828,8 @@ function setupFreeCanvas(task) {
   const canvas = document.querySelector("#taskCanvas");
   if (!canvas) return;
   activeCanvas = canvas;
+  activeCanvasTaskId = task.id;
+  drawing = false;
   const rect = canvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(rect.width * dpr);
@@ -2906,6 +2959,8 @@ function setupTrailCanvas() {
   const canvas = document.querySelector("#taskCanvas");
   if (!canvas) return;
   activeCanvas = canvas;
+  activeCanvasTaskId = "trail";
+  drawing = false;
   const rect = canvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
   canvas.width = Math.round(rect.width * dpr);
@@ -2981,9 +3036,7 @@ function trailCompletionEdgeCount() {
 }
 
 function isTrailFullyConnected() {
-  const labels = new Set(state.trail.sequence || []);
-  return trailCompletionEdgeCount() >= TRAIL_EXPECTED.length - 1
-    && TRAIL_EXPECTED.every((label) => labels.has(label));
+  return trailContainsExpectedSequence(state.trail.sequence || []);
 }
 
 function maybeOpenTrailCompletionPrompt(response = getResponse("trail")) {
@@ -3182,8 +3235,8 @@ function canvasPoint(event, canvas) {
 }
 
 function captureCanvas(taskId) {
-  const canvas = document.querySelector("#taskCanvas");
-  if (!canvas) return state.drawings[taskId] || null;
+  const canvas = activeCanvasTaskId === taskId ? activeCanvas : null;
+  if (!canvas) return state.drawings[taskId] || getResponse(taskId).drawingImage || null;
   const image = canvasToCompactDataUrl(canvas);
   state.drawings[taskId] = image;
   return image;
@@ -3587,7 +3640,6 @@ root.addEventListener("click", async (event) => {
     return;
   }
   if (action === "toggleSetupVoice") {
-    await toggleSetupVoiceRegistration();
     return;
   }
   if (action === "checkHearingEnvironment") {
@@ -3658,7 +3710,13 @@ root.addEventListener("click", async (event) => {
     render();
   }
   if (action === "navView") {
-    state.view = target.dataset.view;
+    const nextView = target.dataset.view;
+    if (isProtectedView(nextView) && !ensureProtectedViewAccess()) {
+      menuOpen = false;
+      render();
+      return;
+    }
+    state.view = nextView;
     menuOpen = false;
     activeRubricItem = null;
     if (state.view === "test") requestImmediateInstructionPlayback(tasks[state.activeTaskIndex]);
@@ -3841,10 +3899,12 @@ root.addEventListener("input", (event) => {
     saveDraft();
   }
   if (target.dataset.voiceManual !== undefined) {
+    if (manualTranscriptComposing || event.isComposing) return;
     applyManualVoiceText(target.value);
     saveDraft();
   }
   if (target.dataset.fluencyManual !== undefined) {
+    if (manualTranscriptComposing || event.isComposing) return;
     const response = getResponse("fluency");
     response.answer.rawTranscript = toSimplifiedChinese(target.value);
     response.answer.interimTranscript = "";
@@ -3852,6 +3912,28 @@ root.addEventListener("input", (event) => {
     refreshFluencyCountUi(response);
     saveDraft();
   }
+});
+
+root.addEventListener("compositionstart", (event) => {
+  const target = event.target;
+  if (target?.dataset?.voiceManual !== undefined || target?.dataset?.fluencyManual !== undefined) {
+    manualTranscriptComposing = true;
+  }
+});
+
+root.addEventListener("compositionend", (event) => {
+  const target = event.target;
+  if (target?.dataset?.voiceManual === undefined && target?.dataset?.fluencyManual === undefined) return;
+  manualTranscriptComposing = false;
+  if (target.dataset.voiceManual !== undefined) applyManualVoiceText(target.value);
+  if (target.dataset.fluencyManual !== undefined) {
+    const response = getResponse("fluency");
+    response.answer.rawTranscript = toSimplifiedChinese(target.value);
+    response.answer.interimTranscript = "";
+    response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
+    refreshFluencyCountUi(response);
+  }
+  saveDraft();
 });
 
 root.addEventListener("change", (event) => {
@@ -4428,7 +4510,7 @@ function resetSetupPromptPlayback() {
 }
 
 function playSetupPrompt() {
-  return playStaticPrompt(SETUP_PROMPT_AUDIO_KEY, "instruction");
+  return speakText(SETUP_PROMPT_TEXT, { rate: 0.82, pitch: 1.18, purpose: "instruction" });
 }
 
 function playHearingPrompt() {
@@ -5633,8 +5715,11 @@ async function transcribeAudioBlob(blob, taskId, step) {
   const response = getResponse(task.id);
   const transcriptionId = activeTranscriptionId + 1;
   activeTranscriptionId = transcriptionId;
+  const transcriptionStartedAt = Date.now();
   speechTranscribing = true;
   response.behavior.speechRecognition = response.behavior.speechRecognition || [];
+  response.behavior.asrStartedAt = response.behavior.asrStartedAt || {};
+  response.behavior.asrStartedAt[step] = transcriptionStartedAt;
   response.behavior.speechRecognition.push({
     step,
     eventType: "cloudflare-asr-upload",
@@ -5656,7 +5741,7 @@ async function transcribeAudioBlob(blob, taskId, step) {
       at: new Date().toISOString()
     });
     if (text) {
-      applyVoiceTextForTask(task, response, step, text);
+      applyVoiceTextForTask(task, response, step, text, { transcriptionStartedAt });
     } else {
       setSpeechWarning(response, step, "未录到声音，请再说一次");
     }
@@ -5708,10 +5793,22 @@ async function requestAsrJson(task, step, blob) {
   }
 }
 
-function applyVoiceTextForTask(task, response, step, text) {
+function applyVoiceTextForTask(task, response, step, text, options = {}) {
   text = cleanAsrTranscript(text);
   if (!text) return;
   if (task.type === "sentence") {
+    const manualEditAt = Number(response.behavior.manualTranscriptEditAt?.[step] || 0);
+    if (manualEditAt && manualEditAt > Number(options.transcriptionStartedAt || 0)) {
+      response.behavior.ignoredAsrAfterManualEdit = response.behavior.ignoredAsrAfterManualEdit || [];
+      response.behavior.ignoredAsrAfterManualEdit.push({
+        step,
+        text,
+        manualEditAt,
+        at: new Date().toISOString()
+      });
+      saveDraft();
+      return;
+    }
     response.answer.transcript = response.answer.transcript || {};
     response.answer.interimTranscript = response.answer.interimTranscript || {};
     response.answer.transcript[step] = text;
@@ -5849,7 +5946,10 @@ function beginLiveTranscriptSession({ resetFinal = false } = {}) {
   const step = getTaskStep(task);
   activeSpeechTaskId = task.id;
   activeSpeechStep = step;
-  if (resetFinal) setLiveVoiceText(task, response, step, { finalText: "", interimText: "", eventType: "reset" });
+  if (resetFinal) {
+    if (response.behavior.manualTranscriptEditAt) delete response.behavior.manualTranscriptEditAt[step];
+    setLiveVoiceText(task, response, step, { finalText: "", interimText: "", eventType: "reset" });
+  }
   else setLiveVoiceText(task, response, step, { finalText: currentLiveFinalText(), interimText: "", eventType: "start" });
   speechSessionBaseFinal = currentLiveFinalText();
 }
@@ -5877,6 +5977,18 @@ function setLiveVoiceText(task, response, step, { finalText = "", interimText = 
   finalText = cleanAsrTranscript(finalText);
   interimText = cleanAsrTranscript(interimText);
   if (task.type === "sentence") {
+    if (response.behavior.manualTranscriptEditAt?.[step] && eventType !== "reset" && eventType !== "start") {
+      response.behavior.ignoredLiveTranscriptAfterManualEdit = response.behavior.ignoredLiveTranscriptAfterManualEdit || [];
+      response.behavior.ignoredLiveTranscriptAfterManualEdit.push({
+        step,
+        finalText,
+        interimText,
+        eventType,
+        at: new Date().toISOString()
+      });
+      saveDraft();
+      return;
+    }
     response.answer.transcript = response.answer.transcript || {};
     response.answer.interimTranscript = response.answer.interimTranscript || {};
     response.answer.transcript[step] = finalText;
@@ -5967,6 +6079,16 @@ function applyManualVoiceText(text) {
     response.answer.interimTranscript = response.answer.interimTranscript || {};
     response.answer.transcript[step] = text;
     response.answer.interimTranscript[step] = "";
+    response.behavior.manualTranscriptEditAt = response.behavior.manualTranscriptEditAt || {};
+    response.behavior.manualTranscriptEditAt[step] = Date.now();
+    response.behavior.liveTranscript = response.behavior.liveTranscript || {};
+    response.behavior.liveTranscript[step] = {
+      finalText: text,
+      interimText: "",
+      updatedAt: new Date().toISOString(),
+      source: "manual"
+    };
+    speechSessionBaseFinal = text;
   }
   if (task.type === "orientation") applyOrientationText(response, step, text);
 }
@@ -6034,37 +6156,56 @@ function orientationOptions(prompt) {
     return optionObjects(weekdays, today.weekday);
   }
   if (prompt.key === "city") {
-    const expected = "南京市";
+    const expected = currentCityName();
     if (response.answer.expectedCity !== expected) {
       response.answer.expectedCity = expected;
       saveDraft();
     }
-    return optionObjects(stableOptionValues(response, "orientation:city:nanjing-fixed", expected, CITY_DISTRACTORS), expected);
+    return optionObjects(stableOptionValues(response, `orientation:city:${expected}`, expected, CITY_DISTRACTORS), expected);
   }
   const expectedPlace = currentPlaceName();
-  const location = response.behavior.location || {};
   if (!expectedPlace) {
-    response.answer.expectedPlace = "社区中心";
+    response.answer.expectedPlace = DEFAULT_PLACE;
     saveDraft();
-    return optionObjects(DEFAULT_PLACE_OPTIONS, "社区中心");
+    return optionObjects(stableOptionValues(response, `orientation:place:${DEFAULT_PLACE}`, DEFAULT_PLACE, PLACE_DISTRACTOR_POOL), DEFAULT_PLACE);
   }
-  const sameCityDistractors = Array.isArray(location.placeDistractors) ? location.placeDistractors.map((entry) => entry.name) : [];
-  const placeDistractors = [...sameCityDistractors, ...DEFAULT_PLACE_OPTIONS].filter((value) => value !== expectedPlace);
+  if (response.answer.expectedPlace !== expectedPlace) {
+    response.answer.expectedPlace = expectedPlace;
+    saveDraft();
+  }
+  const placeDistractors = [...PLACE_DISTRACTOR_POOL, ...DEFAULT_PLACE_OPTIONS].filter((value) => value !== expectedPlace);
   return optionObjects(stableOptionValues(response, `orientation:place:${expectedPlace}`, expectedPlace, placeDistractors), expectedPlace);
+}
+
+function currentCityName() {
+  const response = getResponse("orientation");
+  const location = response.behavior.location || {};
+  return normalizeCityName(response.answer.expectedCity || location.city) || DEFAULT_CITY;
 }
 
 function currentPlaceName() {
   const response = getResponse("orientation");
   const location = response.behavior.location || {};
-  return response.answer.expectedPlace || location.place || generalizePlaceName(firstLocationPart(location.address)) || "";
+  return placeCategoryName(response.answer.expectedPlace || location.place || location.address) || DEFAULT_PLACE;
 }
 
 function placeNameFromReverse(data, loc) {
   const address = data.address || {};
-  const raw = data.name || data.namedetails?.name || address.building || address.amenity || address.road || firstLocationPart(data.display_name);
-  const place = specificPlaceName(raw, loc.city);
-  if (place) return place;
-  return generalizePlaceName(data.display_name || loc.address || "");
+  const raw = [
+    data.name,
+    data.namedetails?.name,
+    data.type,
+    data.category,
+    address.amenity,
+    address.building,
+    address.shop,
+    address.leisure,
+    address.tourism,
+    address.road,
+    data.display_name,
+    loc.address
+  ].filter(Boolean).join(" ");
+  return placeCategoryName(raw) || DEFAULT_PLACE;
 }
 
 async function sameCityPlaceDistractors(loc) {
@@ -6140,7 +6281,38 @@ function cleanCityName(value) {
   return text.split(/[，,\s]/).find(Boolean) || "";
 }
 
+function normalizeCityName(value) {
+  const text = String(value || "").replace(/\s/g, "");
+  if (!text) return "";
+  const cityMatch = text.match(/[^省市自治区县区,，\s]{2,12}市/);
+  if (cityMatch) return cityMatch[0];
+  const municipality = text.match(/^(北京|上海|天津|重庆)$/)?.[1];
+  if (municipality) return `${municipality}市`;
+  return "";
+}
+
+function placeCategoryName(value) {
+  const text = toSimplifiedChinese(String(value || ""));
+  if (!text) return "";
+  if (/医院|门诊|卫生院|卫生服务|诊所/.test(text)) return "医院";
+  if (/学校|大学|学院|中学|小学|幼儿园/.test(text)) return "学校";
+  if (/社区|街道|居委|党群服务|服务中心/.test(text)) return "社区中心";
+  if (/公园|广场|绿地/.test(text)) return "公园";
+  if (/商场|购物中心|商城|百货|商业中心/.test(text)) return "商场";
+  if (/超市|便利店/.test(text)) return "超市";
+  if (/图书馆|书城|书店/.test(text)) return "图书馆";
+  if (/体育|运动中心|健身中心/.test(text)) return "体育中心";
+  if (/博物馆|展览馆|美术馆|科技馆/.test(text)) return "博物馆";
+  if (/车站|火车站|地铁站|公交站|客运站|机场/.test(text)) return "车站";
+  if (/银行/.test(text)) return "银行";
+  if (/药店|药房/.test(text)) return "药店";
+  if (/菜市场|农贸市场|市场/.test(text)) return "菜市场";
+  return "";
+}
+
 function generalizePlaceName(value) {
+  const category = placeCategoryName(value);
+  if (category) return category;
   const text = String(value || "");
   if (/医院|门诊|卫生院|卫生服务/.test(text)) return shortNamedPlace(text, "医院");
   if (/学校|大学|学院|中学|小学/.test(text)) return shortNamedPlace(text, "学校");
@@ -6431,6 +6603,8 @@ async function primeLocationPermission(options = {}) {
   if (!navigator.geolocation) {
     state.permissions.location = "unsupported";
     response.behavior.location = { error: "当前设备不支持定位", at: new Date().toISOString() };
+    response.answer.expectedCity = response.answer.expectedCity || DEFAULT_CITY;
+    response.answer.expectedPlace = response.answer.expectedPlace || DEFAULT_PLACE;
     saveDraft();
     if (rerender) render();
     return false;
@@ -6451,6 +6625,8 @@ async function primeLocationPermission(options = {}) {
   } catch {
     state.permissions.location = "denied";
     response.behavior.location = { error: "定位未授权或不可用", at: new Date().toISOString() };
+    response.answer.expectedCity = response.answer.expectedCity || DEFAULT_CITY;
+    response.answer.expectedPlace = response.answer.expectedPlace || DEFAULT_PLACE;
     saveDraft();
     if (rerender) render();
     return false;
@@ -6469,15 +6645,16 @@ async function reverseGeocodeLocation(response) {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&namedetails=1&zoom=18&lat=${loc.latitude}&lon=${loc.longitude}&accept-language=zh-CN`;
     const data = await fetch(url).then((entry) => entry.json());
+    const address = data.address || {};
     loc.address = data.display_name || "";
-    loc.city = cleanCityName(data.address?.city || data.address?.town || data.address?.county || loc.address || "");
+    loc.city = normalizeCityName(address.city || address.municipality || address.state || address.town || loc.address || "") || DEFAULT_CITY;
     loc.place = placeNameFromReverse(data, loc);
-    loc.placeDistractors = await sameCityPlaceDistractors(loc);
+    loc.placeDistractors = PLACE_DISTRACTOR_POOL.filter((value) => value !== loc.place).map((name) => ({ name, source: "common-scene" }));
     Object.keys(response.behavior.optionOrders || {}).forEach((key) => {
       if (key.startsWith("orientation:city") || key.startsWith("orientation:place")) delete response.behavior.optionOrders[key];
     });
-    getResponse("orientation").answer.expectedCity = "南京市";
-    getResponse("orientation").answer.expectedPlace = loc.place || "";
+    getResponse("orientation").answer.expectedCity = loc.city || DEFAULT_CITY;
+    getResponse("orientation").answer.expectedPlace = loc.place || DEFAULT_PLACE;
   } catch {
     // Coordinates are still kept for backend review.
   }
@@ -6734,12 +6911,8 @@ function aiScoreValue(task, response) {
 }
 
 function scoreTrail() {
-  const edges = trailEdgesForDrawing();
-  const expectedEdges = TRAIL_EXPECTED.slice(0, -1).map((from, index) => ({ from, to: TRAIL_EXPECTED[index + 1] }));
-  const exact = edges.length === expectedEdges.length && edges.every((edge, index) => (
-    edge.from === expectedEdges[index].from && edge.to === expectedEdges[index].to
-  ));
-  return { score: exact && state.trail.errors === 0 && !trailHasCrossing() ? 1 : 0 };
+  const sequence = state.trail.sequence || summarizeTrailEdges(trailEdgesForDrawing()).sequence;
+  return { score: trailContainsExpectedSequence(sequence) ? 1 : 0 };
 }
 
 function trailHasCrossing() {
@@ -7179,7 +7352,7 @@ function drawingScoreReason(task, response, score) {
     if (score < task.maxScore && missing.length) return `未得分：${missing.map(formatMissingCriterion).join("；")}`;
     if (score < task.maxScore && response.ai?.comment) return normalizeMissingScoreComment(response.ai.comment);
   }
-  if (task.type === "trail" && score < task.maxScore) return "连线顺序不完整、顺序错误或出现交叉线。";
+  if (task.type === "trail" && score < task.maxScore) return "最终连线序列未包含完整正确顺序。";
   if (task.type === "drawing" && score < task.maxScore) return "图片 AI 按 MoCA 标准判为未满足全部给分条件。";
   return "";
 }
