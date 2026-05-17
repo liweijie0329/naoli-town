@@ -540,6 +540,7 @@ let drawingUndoStacks = {};
 let menuOpen = false;
 let cognitionMenuOpen = false;
 let protectedViewsUnlocked = false;
+let adminPasswordDialog = null;
 let manualTranscriptComposing = false;
 let setupPromptAttempted = false;
 let setupPromptPlayed = false;
@@ -911,6 +912,7 @@ function resetState() {
   menuOpen = false;
   cognitionMenuOpen = false;
   protectedViewsUnlocked = false;
+  adminPasswordDialog = null;
   manualTranscriptComposing = false;
   resetSetupPromptPlayback();
   hearingIntroPromptStartedAt = 0;
@@ -1112,6 +1114,7 @@ function render() {
     scheduleTaskInstruction(current);
   }
   queueVisibleSpeechAudioPreload();
+  focusAdminPasswordInput();
 }
 
 function renderSetup() {
@@ -1402,6 +1405,7 @@ function renderShell(current) {
         </header>
         ${renderMainView(current)}
       </main>
+      ${renderAdminPasswordDialog()}
     </div>
   `;
 }
@@ -1442,6 +1446,24 @@ function ensureProtectedViewAccess() {
   }
   if (password !== null) window.alert("密码错误");
   return false;
+}
+
+function renderAdminPasswordDialog() {
+  if (!adminPasswordDialog) return "";
+  return html`
+    <div class="admin-password-dialog" role="dialog" aria-modal="true" aria-label="管理员密码">
+      <button class="admin-password-backdrop" data-action="closeAdminPasswordDialog" aria-label="关闭密码弹窗"></button>
+      <section class="admin-password-panel">
+        <h3>请输入管理员密码</h3>
+        <input class="admin-password-input" data-admin-password type="password" inputmode="numeric" autocomplete="off" value="${escapeHtml(adminPasswordDialog.value || "")}" autofocus />
+        ${adminPasswordDialog.error ? `<p>${escapeHtml(adminPasswordDialog.error)}</p>` : ""}
+        <div class="admin-password-actions">
+          <button class="secondary" data-action="closeAdminPasswordDialog">取消</button>
+          <button class="primary" data-action="submitAdminPasswordDialog">确定</button>
+        </div>
+      </section>
+    </div>
+  `;
 }
 
 function renderMainView(current) {
@@ -2123,7 +2145,6 @@ function renderOrientationChoiceTask(response, prompt) {
     <div class="orientation-page orientation-choice-page orientation-${prompt.key}-page">
       <div class="orientation-choice-question-panel">
         <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
-        ${renderOrientationLocationHint(response, prompt.key)}
         ${weekday ? `
           <div class="weekday-answer-line">
             <span>星期</span>
@@ -2143,23 +2164,6 @@ function renderOrientationChoiceTask(response, prompt) {
       </div>
     </div>
   `;
-}
-
-function renderOrientationLocationHint(response, key) {
-  if (!["city", "place"].includes(key)) return "";
-  const text = orientationLocationHintText(response);
-  return text ? `<small class="orientation-location-hint">${escapeHtml(text)}</small>` : "";
-}
-
-function orientationLocationHintText(response) {
-  const location = response.behavior.location;
-  if (!location) return "当前定位：正在获取";
-  if (location.error) return `当前定位：${location.error}`;
-  const city = normalizeCityName(location.city || response.answer.expectedCity || "");
-  const place = placeCategoryName(location.place || response.answer.expectedPlace || location.address || "");
-  if (city || place) return `当前定位：${[city, place].filter(Boolean).join(" · ")}`;
-  if (Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude))) return "当前定位：已获取坐标，正在解析地址";
-  return "当前定位：正在获取";
 }
 
 function weekdayShortLabel(value) {
@@ -3662,6 +3666,19 @@ root.addEventListener("click", async (event) => {
   const action = target.dataset.action;
   const current = tasks[state.activeTaskIndex];
   const buttonSpeech = buttonSpeechData(target);
+  if (action === "closeAdminPasswordDialog") {
+    adminPasswordDialog = null;
+    render();
+    return;
+  }
+  if (action === "submitAdminPasswordDialog") {
+    await submitAdminPasswordDialog();
+    return;
+  }
+  if (requiresDrawerAdminPassword(action, target)) {
+    openAdminPasswordDialog(target);
+    return;
+  }
   if (action === "startSession") playSfx("start");
   else if (["skipTask", "nextTask", "skipLogin", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
   else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu"].includes(action)) playSfx("pick");
@@ -3888,9 +3905,86 @@ root.addEventListener("click", async (event) => {
 
 function shouldStopAudioForAction(action, target) {
   if (action === "tapVigilance") return false;
+  if (["closeAdminPasswordDialog", "submitAdminPasswordDialog"].includes(action)) return false;
   if (["openMenu", "closeMenu", "toggleCognitionMenu"].includes(action)) return false;
   if (target.closest(".hidden-drawer") && ["navView", "selectTask"].includes(action)) return false;
   return true;
+}
+
+function requiresDrawerAdminPassword(action, target) {
+  if (!target.closest(".drawer-panel")) return false;
+  if (action === "goHome") return false;
+  return ["navView", "toggleCognitionMenu", "selectTask"].includes(action);
+}
+
+function openAdminPasswordDialog(target) {
+  adminPasswordDialog = {
+    value: "",
+    error: "",
+    pending: drawerAdminActionFromTarget(target)
+  };
+  render();
+}
+
+function drawerAdminActionFromTarget(target) {
+  return {
+    action: target.dataset.action || "",
+    view: target.dataset.view || "",
+    index: target.dataset.index || ""
+  };
+}
+
+async function submitAdminPasswordDialog() {
+  if (!adminPasswordDialog) return;
+  const password = String(adminPasswordDialog.value || "");
+  if (password !== ADMIN_PASSWORD) {
+    adminPasswordDialog = { ...adminPasswordDialog, value: "", error: "密码错误" };
+    render();
+    return;
+  }
+  const pending = adminPasswordDialog.pending;
+  adminPasswordDialog = null;
+  await runDrawerAdminAction(pending);
+}
+
+async function runDrawerAdminAction(pending) {
+  if (!pending) return;
+  if (pending.action === "toggleCognitionMenu") {
+    cognitionMenuOpen = !cognitionMenuOpen;
+    render();
+    return;
+  }
+  if (pending.action === "navView") {
+    const nextView = pending.view;
+    state.view = nextView;
+    menuOpen = false;
+    activeRubricItem = null;
+    if (state.view === "test") requestImmediateInstructionPlayback(tasks[state.activeTaskIndex]);
+    if (state.view === "admin") await loadSessions(false);
+    render();
+    return;
+  }
+  if (pending.action === "selectTask") {
+    const nextIndex = Number(pending.index);
+    if (tasks[nextIndex]?.id === "memory2" && !isMemory2Available()) {
+      menuOpen = false;
+      render();
+      return;
+    }
+    state.activeTaskIndex = nextIndex;
+    state.view = "test";
+    menuOpen = false;
+    cognitionMenuOpen = false;
+    requestImmediateInstructionPlayback(tasks[nextIndex]);
+    render();
+  }
+}
+
+function focusAdminPasswordInput() {
+  if (!adminPasswordDialog) return;
+  window.requestAnimationFrame(() => {
+    document.querySelector("[data-admin-password]")?.focus();
+  });
 }
 
 document.addEventListener("click", () => {
@@ -3935,6 +4029,10 @@ root.addEventListener("pointerdown", (event) => {
 
 root.addEventListener("input", (event) => {
   const target = event.target;
+  if (target.dataset.adminPassword !== undefined && adminPasswordDialog) {
+    adminPasswordDialog.value = target.value;
+    adminPasswordDialog.error = "";
+  }
   if (target.dataset.bind) {
     const [, key] = target.dataset.bind.split(".");
     state.participant[key] = target.value;
@@ -3953,6 +4051,18 @@ root.addEventListener("input", (event) => {
     response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
     refreshFluencyCountUi(response);
     saveDraft();
+  }
+});
+
+root.addEventListener("keydown", async (event) => {
+  if (!adminPasswordDialog) return;
+  if (event.key === "Enter" && event.target?.dataset?.adminPassword !== undefined) {
+    event.preventDefault();
+    await submitAdminPasswordDialog();
+  }
+  if (event.key === "Escape") {
+    adminPasswordDialog = null;
+    render();
   }
 });
 
