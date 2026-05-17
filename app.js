@@ -620,6 +620,7 @@ function bindViewportMetrics() {
   const updateOnly = () => updateViewportMetrics();
   const updateAndRender = () => {
     updateViewportMetrics();
+    if (isEditableElementFocused()) return;
     window.clearTimeout(viewportRenderTimer);
     viewportRenderTimer = window.setTimeout(() => {
       if (state.view !== "setup") render();
@@ -630,6 +631,16 @@ function bindViewportMetrics() {
   window.addEventListener("orientationchange", updateAndRender, { passive: true });
   window.visualViewport?.addEventListener("resize", updateAndRender, { passive: true });
   window.visualViewport?.addEventListener("scroll", updateOnly, { passive: true });
+}
+
+function isEditableElementFocused() {
+  const element = document.activeElement;
+  if (!element || element === document.body) return false;
+  if (element.isContentEditable) return true;
+  if (element.matches?.("textarea, select")) return true;
+  if (!element.matches?.("input")) return false;
+  const type = (element.getAttribute("type") || "text").toLowerCase();
+  return !["button", "checkbox", "color", "file", "hidden", "radio", "range", "reset", "submit"].includes(type);
 }
 
 function createInitialState() {
