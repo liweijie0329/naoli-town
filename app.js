@@ -3666,7 +3666,7 @@ root.addEventListener("click", async (event) => {
   else if (["skipTask", "nextTask", "skipLogin", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
   else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu"].includes(action)) playSfx("pick");
 
-  if (action !== "tapVigilance") stopAudioPlayback();
+  if (shouldStopAudioForAction(action, target)) stopAudioPlayback();
   if (buttonSpeech) speakButtonSelection(buttonSpeech);
 
   if (action === "toggleCognitionMenu") {
@@ -3886,6 +3886,13 @@ root.addEventListener("click", async (event) => {
   if (action === "selectSavedSession") await selectSavedSession(target.dataset.id);
 });
 
+function shouldStopAudioForAction(action, target) {
+  if (action === "tapVigilance") return false;
+  if (["openMenu", "closeMenu", "toggleCognitionMenu"].includes(action)) return false;
+  if (target.closest(".hidden-drawer") && ["navView", "selectTask"].includes(action)) return false;
+  return true;
+}
+
 document.addEventListener("click", () => {
   if (state.view !== "setup" || !setupPromptRetryPending || setupPromptPlayed) return;
   void playSetupPrompt().then((started) => {
@@ -4004,7 +4011,6 @@ async function startNewSession(participant) {
   cognitionMenuOpen = false;
   render();
   playHearingIntroPromptNow();
-  queueHearingIntroFallback();
   window.setTimeout(() => {
     if (state.view === "hearing") void requestStartupPermissions();
   }, 2800);
@@ -4014,7 +4020,7 @@ async function requestStartupPermissions(options = {}) {
   const { rerender = true } = options;
   await Promise.allSettled([
     primeMicrophonePermission({ keepStream: true }),
-    primeLocationPermission({ rerender: false, resolveAddress: false, timeout: 6500 })
+    primeLocationPermission({ rerender: false, resolveAddress: true, timeout: 15000 })
   ]);
   if (rerender) render();
 }
@@ -4557,38 +4563,15 @@ function playHearingPrompt() {
 }
 
 function playHearingIntroPromptNow() {
-  if (!("speechSynthesis" in window)) return playStaticPrompt(HEARING_PROMPT_AUDIO_KEYS.intro, "instruction");
-  const playbackId = beginAudioPlayback();
-  const speechParams = speechParamsFor(0.82, 1.18);
-  startPlaybackUi(playbackId, "instruction");
-  let finished = false;
-  const finish = () => {
-    if (playbackId !== speechPlaybackId || finished) return;
-    finished = true;
-    clearSpeechTextFallbackTimer();
-    playState = "开始";
-    speechPlaybackPurpose = null;
-    render();
-  };
-  speechTextFallbackTimer = window.setTimeout(finish, browserSpeechFallbackMs(HEARING_INTRO_PROMPT_TEXT));
-  speakTextWithBrowser(HEARING_INTRO_PROMPT_TEXT, {
-    playbackId,
-    speechParams,
-    onStart: () => {
-      hearingIntroPromptStartedAt = Date.now();
-    },
-    finish
+  hearingIntroPromptStartedAt = Date.now();
+  return speakText(HEARING_INTRO_PROMPT_TEXT, {
+    audioKey: HEARING_PROMPT_AUDIO_KEYS.intro,
+    rate: 0.82,
+    pitch: 1.18,
+    purpose: "instruction",
+    preferBuffer: true,
+    fallbackMs: browserSpeechFallbackMs(HEARING_INTRO_PROMPT_TEXT)
   });
-  return Promise.resolve(true);
-}
-
-function queueHearingIntroFallback(delayMs = 1200) {
-  window.setTimeout(() => {
-    const screening = normalizeHearingScreening(state.hearingScreening);
-    if (state.view !== "hearing" || screening.phase !== "intro") return;
-    if (Date.now() - hearingIntroPromptStartedAt < 4000) return;
-    playStaticPrompt(HEARING_PROMPT_AUDIO_KEYS.intro, "instruction");
-  }, delayMs);
 }
 
 function hearingPromptAudioKey(screening = state.hearingScreening) {
@@ -4603,9 +4586,7 @@ function hearingPromptAudioKey(screening = state.hearingScreening) {
 function queueHearingPrompt(delayMs = 180) {
   window.setTimeout(() => {
     if (state.view !== "hearing") return;
-    const intro = normalizeHearingScreening(state.hearingScreening).phase === "intro";
     playHearingPrompt();
-    if (intro) queueHearingIntroFallback();
   }, delayMs);
 }
 
@@ -6720,6 +6701,15 @@ function prepareLocationAnswer() {
 async function primeLocationPermission(options = {}) {
   const { rerender = false, resolveAddress = true, timeout = 10000 } = options;
   const response = getResponse("orientation");
+  if (!window.isSecureContext && !["localhost", "127.0.0.1"].includes(location.hostname)) {
+    state.permissions.location = "unsupported";
+    response.behavior.location = { error: "定位需要 HTTPS 页面", at: new Date().toISOString() };
+    response.answer.expectedCity = response.answer.expectedCity || DEFAULT_CITY;
+    response.answer.expectedPlace = response.answer.expectedPlace || DEFAULT_PLACE;
+    saveDraft();
+    if (rerender) render();
+    return false;
+  }
   if (!navigator.geolocation) {
     state.permissions.location = "unsupported";
     response.behavior.location = { error: "当前设备不支持定位", at: new Date().toISOString() };
@@ -6730,6 +6720,9 @@ async function primeLocationPermission(options = {}) {
     return false;
   }
   try {
+    state.permissions.location = "prompting";
+    response.behavior.location = { status: "requesting", at: new Date().toISOString() };
+    saveDraft();
     const position = await getCurrentPosition({ enableHighAccuracy: true, timeout, maximumAge: 60000 });
     state.permissions.location = "granted";
     response.behavior.location = {
@@ -6742,15 +6735,29 @@ async function primeLocationPermission(options = {}) {
     saveDraft();
     if (rerender) render();
     return true;
-  } catch {
-    state.permissions.location = "denied";
-    response.behavior.location = { error: "定位未授权或不可用", at: new Date().toISOString() };
+  } catch (error) {
+    const locationError = geolocationErrorDetail(error);
+    state.permissions.location = locationError.permission;
+    response.behavior.location = {
+      error: locationError.message,
+      errorCode: error?.code || null,
+      errorName: error?.name || "",
+      errorMessage: error?.message || "",
+      at: new Date().toISOString()
+    };
     response.answer.expectedCity = response.answer.expectedCity || DEFAULT_CITY;
     response.answer.expectedPlace = response.answer.expectedPlace || DEFAULT_PLACE;
     saveDraft();
     if (rerender) render();
     return false;
   }
+}
+
+function geolocationErrorDetail(error) {
+  if (error?.code === 1) return { permission: "denied", message: "定位权限被拒绝" };
+  if (error?.code === 2) return { permission: "unavailable", message: "定位暂不可用" };
+  if (error?.code === 3) return { permission: "timeout", message: "定位超时" };
+  return { permission: "unavailable", message: "定位未授权或不可用" };
 }
 
 function getCurrentPosition(options) {
