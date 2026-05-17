@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-14T13:01:29.835Z",
+  "generatedAt": "2026-05-17T08:38:07.655Z",
   "provider": "doubao",
   "source": "data/tts-texts.json",
   "entries": {
@@ -2887,6 +2887,132 @@
     "hearing:summary": {
       "src": "assets/audio/hearing-summary.mp3",
       "text": "听力测试完成。请点击继续，进入认知测试。",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:u2djc8": {
+      "src": "assets/audio/text-u2djc8.mp3",
+      "text": "重庆市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1o0vgt1": {
+      "src": "assets/audio/text-1o0vgt1.mp3",
+      "text": "长沙市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:cvpgss": {
+      "src": "assets/audio/text-cvpgss.mp3",
+      "text": "郑州市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:bidbuk": {
+      "src": "assets/audio/text-bidbuk.mp3",
+      "text": "合肥市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1iuyrwm": {
+      "src": "assets/audio/text-1iuyrwm.mp3",
+      "text": "福州市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:wj4tsg": {
+      "src": "assets/audio/text-wj4tsg.mp3",
+      "text": "济南市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1s3fomw": {
+      "src": "assets/audio/text-1s3fomw.mp3",
+      "text": "宁波市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:2wu0iw": {
+      "src": "assets/audio/text-2wu0iw.mp3",
+      "text": "无锡市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:xt2ugp": {
+      "src": "assets/audio/text-xt2ugp.mp3",
+      "text": "商场",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1wk2vdy": {
+      "src": "assets/audio/text-1wk2vdy.mp3",
+      "text": "超市",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:n55b5s": {
+      "src": "assets/audio/text-n55b5s.mp3",
+      "text": "车站",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1de650f": {
+      "src": "assets/audio/text-1de650f.mp3",
+      "text": "银行",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:hjf223": {
+      "src": "assets/audio/text-hjf223.mp3",
+      "text": "药店",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "text:1xl3g8j": {
+      "src": "assets/audio/text-1xl3g8j.mp3",
+      "text": "菜市场",
       "profile": "gentle",
       "speedRatio": 1,
       "provider": "doubao-v3",
