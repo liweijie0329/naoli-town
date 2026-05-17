@@ -1,5 +1,7 @@
 import { json, missingDatabase, readJson } from "../../_lib/http.js";
 import {
+  hearingEventRowParams,
+  hearingEventsFromSession,
   itemRowParams,
   normalizeSessionPayload,
   sessionRowParams,
@@ -39,6 +41,13 @@ const insertItemSql = `
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
+const insertHearingEventSql = `
+  INSERT INTO hearing_events (
+    id, session_id, event_type, phase, ear, frequency_hz, level_db_hl, heard,
+    response_label, environment_status, relative_db, event_at, reaction_ms, payload_json
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`;
+
 async function ensureSessionColumns(db) {
   const { results } = await db.prepare("PRAGMA table_info(sessions)").all();
   const columns = new Set((results || []).map((column) => column.name));
@@ -49,6 +58,28 @@ async function ensureSessionColumns(db) {
       if (!/duplicate column|already exists/i.test(error?.message || "")) throw error;
     }
   }
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS hearing_events (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      phase TEXT,
+      ear TEXT,
+      frequency_hz INTEGER,
+      level_db_hl INTEGER,
+      heard INTEGER,
+      response_label TEXT,
+      environment_status TEXT,
+      relative_db REAL,
+      event_at TEXT,
+      reaction_ms INTEGER,
+      payload_json TEXT NOT NULL DEFAULT '{}',
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    )
+  `).run();
+  await db.prepare("CREATE INDEX IF NOT EXISTS idx_hearing_events_session_id ON hearing_events(session_id)").run();
+  await db.prepare("CREATE INDEX IF NOT EXISTS idx_hearing_events_event_type ON hearing_events(event_type)").run();
+  await db.prepare("CREATE INDEX IF NOT EXISTS idx_hearing_events_event_at ON hearing_events(event_at)").run();
 }
 
 export async function onRequestGet({ env }) {
@@ -84,11 +115,16 @@ export async function onRequestPost({ request, env }) {
   await ensureSessionColumns(env.DB);
   const payload = await readJson(request);
   const session = normalizeSessionPayload(payload);
+  const hearingEvents = hearingEventsFromSession(session);
   const statements = [
     env.DB.prepare(upsertSessionSql).bind(...sessionRowParams(session)),
     env.DB.prepare("DELETE FROM item_responses WHERE session_id = ?").bind(session.id),
+    env.DB.prepare("DELETE FROM hearing_events WHERE session_id = ?").bind(session.id),
     ...session.itemResponses.map((item) => (
       env.DB.prepare(insertItemSql).bind(...itemRowParams(session.id, item))
+    )),
+    ...hearingEvents.map((event, index) => (
+      env.DB.prepare(insertHearingEventSql).bind(...hearingEventRowParams(session.id, event, index))
     ))
   ];
 

@@ -43,3 +43,25 @@ CREATE TABLE IF NOT EXISTS item_responses (
 
 CREATE INDEX IF NOT EXISTS idx_item_responses_session_id ON item_responses(session_id);
 CREATE INDEX IF NOT EXISTS idx_item_responses_task_id ON item_responses(task_id);
+
+CREATE TABLE IF NOT EXISTS hearing_events (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  phase TEXT,
+  ear TEXT,
+  frequency_hz INTEGER,
+  level_db_hl INTEGER,
+  heard INTEGER,
+  response_label TEXT,
+  environment_status TEXT,
+  relative_db REAL,
+  event_at TEXT,
+  reaction_ms INTEGER,
+  payload_json TEXT NOT NULL DEFAULT '{}',
+  FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_hearing_events_session_id ON hearing_events(session_id);
+CREATE INDEX IF NOT EXISTS idx_hearing_events_event_type ON hearing_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_hearing_events_event_at ON hearing_events(event_at);

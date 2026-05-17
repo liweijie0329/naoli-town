@@ -17,6 +17,90 @@ function toInteger(value, fallback = 0) {
   return Number.isFinite(number) ? Math.round(number) : fallback;
 }
 
+function toNullableInteger(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.round(number) : null;
+}
+
+function toNullableNumber(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function booleanToInteger(value) {
+  if (typeof value !== "boolean") return null;
+  return value ? 1 : 0;
+}
+
+function eventTime(event = {}) {
+  return event.eventAt || event.responseAt || event.checkedAt || event.endedAt || event.at || event.startedAt || null;
+}
+
+function fallbackHearingEvents(screening = {}) {
+  const events = [];
+  const pushEvent = (event) => events.push({ sequence: events.length + 1, ...event });
+
+  (Array.isArray(screening.environmentChecks) ? screening.environmentChecks : []).forEach((entry, index) => {
+    pushEvent({
+      id: entry.id || `hearing-env-${String(index + 1).padStart(3, "0")}`,
+      eventType: "environment_check",
+      phase: "intro",
+      environmentStatus: entry.status || "",
+      relativeDb: entry.relativeDb ?? entry.averageRelativeDb ?? null,
+      eventAt: eventTime(entry),
+      ...entry
+    });
+  });
+
+  (Array.isArray(screening.channelChecks) ? screening.channelChecks : []).forEach((entry, index) => {
+    pushEvent({
+      id: entry.id || `hearing-channel-${String(index + 1).padStart(3, "0")}`,
+      eventType: "channel_check",
+      phase: "channel",
+      ear: entry.ear || "",
+      frequencyHz: entry.frequencyHz ?? 1000,
+      levelDbHl: entry.levelDbHl ?? 55,
+      responseLabel: entry.responseLabel || (entry.response === "correct" ? "声道正确" : "声道不正确"),
+      eventAt: eventTime(entry),
+      ...entry
+    });
+  });
+
+  (Array.isArray(screening.practiceResponses) ? screening.practiceResponses : []).forEach((entry, index) => {
+    pushEvent({
+      id: entry.id || `hearing-practice-${String(index + 1).padStart(3, "0")}`,
+      eventType: "practice_response",
+      phase: "practice",
+      responseLabel: entry.responseLabel || (entry.heard ? "听到了" : "没听到"),
+      eventAt: eventTime(entry),
+      ...entry
+    });
+  });
+
+  (Array.isArray(screening.responses) ? screening.responses : []).forEach((entry, index) => {
+    pushEvent({
+      id: entry.id || `hearing-test-${String(index + 1).padStart(3, "0")}`,
+      eventType: "test_response",
+      phase: "test",
+      responseLabel: entry.responseLabel || (entry.heard ? "听到了" : "没听到"),
+      eventAt: eventTime(entry),
+      ...entry
+    });
+  });
+
+  return events;
+}
+
+export function hearingEventsFromSession(session = {}) {
+  const screening = session.hearingScreening || {};
+  if (!screening || typeof screening !== "object") return [];
+  return Array.isArray(screening.events) && screening.events.length
+    ? screening.events
+    : fallbackHearingEvents(screening);
+}
+
 function birthDateParts(value) {
   const match = String(value || "").trim().match(/^(\d{4})(?:\D+(\d{1,2}))?(?:\D+(\d{1,2}))?/);
   if (!match) return null;
@@ -179,6 +263,26 @@ export function itemRowParams(sessionId, item) {
     jsonString(item.ai, null),
     drawingImage,
     drawingImage ? 1 : 0
+  ];
+}
+
+export function hearingEventRowParams(sessionId, event, index) {
+  const eventId = event.id || `hearing-event-${String(index + 1).padStart(3, "0")}`;
+  return [
+    `${sessionId}:${eventId}`,
+    sessionId,
+    event.eventType || event.type || "",
+    event.phase || "",
+    event.ear || event.expectedEar || "",
+    toNullableInteger(event.frequencyHz),
+    toNullableInteger(event.levelDbHl),
+    booleanToInteger(event.heard),
+    event.responseLabel || "",
+    event.environmentStatus || (event.eventType === "environment_check" ? event.status || "" : ""),
+    toNullableNumber(event.relativeDb ?? event.averageRelativeDb),
+    eventTime(event),
+    toNullableInteger(event.reactionMs),
+    jsonString(event, {})
   ];
 }
 

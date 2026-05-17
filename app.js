@@ -99,6 +99,8 @@ const HEARING_TONE_DURATION_MS = 1000;
 const HEARING_FADE_SECONDS = 0.035;
 const HEARING_MAX_NO_RESPONSE_DB_HL = 70;
 const HEARING_PASS_PTA_DB_HL = 35;
+const HEARING_ENVIRONMENT_SAMPLE_MS = 3000;
+const HEARING_ENVIRONMENT_QUIET_RELATIVE_DB = -38;
 const HEARING_PRACTICE_STEPS = [
   { ear: "right", frequencyHz: 1000, levelDbHl: 55 },
   { ear: "left", frequencyHz: 1000, levelDbHl: 55 }
@@ -707,6 +709,7 @@ function createHearingScreeningState(overrides = {}) {
     lastToneEndedAt: null,
     message: "",
     environment: { status: "not_checked", relativeDb: null, checkedAt: null },
+    environmentChecks: [],
     channelChecks: [],
     practiceResponses: [],
     responses: [],
@@ -742,6 +745,7 @@ function normalizeHearingScreening(screening = {}) {
   base.environment = base.environment && typeof base.environment === "object"
     ? { status: "not_checked", relativeDb: null, checkedAt: null, ...base.environment }
     : { status: "not_checked", relativeDb: null, checkedAt: null };
+  base.environmentChecks = Array.isArray(base.environmentChecks) ? base.environmentChecks : [];
   base.channelChecks = Array.isArray(base.channelChecks) ? base.channelChecks : [];
   base.practiceResponses = Array.isArray(base.practiceResponses) ? base.practiceResponses : [];
   base.responses = Array.isArray(base.responses) ? base.responses : [];
@@ -1666,6 +1670,11 @@ function hearingSide(key) {
   return HEARING_SIDES.find((side) => side.key === key) || HEARING_SIDES[0];
 }
 
+function formatEarLabel(key) {
+  if (key === "right" || key === "left") return hearingSide(key).label;
+  return "";
+}
+
 function renderHearingEarTarget(side, { compact = false } = {}) {
   return html`
     <div class="hearing-ear-target ${side.key} ${compact ? "compact" : ""}" aria-label="${escapeHtml(side.label)}">
@@ -1700,8 +1709,116 @@ function hearingCompletedTrialCount(screening) {
   return keys.size;
 }
 
+function hearingEventId(prefix, index) {
+  return `${prefix}-${String(index + 1).padStart(3, "0")}`;
+}
+
+function hearingToneTiming(screening) {
+  const startedMs = Number(screening.lastToneStartedAt || 0);
+  const endedMs = Number(screening.lastToneEndedAt || 0);
+  return {
+    toneStartedAt: startedMs ? new Date(startedMs).toISOString() : null,
+    toneEndedAt: endedMs ? new Date(endedMs).toISOString() : null,
+    toneDurationMs: startedMs && endedMs ? Math.max(0, endedMs - startedMs) : null
+  };
+}
+
+function hearingAttemptIndex(responses, trial) {
+  return responses.filter((entry) => entry.ear === trial.ear && Number(entry.frequencyHz) === Number(trial.frequencyHz)).length + 1;
+}
+
+function summarizeHearingResponses(screening = state.hearingScreening) {
+  const normalized = normalizeHearingScreening(screening);
+  const practice = normalized.practiceResponses.filter((entry) => typeof entry.heard === "boolean");
+  const test = normalized.responses.filter((entry) => typeof entry.heard === "boolean");
+  const all = [...practice, ...test];
+  return {
+    total: all.length,
+    heard: all.filter((entry) => entry.heard).length,
+    missed: all.filter((entry) => !entry.heard).length,
+    practiceTotal: practice.length,
+    testTotal: test.length,
+    testFinalFrequencies: normalized.responses.filter((entry) => entry.finalForFrequency).length
+  };
+}
+
+function hearingEventsForExport(screening = state.hearingScreening) {
+  const normalized = normalizeHearingScreening(screening);
+  const events = [];
+  const pushEvent = (event) => {
+    events.push({
+      sequence: events.length + 1,
+      ...event
+    });
+  };
+
+  normalized.environmentChecks.forEach((entry, index) => {
+    pushEvent({
+      id: entry.id || hearingEventId("hearing-env", index),
+      eventType: "environment_check",
+      phase: "intro",
+      environmentStatus: entry.status || "",
+      relativeDb: entry.relativeDb ?? entry.averageRelativeDb ?? null,
+      quietThresholdRelativeDb: entry.quietThresholdRelativeDb ?? HEARING_ENVIRONMENT_QUIET_RELATIVE_DB,
+      checkedAt: entry.checkedAt || entry.endedAt || entry.startedAt || null,
+      unit: "relative dBFS",
+      ...entry
+    });
+  });
+
+  normalized.channelChecks.forEach((entry, index) => {
+    pushEvent({
+      id: entry.id || hearingEventId("hearing-channel", index),
+      eventType: "channel_check",
+      phase: "channel",
+      ear: entry.ear || entry.expectedEar || "",
+      earLabel: entry.expectedLabel || formatEarLabel(entry.ear),
+      frequencyHz: entry.frequencyHz ?? 1000,
+      levelDbHl: entry.levelDbHl ?? 55,
+      responseLabel: entry.response === "correct" ? "声道正确" : "声道不正确",
+      eventAt: entry.at || entry.responseAt || null,
+      ...entry
+    });
+  });
+
+  normalized.practiceResponses.forEach((entry, index) => {
+    pushEvent({
+      id: entry.id || hearingEventId("hearing-practice", index),
+      eventType: "practice_response",
+      phase: "practice",
+      ear: entry.ear || "",
+      earLabel: entry.earLabel || formatEarLabel(entry.ear),
+      frequencyHz: entry.frequencyHz ?? null,
+      levelDbHl: entry.levelDbHl ?? null,
+      heard: Boolean(entry.heard),
+      responseLabel: entry.heard ? "听到了" : "没听到",
+      eventAt: entry.at || entry.responseAt || null,
+      ...entry
+    });
+  });
+
+  normalized.responses.forEach((entry, index) => {
+    pushEvent({
+      id: entry.id || hearingEventId("hearing-test", index),
+      eventType: "test_response",
+      phase: "test",
+      ear: entry.ear || "",
+      earLabel: entry.earLabel || formatEarLabel(entry.ear),
+      frequencyHz: entry.frequencyHz ?? null,
+      levelDbHl: entry.levelDbHl ?? null,
+      heard: Boolean(entry.heard),
+      responseLabel: entry.heard ? "听到了" : "没听到",
+      eventAt: entry.at || entry.responseAt || null,
+      ...entry
+    });
+  });
+
+  return events;
+}
+
 function summarizeHearingScreening(screening = state.hearingScreening) {
   const thresholds = screening.thresholds || { right: {}, left: {} };
+  const responseCounts = summarizeHearingResponses(screening);
   const ears = Object.fromEntries(HEARING_SIDES.map((side) => {
     const primaryValues = HEARING_PRIMARY_FREQUENCIES
       .map((frequencyHz) => thresholdValueForSummary(thresholds[side.key]?.[frequencyHz]))
@@ -1742,6 +1859,7 @@ function summarizeHearingScreening(screening = state.hearingScreening) {
     mocaAudioBaselineDbHl,
     mocaAudioOffsetDb: MOCA_AUDIO_OFFSET_DB,
     mocaAudioLevelDbHl,
+    responseCounts,
     completedTrialCount: hearingCompletedTrialCount(screening),
     totalTrialCount: createHearingTrials().length
   };
@@ -2846,12 +2964,16 @@ function databaseSchemaText() {
 sessions:
   id, participant_name, birth_year, participant_age, gender, education_level
   started_at, finished_at, saved_at, total_duration_ms
-  raw_score, education_bonus, total_score, risk_band, domain_scores_json
+  raw_score, education_bonus, total_score, risk_band, domain_scores_json, payload_json
 
 item_responses:
   session_id, task_id, domain, title, modality, max_score, score
   started_at, ended_at, duration_ms
   answer_json, behavior_json, drawing_image, ai_json
+
+hearing_events:
+  session_id, event_type, phase, ear, frequency_hz, level_db_hl, heard
+  response_label, environment_status, relative_db, event_at, reaction_ms, payload_json
 
 behavior_json:
   sequence, errors, undoCount, taps, strokes, voiceEvents, audioRecordings, location`;
@@ -3324,8 +3446,10 @@ function cubeReferenceSvg() {
 }
 
 function startHearingCalibration() {
+  const previous = normalizeHearingScreening(state.hearingScreening);
   state.hearingScreening = createHearingScreeningState({
-    environment: state.hearingScreening?.environment || { status: "not_checked", relativeDb: null, checkedAt: null },
+    environment: previous.environment,
+    environmentChecks: previous.environmentChecks,
     phase: "channel",
     status: "in_progress",
     startedAt: new Date().toISOString()
@@ -3352,8 +3476,11 @@ function skipHearingCalibration() {
 }
 
 function restartHearingCalibration() {
-  const environment = state.hearingScreening?.environment || { status: "not_checked", relativeDb: null, checkedAt: null };
-  state.hearingScreening = createHearingScreeningState({ environment });
+  const previous = normalizeHearingScreening(state.hearingScreening);
+  state.hearingScreening = createHearingScreeningState({
+    environment: previous.environment,
+    environmentChecks: previous.environmentChecks
+  });
   saveDraft();
   render();
   queueHearingPrompt();
@@ -3370,14 +3497,37 @@ function enterCognitionTest() {
 
 async function checkHearingEnvironment() {
   const screening = normalizeHearingScreening(state.hearingScreening);
+  const startedAt = new Date().toISOString();
+  const attempt = {
+    id: hearingEventId("hearing-env", screening.environmentChecks.length),
+    method: "microphone_rms_relative_db",
+    startedAt,
+    checkedAt: startedAt,
+    status: "checking",
+    durationMs: HEARING_ENVIRONMENT_SAMPLE_MS,
+    quietThresholdRelativeDb: HEARING_ENVIRONMENT_QUIET_RELATIVE_DB,
+    unit: "relative dBFS"
+  };
   state.hearingScreening = {
     ...screening,
-    environment: { ...screening.environment, status: "checking", checkedAt: new Date().toISOString() },
+    environment: { ...screening.environment, status: "checking", checkedAt: startedAt },
+    environmentChecks: [...screening.environmentChecks, attempt],
     message: ""
   };
   render();
   if (!navigator.mediaDevices?.getUserMedia) {
-    state.hearingScreening.environment = { status: "unavailable", relativeDb: null, checkedAt: new Date().toISOString(), reason: "microphone_unsupported" };
+    const endedAt = new Date().toISOString();
+    const result = { ...attempt, status: "unavailable", relativeDb: null, endedAt, checkedAt: endedAt, reason: "microphone_unsupported" };
+    state.hearingScreening.environment = {
+      status: result.status,
+      relativeDb: result.relativeDb,
+      checkedAt: result.checkedAt,
+      reason: result.reason,
+      method: result.method,
+      quietThresholdRelativeDb: result.quietThresholdRelativeDb,
+      unit: result.unit
+    };
+    state.hearingScreening.environmentChecks = replaceLastHearingEnvironmentCheck(state.hearingScreening.environmentChecks, result);
     saveDraft();
     render();
     return;
@@ -3392,30 +3542,72 @@ async function checkHearingEnvironment() {
     const analyser = context.createAnalyser();
     analyser.fftSize = 2048;
     source.connect(analyser);
-    const relativeDb = await sampleRelativeEnvironmentDb(analyser, 3000);
+    const noiseStats = await sampleRelativeEnvironmentDb(analyser, HEARING_ENVIRONMENT_SAMPLE_MS);
     source.disconnect();
     analyser.disconnect();
     context.close?.().catch(() => {});
     releaseMicStream();
-    const quiet = relativeDb <= -38;
-    state.hearingScreening.environment = {
+    const relativeDb = noiseStats.averageRelativeDb;
+    const quiet = relativeDb <= HEARING_ENVIRONMENT_QUIET_RELATIVE_DB;
+    const endedAt = new Date().toISOString();
+    const result = {
+      ...attempt,
       status: quiet ? "quiet" : "noisy",
       relativeDb,
-      checkedAt: new Date().toISOString(),
+      averageRelativeDb: relativeDb,
+      peakRelativeDb: noiseStats.peakRelativeDb,
+      sampleCount: noiseStats.sampleCount,
+      durationMs: noiseStats.durationMs,
+      endedAt,
+      checkedAt: endedAt,
       note: "浏览器麦克风相对噪声估计，非校准 dB(A)"
     };
+    state.hearingScreening.environment = {
+      status: result.status,
+      relativeDb: result.relativeDb,
+      averageRelativeDb: result.averageRelativeDb,
+      peakRelativeDb: result.peakRelativeDb,
+      sampleCount: result.sampleCount,
+      durationMs: result.durationMs,
+      checkedAt: result.checkedAt,
+      note: result.note,
+      method: result.method,
+      quietThresholdRelativeDb: result.quietThresholdRelativeDb,
+      unit: result.unit
+    };
+    state.hearingScreening.environmentChecks = replaceLastHearingEnvironmentCheck(state.hearingScreening.environmentChecks, result);
   } catch (error) {
     context?.close?.().catch(() => {});
     releaseMicStream();
-    state.hearingScreening.environment = {
+    const endedAt = new Date().toISOString();
+    const result = {
+      ...attempt,
       status: "unavailable",
       relativeDb: null,
-      checkedAt: new Date().toISOString(),
+      endedAt,
+      checkedAt: endedAt,
       reason: error?.message || "environment_check_failed"
     };
+    state.hearingScreening.environment = {
+      status: result.status,
+      relativeDb: result.relativeDb,
+      checkedAt: result.checkedAt,
+      reason: result.reason,
+      method: result.method,
+      quietThresholdRelativeDb: result.quietThresholdRelativeDb,
+      unit: result.unit
+    };
+    state.hearingScreening.environmentChecks = replaceLastHearingEnvironmentCheck(state.hearingScreening.environmentChecks, result);
   }
   saveDraft();
   render();
+}
+
+function replaceLastHearingEnvironmentCheck(checks, result) {
+  const next = Array.isArray(checks) ? [...checks] : [];
+  if (!next.length) return [result];
+  next[next.length - 1] = result;
+  return next;
 }
 
 function sampleRelativeEnvironmentDb(analyser, durationMs) {
@@ -3431,7 +3623,13 @@ function sampleRelativeEnvironmentDb(analyser, durationMs) {
       samples.push(20 * Math.log10(Math.max(rms, 0.000001)));
       if (Date.now() - startedAt >= durationMs) {
         const average = samples.reduce((sum, value) => sum + value, 0) / Math.max(1, samples.length);
-        resolve(Math.round(average * 10) / 10);
+        const peak = samples.reduce((max, value) => Math.max(max, value), -Infinity);
+        resolve({
+          averageRelativeDb: Math.round(average * 10) / 10,
+          peakRelativeDb: Number.isFinite(peak) ? Math.round(peak * 10) / 10 : null,
+          sampleCount: samples.length,
+          durationMs: Date.now() - startedAt
+        });
       } else {
         window.setTimeout(tick, 120);
       }
@@ -3445,12 +3643,21 @@ function confirmHearingChannel(value) {
   const previousPhase = screening.phase;
   const previousChannelIndex = screening.channelCheckIndex;
   const side = HEARING_SIDES[screening.channelCheckIndex] || HEARING_SIDES[0];
+  const responseAt = new Date().toISOString();
   screening.channelChecks.push({
+    id: hearingEventId("hearing-channel", screening.channelChecks.length),
+    phase: "channel",
+    channelCheckIndex: screening.channelCheckIndex,
     ear: side.key,
     expectedLabel: side.label,
+    frequencyHz: 1000,
+    levelDbHl: 55,
     response: value === "correct" ? "correct" : "wrong",
-    at: new Date().toISOString(),
-    reactionMs: hearingReactionMs(screening)
+    responseLabel: value === "correct" ? "声道正确" : "声道不正确",
+    at: responseAt,
+    responseAt,
+    reactionMs: hearingReactionMs(screening),
+    ...hearingToneTiming(screening)
   });
   screening.currentTonePlaying = false;
   screening.message = value === "correct" ? "" : "请检查耳机左右是否戴反。";
@@ -3475,12 +3682,20 @@ function answerHearingPractice(heard, { source = "button" } = {}) {
   const screening = normalizeHearingScreening(state.hearingScreening);
   const previousPhase = screening.phase;
   const step = HEARING_PRACTICE_STEPS[screening.practiceIndex] || HEARING_PRACTICE_STEPS[0];
+  const responseAt = new Date().toISOString();
   screening.practiceResponses.push({
+    id: hearingEventId("hearing-practice", screening.practiceResponses.length),
+    phase: "practice",
+    practiceIndex: screening.practiceIndex,
     ...step,
+    earLabel: formatEarLabel(step.ear),
     heard,
+    responseLabel: heard ? "听到了" : "没听到",
     source,
-    at: new Date().toISOString(),
-    reactionMs: hearingReactionMs(screening)
+    at: responseAt,
+    responseAt,
+    reactionMs: hearingReactionMs(screening),
+    ...hearingToneTiming(screening)
   });
   screening.currentTonePlayed = false;
   screening.currentTonePlaying = false;
@@ -3503,15 +3718,24 @@ function answerHearingTrial(heard, { source = "button" } = {}) {
   const previousPhase = screening.phase;
   const trial = screening.trials[screening.trialIndex] || screening.trials[0];
   const levelDbHl = HEARING_LEVELS_DB_HL[screening.levelIndex] || HEARING_LEVELS_DB_HL[0];
+  const responseAt = new Date().toISOString();
   const response = {
+    id: hearingEventId("hearing-test", screening.responses.length),
+    phase: "test",
+    trialIndex: screening.trialIndex,
+    attemptIndex: hearingAttemptIndex(screening.responses, trial),
     ear: trial.ear,
+    earLabel: formatEarLabel(trial.ear),
     frequencyHz: trial.frequencyHz,
     primary: trial.primary,
     levelDbHl,
     heard,
+    responseLabel: heard ? "听到了" : "没听到",
     source,
-    at: new Date().toISOString(),
-    reactionMs: hearingReactionMs(screening)
+    at: responseAt,
+    responseAt,
+    reactionMs: hearingReactionMs(screening),
+    ...hearingToneTiming(screening)
   };
   screening.responses.push(response);
   screening.currentTonePlayed = false;
@@ -7623,10 +7847,30 @@ function hasCompletedHearingScreening(screening) {
   return normalized.status === "completed" && hearingCompletedTrialCount(normalized) > 0;
 }
 
+function hasAnyHearingScreeningRecord(screening) {
+  const normalized = normalizeHearingScreening(screening);
+  return hasCompletedHearingScreening(normalized)
+    || normalized.status === "skipped"
+    || normalized.environment.status !== "not_checked"
+    || normalized.environmentChecks.length > 0
+    || normalized.channelChecks.length > 0
+    || normalized.practiceResponses.length > 0
+    || normalized.responses.length > 0;
+}
+
 function compactHearingScreeningForPayload(screening) {
-  if (!hasCompletedHearingScreening(screening)) return null;
+  if (!hasAnyHearingScreeningRecord(screening)) return null;
   const copy = JSON.parse(JSON.stringify(normalizeHearingScreening(screening)));
-  copy.summary = copy.summary || summarizeHearingScreening(copy);
+  copy.responseCounts = summarizeHearingResponses(copy);
+  copy.events = hearingEventsForExport(copy);
+  copy.summary = copy.summary || (hasCompletedHearingScreening(copy) ? summarizeHearingScreening(copy) : {
+    protocolVersion: HEARING_PROTOCOL_VERSION,
+    status: copy.status === "skipped" ? "skipped" : "incomplete",
+    pass: null,
+    responseCounts: copy.responseCounts,
+    completedTrialCount: hearingCompletedTrialCount(copy),
+    totalTrialCount: createHearingTrials().length
+  });
   delete copy.currentTonePlaying;
   delete copy.currentTonePlayed;
   delete copy.message;
@@ -7824,6 +8068,8 @@ function csvRowsForSession(session) {
   const participant = session.participant || {};
   const hearing = session.hearingScreening || null;
   const hearingSummary = hearing?.summary || {};
+  const hearingResponseCounts = hearing?.responseCounts || hearingSummary.responseCounts || (hearing ? summarizeHearingResponses(hearing) : {});
+  const hearingEvents = Array.isArray(hearing?.events) ? hearing.events : (hearing ? hearingEventsForExport(hearing) : []);
   const itemResponses = Array.isArray(session.itemResponses) && session.itemResponses.length
     ? session.itemResponses
     : [{ taskId: "", title: "", domain: "", modality: "", maxScore: "", score: "", answer: {}, behavior: {}, ai: null }];
@@ -7849,6 +8095,14 @@ function csvRowsForSession(session) {
     hearing_left_pta4: hearingSummary.ears?.left?.pta4 ?? "",
     hearing_worse_ear: formatWorseEarLabel(hearingSummary.worseEar),
     hearing_moca_audio_level: hearingSummary.mocaAudioLevelDbHl ?? "",
+    hearing_environment_status: hearing?.environment?.status || "",
+    hearing_environment_relative_db: hearing?.environment?.relativeDb ?? "",
+    hearing_environment_checked_at: hearing?.environment?.checkedAt || "",
+    hearing_response_count: hearingResponseCounts.total ?? "",
+    hearing_heard_count: hearingResponseCounts.heard ?? "",
+    hearing_missed_count: hearingResponseCounts.missed ?? "",
+    hearing_environment_checks_json: hearing ? stringifyForCsv(hearing.environmentChecks || []) : "",
+    hearing_events_json: hearing ? stringifyForCsv(hearingEvents) : "",
     hearing_screening_json: hearing ? stringifyForCsv(hearing) : "",
     task_id: item.taskId || "",
     task_title: item.title || "",
