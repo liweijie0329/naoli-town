@@ -55,7 +55,7 @@ const DEFAULT_PLACE_OPTIONS = [DEFAULT_PLACE, "医院", "学校", "公园"];
 const PLACE_SEARCH_TERMS = ["医院", "学校", "社区中心", "大学", "公园", "图书馆", "体育中心", "博物馆"];
 const MIN_PLACE_DISTRACTOR_KM = 10;
 const DRAWING_CONFIRM_NUDGE_MS = 10000;
-const SPEECH_VOLUME = 0.72;
+const MOCA_AUDIO_DEFAULT_LEVEL_DB_HL = 35;
 const MOCA_AUDIO_OFFSET_DB = 30;
 const MOCA_AUDIO_REFERENCE_LEVEL_DB_HL = 65;
 const MOCA_AUDIO_REFERENCE_VOLUME = 0.72;
@@ -715,6 +715,8 @@ function createHearingScreeningState(overrides = {}) {
     responses: [],
     thresholds: { right: {}, left: {} },
     summary: null,
+    mocaAudioLevelDbHl: MOCA_AUDIO_DEFAULT_LEVEL_DB_HL,
+    mocaAudioAdjustedAt: null,
     trials: createHearingTrials(),
     ...overrides
   };
@@ -753,6 +755,8 @@ function normalizeHearingScreening(screening = {}) {
     right: base.thresholds?.right && typeof base.thresholds.right === "object" ? base.thresholds.right : {},
     left: base.thresholds?.left && typeof base.thresholds.left === "object" ? base.thresholds.left : {}
   };
+  base.mocaAudioLevelDbHl = clampMocaAudioLevelDbHl(base.summary?.mocaAudioLevelDbHl ?? base.mocaAudioLevelDbHl);
+  base.mocaAudioAdjustedAt = base.mocaAudioAdjustedAt || null;
   return base;
 }
 
@@ -760,6 +764,15 @@ function clampInteger(value, min, max) {
   const number = Number(value);
   if (!Number.isInteger(number)) return min;
   return Math.max(min, Math.min(max, number));
+}
+
+function clampMocaAudioLevelDbHl(value) {
+  const level = Number(value);
+  if (!Number.isFinite(level)) return MOCA_AUDIO_DEFAULT_LEVEL_DB_HL;
+  return Math.max(
+    MOCA_AUDIO_DEFAULT_LEVEL_DB_HL,
+    Math.min(MOCA_AUDIO_MAX_LEVEL_DB_HL, Math.round(level))
+  );
 }
 
 function normalizeTrailState(trail = {}) {
@@ -1640,6 +1653,7 @@ function renderHearingPlayButton(stimulus, screening) {
 function renderHearingSummary(screening) {
   const summary = screening.summary || summarizeHearingScreening(screening);
   const ears = summary.ears || {};
+  const audioLevel = summary.mocaAudioLevelDbHl ?? screening.mocaAudioLevelDbHl ?? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL;
   return html`
     <div class="hearing-card hearing-summary-card">
       <div class="hearing-summary-grid">
@@ -1649,6 +1663,10 @@ function renderHearingSummary(screening) {
             <strong>${formatThreshold(ears[side.key]?.pta4)}</strong>
           </div>
         `).join("")}
+        <div class="hearing-summary-item">
+          <span>系统音量</span>
+          <strong>${formatAudioLevel(audioLevel)}</strong>
+        </div>
       </div>
       <div class="hearing-summary-actions">
         <button class="primary big-button hearing-continue-button pulse" data-action="enterCognitionTest">继续</button>
@@ -1701,6 +1719,11 @@ function formatThreshold(value) {
   const minimumLevel = HEARING_LEVELS_DB_HL[0];
   if (rounded <= minimumLevel) return `≤${minimumLevel} dB HL`;
   return `${rounded} dB HL`;
+}
+
+function formatAudioLevel(value) {
+  if (!Number.isFinite(Number(value))) return "-";
+  return `${Math.round(Number(value))} dB HL`;
 }
 
 function hearingCompletedTrialCount(screening) {
@@ -1840,8 +1863,8 @@ function summarizeHearingScreening(screening = state.hearingScreening) {
     .reduce((max, value) => Math.max(max, Number(value)), null);
   const mocaAudioBaselineDbHl = Number.isFinite(Number(worsePta)) ? Number(worsePta) : null;
   const mocaAudioLevelDbHl = mocaAudioBaselineDbHl === null
-    ? null
-    : Math.min(MOCA_AUDIO_MAX_LEVEL_DB_HL, Math.round(mocaAudioBaselineDbHl + MOCA_AUDIO_OFFSET_DB));
+    ? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL
+    : clampMocaAudioLevelDbHl(mocaAudioBaselineDbHl + MOCA_AUDIO_OFFSET_DB);
   const status = worsePta === null
     ? "incomplete"
     : worsePta > HEARING_PASS_PTA_DB_HL ? "refer" : "pass";
@@ -2648,7 +2671,7 @@ function renderSessionDetail(session) {
         ${detailMetric("听力初筛", formatHearingStatus(hearingSummary?.status || hearing.status))}
         ${detailMetric("右耳 4fPTA", formatThreshold(hearingSummary?.ears?.right?.pta4))}
         ${detailMetric("左耳 4fPTA", formatThreshold(hearingSummary?.ears?.left?.pta4))}
-        ${detailMetric("MoCA 音量", formatThreshold(hearingSummary?.mocaAudioLevelDbHl))}
+        ${detailMetric("MoCA 音量", formatAudioLevel(hearingSummary?.mocaAudioLevelDbHl ?? hearing.mocaAudioLevelDbHl))}
         ${detailMetric("保存时间", session.savedAt ? new Date(session.savedAt).toLocaleString() : "-")}
       </div>
       <div class="item-detail-list">
@@ -3469,6 +3492,7 @@ function skipHearingCalibration() {
       protocolVersion: HEARING_PROTOCOL_VERSION,
       status: "skipped",
       pass: null,
+      mocaAudioLevelDbHl: MOCA_AUDIO_DEFAULT_LEVEL_DB_HL,
       note: "用户跳过听力测试"
     }
   };
@@ -3780,6 +3804,12 @@ function advanceHearingTrial(screening) {
   screening.status = "completed";
   screening.finishedAt = new Date().toISOString();
   screening.summary = summarizeHearingScreening(screening);
+  applyMocaAudioLevelFromHearingSummary(screening);
+}
+
+function applyMocaAudioLevelFromHearingSummary(screening) {
+  screening.mocaAudioLevelDbHl = clampMocaAudioLevelDbHl(screening.summary?.mocaAudioLevelDbHl);
+  screening.mocaAudioAdjustedAt = screening.finishedAt || new Date().toISOString();
 }
 
 function hearingReactionMs(screening) {
@@ -4136,6 +4166,7 @@ function shouldStopAudioForAction(action, target) {
 }
 
 function requiresDrawerAdminPassword(action, target) {
+  if (protectedViewsUnlocked) return false;
   if (!target.closest(".drawer-panel")) return false;
   if (action === "goHome") return false;
   return ["navView", "toggleCognitionMenu", "selectTask"].includes(action);
@@ -4166,6 +4197,7 @@ async function submitAdminPasswordDialog() {
     render();
     return;
   }
+  protectedViewsUnlocked = true;
   const pending = adminPasswordDialog.pending;
   adminPasswordDialog = null;
   await runDrawerAdminAction(pending);
@@ -5124,11 +5156,18 @@ function speechParamsFor(rate, pitch) {
 }
 
 function mocaSpeechVolume() {
-  const level = Number(state.hearingScreening?.summary?.mocaAudioLevelDbHl);
-  if (!Number.isFinite(level)) return SPEECH_VOLUME;
+  const level = currentMocaAudioLevelDbHl();
   const volume = MOCA_AUDIO_REFERENCE_VOLUME
     + ((level - MOCA_AUDIO_REFERENCE_LEVEL_DB_HL) / 30) * (1 - MOCA_AUDIO_REFERENCE_VOLUME);
   return clampSpeech(volume, 0.45, 0.95);
+}
+
+function currentMocaAudioLevelDbHl() {
+  const summaryLevel = Number(state.hearingScreening?.summary?.mocaAudioLevelDbHl);
+  if (Number.isFinite(summaryLevel)) return clampMocaAudioLevelDbHl(summaryLevel);
+  const screeningLevel = Number(state.hearingScreening?.mocaAudioLevelDbHl);
+  if (Number.isFinite(screeningLevel)) return clampMocaAudioLevelDbHl(screeningLevel);
+  return MOCA_AUDIO_DEFAULT_LEVEL_DB_HL;
 }
 
 async function playStaticTtsAudio(audioKey, { playbackId, onStart, done, preferBuffer = false }) {
@@ -7867,6 +7906,7 @@ function compactHearingScreeningForPayload(screening) {
     protocolVersion: HEARING_PROTOCOL_VERSION,
     status: copy.status === "skipped" ? "skipped" : "incomplete",
     pass: null,
+    mocaAudioLevelDbHl: copy.mocaAudioLevelDbHl ?? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL,
     responseCounts: copy.responseCounts,
     completedTrialCount: hearingCompletedTrialCount(copy),
     totalTrialCount: createHearingTrials().length
@@ -8094,7 +8134,7 @@ function csvRowsForSession(session) {
     hearing_right_pta4: hearingSummary.ears?.right?.pta4 ?? "",
     hearing_left_pta4: hearingSummary.ears?.left?.pta4 ?? "",
     hearing_worse_ear: formatWorseEarLabel(hearingSummary.worseEar),
-    hearing_moca_audio_level: hearingSummary.mocaAudioLevelDbHl ?? "",
+    hearing_moca_audio_level: hearingSummary.mocaAudioLevelDbHl ?? hearing?.mocaAudioLevelDbHl ?? "",
     hearing_environment_status: hearing?.environment?.status || "",
     hearing_environment_relative_db: hearing?.environment?.relativeDb ?? "",
     hearing_environment_checked_at: hearing?.environment?.checkedAt || "",
