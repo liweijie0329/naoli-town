@@ -497,6 +497,10 @@ h4 {
   font-size: clamp(22px, 2.5vw, 28px);
 }
 
+.confirm-button.answer-ready {
+  animation: pulseRed 1.4s ease-in-out infinite;
+}
+
 .confirm-button.attention-nudge {
   animation: confirmNudge 0.82s ease-in-out infinite;
 }
@@ -1377,6 +1381,39 @@ h4 {
   padding-bottom: clamp(54px, 8dvh, 78px);
 }
 
+.hearing-complete-animation {
+  position: relative;
+  display: grid;
+  width: clamp(82px, 10vw, 118px);
+  height: clamp(82px, 10vw, 118px);
+  place-items: center;
+}
+
+.hearing-complete-ring {
+  position: absolute;
+  inset: 0;
+  border: 6px solid rgba(34, 169, 107, 0.24);
+  border-top-color: var(--leaf);
+  border-radius: 999px;
+  animation: hearingCompleteSpin 1.1s ease-out 1, hearingCompleteSettle 1.5s ease-in-out 1.1s infinite;
+}
+
+.hearing-complete-check {
+  display: grid;
+  width: 68%;
+  height: 68%;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--leaf);
+  box-shadow: 0 6px 0 var(--leaf-dark);
+  color: #fff;
+  font-size: clamp(38px, 5vw, 58px);
+  font-weight: 1000;
+  line-height: 1;
+  transform: scale(0.74);
+  animation: hearingCheckPop 0.55s cubic-bezier(0.18, 0.89, 0.32, 1.28) 0.35s forwards;
+}
+
 .hearing-result-panel {
   width: 100%;
   min-height: 210px;
@@ -1771,6 +1808,12 @@ h4 {
   border-radius: 8px;
   background: #fff;
   touch-action: none;
+}
+
+.task-canvas.locked {
+  cursor: not-allowed;
+  opacity: 0.5;
+  filter: grayscale(0.28);
 }
 
 .cube-canvas {
@@ -3630,13 +3673,48 @@ h4 {
 
 @keyframes pulseRed {
   0% {
-    box-shadow: 0 0 0 0 rgba(239, 76, 63, 0.36);
+    transform: scale(1);
+    box-shadow: 0 5px 0 #bf533e, 0 0 0 0 rgba(239, 76, 63, 0.36);
   }
   70% {
-    box-shadow: 0 0 0 12px rgba(239, 76, 63, 0);
+    transform: scale(1.035);
+    box-shadow: 0 5px 0 #bf533e, 0 0 0 12px rgba(239, 76, 63, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(239, 76, 63, 0);
+    transform: scale(1);
+    box-shadow: 0 5px 0 #bf533e, 0 0 0 0 rgba(239, 76, 63, 0);
+  }
+}
+
+@keyframes hearingCompleteSpin {
+  from {
+    transform: rotate(-180deg) scale(0.78);
+    opacity: 0.4;
+  }
+  to {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes hearingCompleteSettle {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+@keyframes hearingCheckPop {
+  from {
+    opacity: 0;
+    transform: scale(0.74);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 

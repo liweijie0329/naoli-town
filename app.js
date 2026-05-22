@@ -27,6 +27,7 @@ const DIGIT_BACKWARD_BANK = [
 const MEMORY_WAIT_MS = 5 * 60 * 1000;
 const LOCAL_SESSIONS_KEY = "moca-game-local-sessions";
 const ADMIN_PASSWORD = "123";
+const SERIAL_SUBTRACTION_NUMBER = 7;
 const SETUP_PROMPT_TEXT = "请填写姓名、出生日期、性别和教育水平。";
 const LOGO_SRC = "./assets/logo.svg";
 const MOCA_SHEET_IMAGE = "./assets/moca/moca-page.png";
@@ -317,7 +318,7 @@ const tasks = [
     modality: "拖拽连线",
     prompt: "请从一个圆圈拖线连到另一个圆圈，按数字和汉字交替上升的规则完成。",
     instruction: "请按数字和汉字交替上升的规则，把所有圆圈用一条线连起来。每次从当前圆圈拖到下一个圆圈。",
-    scoring: "最终连线序列只要包含 1-甲-2-乙-3-丙-4-丁-5-戊 的正确顺序，即给 1 分；重复点击同一节点不扣分，撤销或重画后按最后留下的序列判分。"
+    scoring: "最终连线序列只要包含 1-甲-2-乙-3-丙-4-丁-5-戊 的正确顺序，即给 1 分；重复点击同一节点不扣分，撤销后按最后留下的序列判分。"
   },
   {
     id: "cube",
@@ -421,13 +422,13 @@ const tasks = [
   {
     id: "serial7",
     domain: "注意",
-    title: "100 连续减随机数",
+    title: "100 连续减 7",
     maxScore: 3,
     type: "serial7",
     modality: "数字键盘",
-    prompt: "请从 100 中减去指定数字，再从得数中继续减同一个数字，一共算 5 次。",
-    instruction: "现在请您做一道计算题，从 100 中减去指定数字，而后从得数中再减去同一个数字，一直往下减，直到我让您停下为止。",
-    scoring: "每次测评从 1-9 中随机抽取一个减数。4-5 个正确给 3 分，2-3 个正确给 2 分，1 个正确给 1 分，0 个正确给 0 分。"
+    prompt: "请从 100 中连续减 7，一共算 5 次。",
+    instruction: "现在请您做一道计算题，从 100 中减 7，而后从得数中再减 7，一直往下减，直到我让您停下为止。",
+    scoring: "4-5 个正确给 3 分，2-3 个正确给 2 分，1 个正确给 1 分，0 个正确给 0 分。"
   },
   {
     id: "sentence",
@@ -488,7 +489,7 @@ const rubricGroups = [
   {
     title: "视空间与执行功能",
     items: [
-      { title: "交替连线测验", prompt: "请您按照从数字到汉字并逐渐升高的顺序画一条连线。从 1 连向甲，再连向 2，并一直连下去，到戊结束。", scoring: "最终连线序列包含 1-甲-2-乙-3-丙-4-丁-5-戊 的正确顺序即给 1 分。重复点击同一节点不扣分，撤销或重画后按最后留下的序列判分。", image: true },
+      { title: "交替连线测验", prompt: "请您按照从数字到汉字并逐渐升高的顺序画一条连线。从 1 连向甲，再连向 2，并一直连下去，到戊结束。", scoring: "最终连线序列包含 1-甲-2-乙-3-丙-4-丁-5-戊 的正确顺序即给 1 分。重复点击同一节点不扣分，撤销后按最后留下的序列判分。", image: true },
       { title: "复制立方体", prompt: "请您照着这幅图在下面的空白处再画一遍，并尽可能精确。", scoring: "符合下列标准时给 1 分：图形可辨认为三维结构；主要线条基本存在；无明显无关多余线；相对边大致平行且长度接近。允许手绘线条抖动、重描、轻微断开、角度不完美或小幅长度偏差。", image: true },
       { title: "画钟表", prompt: "请您在此处画一个钟表，填上所有的数字并指示出 11 点 10 分。", scoring: "轮廓 1 分：圆、椭圆或近似圆均可，允许轻微缺陷。数字 1 分：1-12 基本写全、可辨认、总体顺时针分布即可，允许歪斜、大小不一、间距不均。指针 1 分：必须看得到两根指针并大致表示 11 点 10 分，时针短于分针；没有指针或只有一根指针时，指针项为 0 分。", image: true }
     ]
@@ -507,7 +508,7 @@ const rubricGroups = [
       { title: "数字顺背", prompt: "下面我说一些数字，您仔细听。说完后，请按原来的顺序选择出来。", scoring: "复述准确给 1 分。", image: false },
       { title: "数字倒背", prompt: "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。", scoring: "倒背正确回答为 2-4-7，复述准确给 1 分。", image: false },
       { title: "警觉性", prompt: "下面我要读出一系列数字，请注意听。每当我读到 1 的时候，您就敲一下按钮。当我读其他数字时不要敲。", scoring: "完全正确或只有一次错误给 1 分，否则不给分。错误指读 1 时没有敲，或读其他数字时敲了。", image: false },
-      { title: "100 连续减随机数", prompt: "从 100 中连续减去本次随机抽到的同一个数字，一共回答 5 步。", scoring: "全部错误记 0 分，1 个正确给 1 分，2-3 个正确给 2 分，4-5 个正确给 3 分。每一步按本次随机减数单独评定。", image: false }
+      { title: "100 连续减 7", prompt: "从 100 中连续减 7，一共回答 5 步。", scoring: "全部错误记 0 分，1 个正确给 1 分，2-3 个正确给 2 分，4-5 个正确给 3 分。每一步按减 7 单独评定。", image: false }
     ]
   },
   {
@@ -666,6 +667,7 @@ function createInitialState() {
     memoryWaitStartedAt: null,
     resumeAfterMemory2Index: null,
     playedInstructionKeys: {},
+    completedInstructionKeys: {},
     taskSubmitting: null,
     permissions: { microphone: "unknown", location: "unknown" },
     voiceProfile: "cartoon",
@@ -886,6 +888,7 @@ function migrateState() {
   state.taskRuntime = normalizeTaskRuntime(state.taskRuntime);
   state.trail = normalizeTrailState(state.trail);
   state.playedInstructionKeys = state.playedInstructionKeys || {};
+  state.completedInstructionKeys = state.completedInstructionKeys || { ...state.playedInstructionKeys };
   state.permissions = state.permissions || { microphone: "unknown", location: "unknown" };
   state.voiceProfile = VOICE_PROFILES[state.voiceProfile] ? state.voiceProfile : "cartoon";
   state.setupAttempted = Boolean(state.setupAttempted);
@@ -988,7 +991,7 @@ function createTaskRuntime() {
     digitBackwardBankId: digitBackward.id,
     digitBackwardStimulus: digitBackward.stimulus,
     digitBackwardAnswer: digitBackward.answer,
-    serialSubtractionNumber: randomInteger(1, 9)
+    serialSubtractionNumber: SERIAL_SUBTRACTION_NUMBER
   };
 }
 
@@ -1026,10 +1029,7 @@ function normalizeTaskRuntime(runtime = {}) {
   base.digitBackwardStimulus = backward.stimulus;
   base.digitBackwardAnswer = backward.answer;
 
-  const serialNumber = Number(base.serialSubtractionNumber);
-  base.serialSubtractionNumber = Number.isInteger(serialNumber) && serialNumber >= 1 && serialNumber <= 9
-    ? serialNumber
-    : randomInteger(1, 9);
+  base.serialSubtractionNumber = SERIAL_SUBTRACTION_NUMBER;
   return base;
 }
 
@@ -1087,7 +1087,8 @@ function activeDigitItem(task) {
 }
 
 function serialSubtractionNumber() {
-  return ensureTaskRuntime().serialSubtractionNumber;
+  ensureTaskRuntime();
+  return SERIAL_SUBTRACTION_NUMBER;
 }
 
 function beginTask(taskId) {
@@ -1124,7 +1125,6 @@ function render() {
 
   ensureRenderableTask();
   const current = tasks[state.activeTaskIndex] || tasks[0];
-  if (state.view === "test") beginTask(current.id);
   root.innerHTML = renderShell(current);
   if (state.view === "test") {
     setupCurrentTask(current);
@@ -1378,8 +1378,7 @@ function segmentedField(key, label, value, options, invalid = false, className =
 function renderShell(current) {
   const totals = computeTotals();
   const hearingView = state.view === "hearing";
-  const progressLabel = hearingView ? "听力" : `${state.activeTaskIndex + 1}/${tasks.length}`;
-  const progressWidth = hearingView ? hearingProgressPercent() : ((state.activeTaskIndex + 1) / tasks.length) * 100;
+  const progress = headerProgressState();
   const drawerAvatar = participantAvatarSrc();
   return html`
     <div class="app-shell">
@@ -1416,8 +1415,8 @@ function renderShell(current) {
             ${state.view === "test" ? `<p class="header-prompt">${escapeHtml(current.prompt)}</p>` : ""}
           </div>
           <div class="header-progress">
-            <span>${progressLabel}</span>
-            <div class="progress-track"><span style="width:${progressWidth}%"></span></div>
+            <span>${escapeHtml(progress.label)}</span>
+            <div class="progress-track"><span style="width:${progress.width}%"></span></div>
           </div>
         </header>
         ${renderMainView(current)}
@@ -1425,6 +1424,25 @@ function renderShell(current) {
       ${renderAdminPasswordDialog()}
     </div>
   `;
+}
+
+function headerProgressState() {
+  if (state.view === "hearing") {
+    const progress = hearingQuestionProgress(state.hearingScreening);
+    return {
+      label: `听力 ${progress.current}/${progress.total}`,
+      width: hearingProgressPercent()
+    };
+  }
+  if (state.view === "test") {
+    const current = Math.min(tasks.length, state.activeTaskIndex + 1);
+    return {
+      label: `认知 ${current}/${tasks.length}`,
+      width: (current / tasks.length) * 100
+    };
+  }
+  if (state.view === "results") return { label: "完成", width: 100 };
+  return { label: "", width: 0 };
 }
 
 function participantAvatarSrc() {
@@ -1509,6 +1527,17 @@ function hearingProgressPercent() {
     return 46 + (screening.trialIndex / Math.max(1, trialCount)) * 48;
   }
   return 8;
+}
+
+function hearingQuestionProgress(screening = state.hearingScreening) {
+  const normalized = normalizeHearingScreening(screening);
+  const total = HEARING_SIDES.length + HEARING_PRACTICE_STEPS.length + normalized.trials.length;
+  const completed = Math.min(HEARING_SIDES.length, normalized.channelChecks.length)
+    + Math.min(HEARING_PRACTICE_STEPS.length, normalized.practiceResponses.length)
+    + hearingCompletedTrialCount(normalized);
+  if (normalized.phase === "intro") return { current: 0, total };
+  if (normalized.phase === "summary") return { current: total, total };
+  return { current: Math.min(total, completed + 1), total };
 }
 
 function renderHearingCalibration() {
@@ -1656,6 +1685,11 @@ function renderHearingSummary(screening) {
   const audioLevel = summary.mocaAudioLevelDbHl ?? screening.mocaAudioLevelDbHl ?? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL;
   return html`
     <div class="hearing-card hearing-summary-card">
+      <div class="hearing-complete-animation" aria-hidden="true">
+        <span class="hearing-complete-ring"></span>
+        <span class="hearing-complete-check">✓</span>
+      </div>
+      <p class="hearing-summary-note">听力测试已完成，请继续认知测试</p>
       <div class="hearing-summary-grid">
         ${HEARING_SIDES.map((side) => `
           <div class="hearing-summary-item">
@@ -1944,25 +1978,40 @@ function renderTaskActions(task, step) {
   const showConfirm = shouldShowConfirmButton(task);
   if (!secondary && !showConfirm) return `<div class="task-actions spacer"></div>`;
   const submitting = isTaskSubmitting(task);
-  const confirmClass = `confirm-button ${shouldNudgeConfirm(task) ? "attention-nudge" : ""}`;
+  const response = getResponse(task.id);
+  const readyToAnswer = isTaskReadyToAnswer(task, step);
+  const answerReady = readyToAnswer && hasTaskAnswer(task, response, step);
+  const confirmDisabled = speechTranscribing || submitting || !answerReady;
+  const confirmClass = `confirm-button ${answerReady ? "answer-ready" : ""} ${shouldNudgeConfirm(task) ? "attention-nudge" : ""}`;
   return html`
     <div class="task-actions">
       <div class="task-actions-left">${secondary || ""}</div>
-      ${showConfirm ? `<button class="${confirmClass}" data-action="nextTask" ${speechTranscribing || submitting ? "disabled" : ""}>${submitting ? taskSubmittingLabel(task) : confirmLabel(task, step)}</button>` : ""}
+      ${showConfirm ? `<button class="${confirmClass}" data-action="nextTask" ${confirmDisabled ? "disabled" : ""}>${submitting ? taskSubmittingLabel(task) : confirmLabel(task, step)}</button>` : ""}
       <div class="task-actions-right"></div>
     </div>
   `;
 }
 
+function refreshTaskActionButtons() {
+  if (state.view !== "test") return;
+  const task = tasks[state.activeTaskIndex];
+  if (!task) return;
+  const step = getTaskStep(task);
+  const button = document.querySelector(".confirm-button");
+  if (!button) return;
+  const submitting = isTaskSubmitting(task);
+  const answerReady = isTaskReadyToAnswer(task, step) && hasTaskAnswer(task, getResponse(task.id), step);
+  button.disabled = speechTranscribing || submitting || !answerReady;
+  button.classList.toggle("answer-ready", answerReady);
+}
+
 function taskActionSecondaryButtons(task) {
   const disabled = isTaskSubmitting(task) ? "disabled" : "";
   if (task.type === "trail") return `
-    <button class="utility-button" data-action="undoTrail" ${disabled}>撤销</button>
-    <button class="utility-button" data-action="clearTrail" ${disabled}>重画</button>
+    <button class="utility-button" data-action="undoTrail" ${disabled}>↩ 撤销一步</button>
   `;
   if (task.type === "drawing") return `
-    <button class="utility-button" data-action="undoDrawing" ${disabled}>撤销</button>
-    <button class="utility-button" data-action="clearDrawing" ${disabled}>重画</button>
+    <button class="utility-button" data-action="undoDrawing" ${disabled}>↩ 撤销一步</button>
   `;
   if (task.type === "choice" && getResponse(task.id).answer.audioReady) return `<button class="utility-button" data-action="backspaceDigit" ${disabled}>删除</button>`;
   if (task.type === "serial7") return `<button class="utility-button" data-action="backspaceSerial" ${disabled}>删除</button>`;
@@ -1987,6 +2036,51 @@ function shouldNudgeConfirm(task) {
   return task?.type === "drawing" && Boolean(getResponse(task.id).behavior.confirmNudge);
 }
 
+function isTaskReadyToAnswer(task, step = getTaskStep(task)) {
+  return isInstructionComplete(task, step);
+}
+
+function hasTaskAnswer(task, response = getResponse(task.id), step = getTaskStep(task)) {
+  if (!task) return false;
+  if (task.type === "trail") return trailCompletionEdgeCount() > 0;
+  if (task.type === "drawing") {
+    return Boolean(response.drawingImage || state.drawings[task.id] || Number(response.behavior.strokes || 0));
+  }
+  if (task.type === "naming") {
+    const item = task.items[step];
+    return Boolean(item && String(response.answer[item.key] || "").trim());
+  }
+  if (task.type === "memory") {
+    const selected = response.answer.selectedWords || [];
+    if (task.trial === 1) return Boolean(response.answer.audioReady) && selected.length >= MEMORY_TARGET_COUNT;
+    return selected.length > 0;
+  }
+  if (task.type === "choice") {
+    const sequence = response.answer.sequence || [];
+    return sequence.length >= activeDigitItem(task).answer.length;
+  }
+  if (task.type === "serial7") {
+    const values = response.answer.values || [];
+    return String(values[step] || "").trim().length > 0;
+  }
+  if (task.type === "sentence") return sentenceStepHasSpeechAttempt(task, step);
+  if (task.type === "fluency") return Boolean(response.answer.completedAt);
+  if (task.type === "abstractionChoice") {
+    const item = task.items[step];
+    return Boolean(item && String(response.answer[item.key] || "").trim());
+  }
+  if (task.type === "orientation") return hasOrientationAnswer(response, step);
+  return false;
+}
+
+function hasOrientationAnswer(response, step) {
+  const prompt = orientationPrompts[step];
+  if (!prompt) return false;
+  if (prompt.key === "year") return String(response.answer.year || "").trim().length >= 4;
+  if (prompt.key === "date") return Boolean(String(response.answer.month || "").trim() && String(response.answer.day || "").trim());
+  return Boolean(String(response.answer[prompt.key] || response.answer.orientationChoices?.[prompt.key] || "").trim());
+}
+
 function getTaskStep(task) {
   const response = getResponse(task.id);
   return Math.min(Number(response.answer?.step || 0), getTaskStepCount(task) - 1);
@@ -2002,8 +2096,8 @@ function getTaskStepCount(task) {
 }
 
 function confirmLabel(task, step) {
-  if (state.activeTaskIndex === tasks.length - 1 && step >= getTaskStepCount(task) - 1) return "完成";
-  return "确定";
+  if (state.activeTaskIndex === tasks.length - 1 && step >= getTaskStepCount(task) - 1) return "答完了，查看结果";
+  return "答完了，下一题";
 }
 
 function renderTaskWorkspace(task, step) {
@@ -2022,9 +2116,10 @@ function renderTaskWorkspace(task, step) {
 }
 
 function renderTrailTask() {
+  const locked = isTaskReadyToAnswer(tasks[state.activeTaskIndex]) ? "" : "locked";
   return html`
     <div class="trail-page">
-      <canvas id="taskCanvas" class="task-canvas" aria-label="交替连线画图区域"></canvas>
+      <canvas id="taskCanvas" class="task-canvas ${locked}" aria-label="交替连线画图区域"></canvas>
       ${renderTrailCompletionPrompt()}
     </div>
   `;
@@ -2032,6 +2127,7 @@ function renderTrailTask() {
 
 function renderDrawingTask(task) {
   const hasReference = task.drawingKind === "cube" || task.drawingKind === "clock";
+  const locked = isTaskReadyToAnswer(task) ? "" : "locked";
   return html`
     <div class="drawing-page ${task.drawingKind === "clock" ? "clock-page" : ""} ${task.drawingKind === "cube" ? "cube-page" : ""}">
       ${task.drawingKind === "cube" ? `
@@ -2051,7 +2147,7 @@ function renderDrawingTask(task) {
       ${hasReference ? `<div class="cube-arrow-hint">→</div>` : ""}
       <div class="canvas-wrap">
         <div class="canvas-surface">
-          <canvas id="taskCanvas" class="task-canvas ${task.drawingKind === "cube" ? "cube-canvas" : ""}" aria-label="${escapeHtml(task.title)}画图区域"></canvas>
+          <canvas id="taskCanvas" class="task-canvas ${task.drawingKind === "cube" ? "cube-canvas" : ""} ${locked}" aria-label="${escapeHtml(task.title)}画图区域"></canvas>
         </div>
       </div>
     </div>
@@ -2067,7 +2163,7 @@ function renderTrailCompletionPrompt() {
         <strong>所有圆圈都连完了</strong>
         <p>是否确定提交这一题？</p>
         <div class="trail-completion-actions">
-          <button class="primary" data-action="confirmTrailCompletion">确定</button>
+          <button class="primary" data-action="confirmTrailCompletion">答完了，下一题</button>
           <button class="ghost" data-action="cancelTrailCompletion">取消</button>
         </div>
       </div>
@@ -2078,6 +2174,7 @@ function renderTrailCompletionPrompt() {
 function renderNamingTask(task, step) {
   const response = getResponse(task.id);
   const item = task.items[step];
+  const disabled = isTaskReadyToAnswer(task, step) ? "" : "disabled";
   return html`
     <div class="naming-page">
       <div class="animal-visual-panel">
@@ -2086,7 +2183,7 @@ function renderNamingTask(task, step) {
       <div class="animal-side">
         <h4>这是什么动物？</h4>
         <div class="option-grid">
-          ${item.options.map((option) => `<button class="option ${response.answer[item.key] === option ? "picked" : ""}" data-action="chooseNaming" data-value="${escapeHtml(option)}"${speechAttrs(option, audioKeyForText(option))}>${escapeHtml(option)}</button>`).join("")}
+          ${item.options.map((option) => `<button class="option ${response.answer[item.key] === option ? "picked" : ""}" data-action="chooseNaming" data-value="${escapeHtml(option)}" ${disabled}${speechAttrs(option, audioKeyForText(option))}>${escapeHtml(option)}</button>`).join("")}
         </div>
       </div>
     </div>
@@ -2098,6 +2195,7 @@ function renderMemoryTask(task) {
   const selected = response.answer.selectedWords || [];
   const options = memoryCandidateWords(task.id);
   const ready = task.trial === 2 || Boolean(response.answer.audioReady);
+  const inputDisabled = isTaskReadyToAnswer(task) ? "" : "disabled";
   return html`
     <div class="memory-page ${ready ? "ready" : ""}">
       ${ready ? "" : `<div class="memory-audio">
@@ -2110,7 +2208,7 @@ function renderMemoryTask(task) {
           <span>${selected.length}/${MEMORY_TARGET_COUNT}</span>
         </div>
         <div class="option-grid memory-options">
-          ${options.map((word) => `<button class="option ${selected.includes(word) ? "picked" : ""}" data-action="toggleMemoryWord" data-word="${escapeHtml(word)}"${speechAttrs(word, memoryWordAudioKey(word))}>${escapeHtml(word)}</button>`).join("")}
+          ${options.map((word) => `<button class="option ${selected.includes(word) ? "picked" : ""}" data-action="toggleMemoryWord" data-word="${escapeHtml(word)}" ${inputDisabled}${speechAttrs(word, memoryWordAudioKey(word))}>${escapeHtml(word)}</button>`).join("")}
         </div>
         ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
       ` : `<p class="memory-wait-copy">请先点击开始，听完 5 个词后再选择。</p>`}
@@ -2119,6 +2217,8 @@ function renderMemoryTask(task) {
 }
 
 function renderMemoryStartButton() {
+  const task = tasks[state.activeTaskIndex];
+  if (!isTaskReadyToAnswer(task)) return `<button class="primary circle-button sound-button" disabled>请听说明</button>`;
   if (playState === "播放中...") {
     return `<button class="primary circle-button sound-button" disabled>请听题</button>`;
   }
@@ -2132,6 +2232,7 @@ function renderChoiceTask(task) {
   const backward = task.id === "digitBackward";
   const answerLength = activeDigitItem(task).answer.length;
   const modeLabel = backward ? "倒序" : "顺序";
+  const inputDisabled = isTaskReadyToAnswer(task) ? "" : "disabled";
   return html`
     <div class="digit-page ${ready ? "ready keypad-split-page" : ""}">
       ${ready ? `
@@ -2141,7 +2242,7 @@ function renderChoiceTask(task) {
         </div>
         <div class="keypad-panel">
           <div class="keypad digit-keypad">
-            ${renderKeypadDigits("appendDigit")}
+            ${renderKeypadDigits("appendDigit", inputDisabled)}
           </div>
         </div>
       ` : `
@@ -2167,11 +2268,12 @@ function renderVigilanceTask() {
   const started = Boolean(response.answer.startedAt);
   const running = Boolean(response.answer.running);
   const tapCount = (response.answer.taps || []).length;
+  const readyToAnswer = isTaskReadyToAnswer(tasks[state.activeTaskIndex]);
   return html`
     <div class="vigilance-page">
       <strong class="tap-instruction">听到 1 敲一下</strong>
       ${started ? renderAudioWave() : ""}
-      ${!started ? `<button class="primary circle-button pulse" data-action="playCurrentAudio">开始</button>` : ""}
+      ${!started ? `<button class="primary circle-button ${readyToAnswer ? "pulse" : ""}" data-action="playCurrentAudio" ${readyToAnswer ? "" : "disabled"}>${readyToAnswer ? "开始" : "请听说明"}</button>` : ""}
       ${started ? `<button class="tap-button ${running ? "pulse" : ""}" data-action="tapVigilance" ${running ? "" : "disabled"}>敲一下</button>` : ""}
       ${started ? `<span class="tap-count">已敲 ${tapCount} 下</span>` : ""}
     </div>
@@ -2180,10 +2282,10 @@ function renderVigilanceTask() {
 
 function renderSerial7Task(step) {
   const response = getResponse("serial7");
-  ensureSerialStepTiming(response, step);
   const values = response.answer.values || ["", "", "", "", ""];
   const subtractBy = serialSubtractionNumber();
   const question = step === 0 ? `100减${subtractBy}等于多少？` : `再减${subtractBy}，等于多少？`;
+  const inputDisabled = isTaskReadyToAnswer(tasks[state.activeTaskIndex], step) ? "" : "disabled";
   return html`
     <div class="serial-page keypad-split-page">
       <div class="keypad-question-panel">
@@ -2192,7 +2294,7 @@ function renderSerial7Task(step) {
       </div>
       <div class="keypad-panel">
         <div class="keypad serial-keypad">
-          ${renderKeypadDigits("inputSerialDigit")}
+          ${renderKeypadDigits("inputSerialDigit", inputDisabled)}
         </div>
       </div>
     </div>
@@ -2212,11 +2314,12 @@ function renderFluencyTask() {
   const waiting = speechTranscribing && tasks[state.activeTaskIndex]?.id === "fluency";
   const live = getLiveTranscript(tasks.find((task) => task.id === "fluency"), response, 0);
   const animals = fluencyAnimalNamesFromResponse(response, live);
+  const readyToAnswer = isTaskReadyToAnswer(tasks[state.activeTaskIndex]);
   return html`
     <div class="fluency-page">
       ${renderAudioWave()}
       ${completed ? "" : `<div class="speech-controls">
-        <button class="timer-button ${running ? "running" : waiting ? "" : "pulse"}" ${waiting ? "disabled" : `data-action="${running ? "stopFluency" : "startFluency"}"`}>${waiting ? "请稍等" : running ? "停止" : "开始"}</button>
+        <button class="timer-button ${running ? "running" : waiting || !readyToAnswer ? "" : "pulse"}" ${waiting || !readyToAnswer ? "disabled" : `data-action="${running ? "stopFluency" : "startFluency"}"`}>${waiting ? "请稍等" : readyToAnswer ? running ? "停止" : "开始" : "请听说明"}</button>
       </div>`}
       <strong class="fluency-count-status">${fluencyStatusText(response, animals)}</strong>
       <div class="animal-count-list">${renderAnimalCountChips(animals)}</div>
@@ -2240,6 +2343,7 @@ function renderAbstractionTask(task, step) {
   const item = task.items[step];
   const value = response.answer[item.key] || "";
   const options = abstractionOptions(response, item);
+  const disabled = isTaskReadyToAnswer(task, step) ? "" : "disabled";
   return html`
     <div class="abstraction-page abstraction-split-page">
       <div class="abstraction-visual-panel">
@@ -2249,7 +2353,7 @@ function renderAbstractionTask(task, step) {
       </div>
       <div class="abstraction-choice-panel">
         <div class="option-grid abstraction-options">
-          ${options.map((option) => `<button class="option ${value === option ? "picked" : ""} ${item.practice && option === item.answer ? "guided-option" : ""}" data-action="chooseAbstraction" data-key="${item.key}" data-value="${escapeHtml(option)}"${speechAttrs(option, audioKeyForText(option))}>${escapeHtml(option)}${item.practice && option === item.answer ? `<span class="hand-cue">👉</span>` : ""}</button>`).join("")}
+          ${options.map((option) => `<button class="option ${value === option ? "picked" : ""} ${item.practice && option === item.answer ? "guided-option" : ""}" data-action="chooseAbstraction" data-key="${item.key}" data-value="${escapeHtml(option)}" ${disabled}${speechAttrs(option, audioKeyForText(option))}>${escapeHtml(option)}${item.practice && option === item.answer ? `<span class="hand-cue">👉</span>` : ""}</button>`).join("")}
         </div>
       </div>
       ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
@@ -2264,12 +2368,13 @@ function renderOrientationTask(step) {
   if (["weekday", "city", "place"].includes(prompt.key)) return renderOrientationChoiceTask(response, prompt);
   const options = orientationOptions(prompt);
   const picked = response.answer.orientationChoices?.[prompt.key] || "";
+  const disabled = isTaskReadyToAnswer(tasks[state.activeTaskIndex], step) ? "" : "disabled";
   return html`
     <div class="orientation-page">
       <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
       ${options.length ? `
         <div class="option-grid orientation-options">
-          ${options.map((option) => `<button class="option ${picked === option.value ? "picked" : ""}" data-action="chooseOrientation" data-key="${prompt.key}" data-value="${escapeHtml(option.value)}"${speechAttrs(option.label, audioKeyForText(option.label))}>${escapeHtml(option.label)}</button>`).join("")}
+          ${options.map((option) => `<button class="option ${picked === option.value ? "picked" : ""}" data-action="chooseOrientation" data-key="${prompt.key}" data-value="${escapeHtml(option.value)}" ${disabled}${speechAttrs(option.label, audioKeyForText(option.label))}>${escapeHtml(option.label)}</button>`).join("")}
         </div>
       ` : ""}
     </div>
@@ -2282,6 +2387,7 @@ function renderOrientationChoiceTask(response, prompt) {
   const weekday = prompt.key === "weekday";
   const answerText = weekday ? weekdayShortLabel(picked) : picked;
   const optionClass = weekday ? "orientation-weekday-options" : "orientation-text-options";
+  const disabled = isTaskReadyToAnswer(tasks[state.activeTaskIndex]) ? "" : "disabled";
   return html`
     <div class="orientation-page orientation-choice-page orientation-${prompt.key}-page">
       <div class="orientation-choice-question-panel">
@@ -2299,7 +2405,7 @@ function renderOrientationChoiceTask(response, prompt) {
         <div class="option-grid orientation-options ${optionClass}">
           ${options.map((option) => {
             const label = weekday ? weekdayShortLabel(option.label) : option.label;
-            return `<button class="option ${picked === option.value ? "picked" : ""}" data-action="chooseOrientation" data-key="${prompt.key}" data-value="${escapeHtml(option.value)}"${speechAttrs(option.label, audioKeyForText(option.label))}>${escapeHtml(label)}</button>`;
+            return `<button class="option ${picked === option.value ? "picked" : ""}" data-action="chooseOrientation" data-key="${prompt.key}" data-value="${escapeHtml(option.value)}" ${disabled}${speechAttrs(option.label, audioKeyForText(option.label))}>${escapeHtml(label)}</button>`;
           }).join("")}
         </div>
       </div>
@@ -2312,6 +2418,7 @@ function weekdayShortLabel(value) {
 }
 
 function renderOrientationNumberTask(response, prompt) {
+  const disabled = isTaskReadyToAnswer(tasks[state.activeTaskIndex]) ? "" : "disabled";
   if (prompt.key === "year") {
     const value = response.answer.year || "";
     return html`
@@ -2322,7 +2429,7 @@ function renderOrientationNumberTask(response, prompt) {
         </div>
         <div class="keypad-panel">
           <div class="keypad orientation-keypad">
-            ${renderOrientationKeypad("year")}
+            ${renderOrientationKeypad("year", disabled)}
           </div>
         </div>
       </div>
@@ -2334,11 +2441,11 @@ function renderOrientationNumberTask(response, prompt) {
       <div class="keypad-question-panel">
         <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
         <div class="date-input-pair date-input-with-units">
-          <button class="date-input-box ${activeField === "month" ? "active" : ""}" data-action="setOrientationDateField" data-field="month">
+          <button class="date-input-box ${activeField === "month" ? "active" : ""}" data-action="setOrientationDateField" data-field="month" ${disabled}>
             <strong>${escapeHtml(response.answer.month || " ")}</strong>
           </button>
           <span class="date-unit">月</span>
-          <button class="date-input-box ${activeField === "day" ? "active" : ""}" data-action="setOrientationDateField" data-field="day">
+          <button class="date-input-box ${activeField === "day" ? "active" : ""}" data-action="setOrientationDateField" data-field="day" ${disabled}>
             <strong>${escapeHtml(response.answer.day || " ")}</strong>
           </button>
           <span class="date-unit">号</span>
@@ -2346,7 +2453,7 @@ function renderOrientationNumberTask(response, prompt) {
       </div>
       <div class="keypad-panel">
         <div class="keypad orientation-keypad">
-          ${renderOrientationKeypad(activeField)}
+          ${renderOrientationKeypad(activeField, disabled)}
         </div>
       </div>
     </div>
@@ -2366,12 +2473,14 @@ function renderYearDigitBoxes(value) {
 }
 
 function renderSpeechCard(live) {
+  const current = tasks[state.activeTaskIndex];
+  const disabled = isTaskReadyToAnswer(current, getTaskStep(current)) ? "" : "disabled";
   return html`
     <div class="speech-page">
       ${renderAudioWave()}
       ${renderAudioButton("playCurrentAudio")}
       ${live?.warningText ? `<p class="task-warning">${escapeHtml(live.warningText)}</p>` : ""}
-      ${renderTranscriptEditor(live, "sentence")}
+      ${renderTranscriptEditor(live, "sentence", disabled)}
     </div>
   `;
 }
@@ -2415,10 +2524,10 @@ function renderLiveTranscriptBox(live, placeholder) {
   `;
 }
 
-function renderTranscriptEditor(live, kind) {
+function renderTranscriptEditor(live, kind, disabled = "") {
   const value = joinTranscriptText(live?.finalText, live?.interimText);
   const attr = kind === "fluency" ? "data-fluency-manual" : "data-voice-manual";
-  return `<textarea class="transcript-input" ${attr} placeholder="语音识别结果会显示在这里，也可以手动修改。">${escapeHtml(value)}</textarea>`;
+  return `<textarea class="transcript-input" ${attr} ${disabled} placeholder="语音识别结果会显示在这里，也可以手动修改。">${escapeHtml(value)}</textarea>`;
 }
 
 function renderAudioWave() {
@@ -2444,6 +2553,9 @@ function renderAudioWave() {
 
 function renderAudioButton(action) {
   const current = tasks[state.activeTaskIndex];
+  if (!isTaskReadyToAnswer(current, getTaskStep(current))) {
+    return `<button class="primary circle-button sound-button" disabled>请听说明</button>`;
+  }
   if (playState === "播放中..." && !(action === "playCurrentAudio" && current?.type === "sentence" && speechPlaybackPurpose === "instruction")) {
     return `<button class="primary circle-button sound-button" disabled>请听题</button>`;
   }
@@ -2470,19 +2582,19 @@ function sentenceStepHasSpeechAttempt(task, step) {
   ));
 }
 
-function renderKeypadDigits(action) {
+function renderKeypadDigits(action, disabled = "") {
   return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""]
     .map((digit) => digit
-      ? `<button data-action="${action}" data-digit="${digit}"${speechAttrs(digit, `digit:${digit}`)}>${digit}</button>`
+      ? `<button data-action="${action}" data-digit="${digit}" ${disabled}${speechAttrs(digit, `digit:${digit}`)}>${digit}</button>`
       : `<span class="keypad-spacer"></span>`)
     .join("");
 }
 
-function renderOrientationKeypad(field) {
+function renderOrientationKeypad(field, disabled = "") {
   return ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", ""]
     .map((value) => {
       if (!value) return `<span class="keypad-spacer"></span>`;
-      return `<button data-action="inputOrientationDigit" data-field="${field}" data-digit="${value}"${speechAttrs(value, `digit:${value}`)}>${value}</button>`;
+      return `<button data-action="inputOrientationDigit" data-field="${field}" data-digit="${value}" ${disabled}${speechAttrs(value, `digit:${value}`)}>${value}</button>`;
     })
     .join("");
 }
@@ -3042,6 +3154,8 @@ function setupFreeCanvas(task) {
   }
 
   canvas.onpointerdown = (event) => {
+    if (!isTaskReadyToAnswer(task)) return;
+    beginTask(task.id);
     drawing = true;
     markDrawingInteraction(task);
     rememberDrawingUndoState(task.id);
@@ -3152,6 +3266,9 @@ function setupTrailCanvas() {
   activeCtx = canvas.getContext("2d");
   activeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   canvas.onpointerdown = (event) => {
+    const task = tasks[state.activeTaskIndex];
+    if (!isTaskReadyToAnswer(task)) return;
+    beginTask("trail");
     const point = canvasPoint(event, canvas);
     const node = nearestTrailNode(point, canvas);
     if (!node) return;
@@ -3933,6 +4050,11 @@ root.addEventListener("click", async (event) => {
     openAdminPasswordDialog(target);
     return;
   }
+  if (isTaskActionBlockedUntilInstructionComplete(action, current)) {
+    render();
+    return;
+  }
+  if (shouldStartTaskTimingForAction(action, current)) beginTask(current.id);
   if (action === "startSession") playSfx("start");
   else if (["skipTask", "nextTask", "skipLogin", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
   else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu"].includes(action)) playSfx("pick");
@@ -4157,6 +4279,59 @@ root.addEventListener("click", async (event) => {
   if (action === "selectSavedSession") await selectSavedSession(target.dataset.id);
 });
 
+function isTaskActionBlockedUntilInstructionComplete(action, task) {
+  if (state.view !== "test" || !task) return false;
+  if (!taskActionsRequiringInstruction().has(action)) return false;
+  return !isTaskReadyToAnswer(task);
+}
+
+function taskActionsRequiringInstruction() {
+  return new Set([
+    "nextTask",
+    "confirmTrailCompletion",
+    "playCurrentAudio",
+    "toggleVoiceInput",
+    "chooseNaming",
+    "toggleMemoryWord",
+    "appendDigit",
+    "backspaceDigit",
+    "tapVigilance",
+    "startFluency",
+    "stopFluency",
+    "chooseAbstraction",
+    "inputSerialDigit",
+    "backspaceSerial",
+    "inputOrientationDigit",
+    "backspaceOrientation",
+    "setOrientationDateField",
+    "chooseOrientation",
+    "undoDrawing",
+    "undoTrail",
+    "clearDrawing",
+    "clearTrail"
+  ]);
+}
+
+function shouldStartTaskTimingForAction(action, task) {
+  if (state.view !== "test" || !task) return false;
+  return new Set([
+    "playCurrentAudio",
+    "toggleVoiceInput",
+    "chooseNaming",
+    "toggleMemoryWord",
+    "appendDigit",
+    "tapVigilance",
+    "startFluency",
+    "chooseAbstraction",
+    "inputSerialDigit",
+    "inputOrientationDigit",
+    "setOrientationDateField",
+    "chooseOrientation",
+    "nextTask",
+    "confirmTrailCompletion"
+  ]).has(action);
+}
+
 function shouldStopAudioForAction(action, target) {
   if (action === "tapVigilance") return false;
   if (["closeAdminPasswordDialog", "submitAdminPasswordDialog"].includes(action)) return false;
@@ -4279,7 +4454,10 @@ root.addEventListener("pointerdown", (event) => {
   const target = event.target.closest("[data-action='tapVigilance']");
   if (!target) return;
   event.preventDefault();
+  const task = tasks[state.activeTaskIndex];
+  if (!isTaskReadyToAnswer(task)) return;
   vigilancePointerTapAt = Date.now();
+  beginTask("vigilance");
   tapVigilance(vigilancePointerTapAt);
 }, { passive: false });
 
@@ -4296,16 +4474,24 @@ root.addEventListener("input", (event) => {
   }
   if (target.dataset.voiceManual !== undefined) {
     if (manualTranscriptComposing || event.isComposing) return;
+    const task = tasks[state.activeTaskIndex];
+    if (!isTaskReadyToAnswer(task)) return;
+    beginTask(task.id);
     applyManualVoiceText(target.value);
+    refreshTaskActionButtons();
     saveDraft();
   }
   if (target.dataset.fluencyManual !== undefined) {
     if (manualTranscriptComposing || event.isComposing) return;
+    const task = tasks[state.activeTaskIndex];
+    if (!isTaskReadyToAnswer(task)) return;
+    beginTask(task.id);
     const response = getResponse("fluency");
     response.answer.rawTranscript = toSimplifiedChinese(target.value);
     response.answer.interimTranscript = "";
     response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
     refreshFluencyCountUi(response);
+    refreshTaskActionButtons();
     saveDraft();
   }
 });
@@ -4333,6 +4519,9 @@ root.addEventListener("compositionend", (event) => {
   const target = event.target;
   if (target?.dataset?.voiceManual === undefined && target?.dataset?.fluencyManual === undefined) return;
   manualTranscriptComposing = false;
+  const task = tasks[state.activeTaskIndex];
+  if (!isTaskReadyToAnswer(task)) return;
+  beginTask(task.id);
   if (target.dataset.voiceManual !== undefined) applyManualVoiceText(target.value);
   if (target.dataset.fluencyManual !== undefined) {
     const response = getResponse("fluency");
@@ -4341,6 +4530,7 @@ root.addEventListener("compositionend", (event) => {
     response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
     refreshFluencyCountUi(response);
   }
+  refreshTaskActionButtons();
   saveDraft();
 });
 
@@ -4437,6 +4627,10 @@ async function nextTask() {
   const response = getResponse(task.id);
   const step = getTaskStep(task);
   ensureBlankAnswerForStep(task, response, step);
+  if (!isTaskReadyToAnswer(task, step) || !hasTaskAnswer(task, response, step)) {
+    render();
+    return;
+  }
   if (!canConfirmTask(task, response)) {
     render();
     return;
@@ -4747,26 +4941,38 @@ async function submitActiveTask() {
 
 function scheduleTaskInstruction(task) {
   const step = getTaskStep(task);
-  const key = `${task.id}:${step}`;
+  const key = taskInstructionKey(task, step);
   const force = immediateInstructionPlayback;
   immediateInstructionPlayback = false;
   if (state.playedInstructionKeys[key] && !force) return;
   const text = taskInstructionText(task, step);
-  if (!text) return;
+  if (!text) {
+    markInstructionComplete(task, step);
+    return;
+  }
   state.playedInstructionKeys[key] = true;
+  delete state.completedInstructionKeys[key];
   saveDraft();
   clearInstructionTimer();
   instructionTimer = window.setTimeout(() => {
     instructionTimer = null;
     if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
     if (task.id === "memory1" && getResponse(task.id).answer.wordsPlaybackStarted) return;
-    speakText(text, { rate: 0.82, pitch: 1.18, purpose: "instruction", audioKey: audioKeyForInstruction(task, step) });
+    speakText(text, {
+      rate: 0.82,
+      pitch: 1.18,
+      purpose: "instruction",
+      audioKey: audioKeyForInstruction(task, step),
+      done: () => markInstructionComplete(task, step)
+    });
   }, force ? 0 : 260);
 }
 
 function resetInstructionPlayback(task, step = getTaskStep(task)) {
   if (!task) return;
-  delete state.playedInstructionKeys[`${task.id}:${step}`];
+  const key = taskInstructionKey(task, step);
+  delete state.playedInstructionKeys[key];
+  delete state.completedInstructionKeys[key];
 }
 
 function requestImmediateInstructionPlayback(task, step = getTaskStep(task)) {
@@ -4794,6 +5000,23 @@ function taskInstructionText(task, step) {
   }
   if (task.type === "orientation") return orientationPrompts[step].label;
   return task.instruction || task.prompt;
+}
+
+function taskInstructionKey(task, step = getTaskStep(task)) {
+  return task ? `${task.id}:${step}` : "";
+}
+
+function isInstructionComplete(task, step = getTaskStep(task)) {
+  if (!task) return true;
+  return Boolean(state.completedInstructionKeys?.[taskInstructionKey(task, step)]);
+}
+
+function markInstructionComplete(task, step = getTaskStep(task)) {
+  if (!task) return;
+  state.completedInstructionKeys = state.completedInstructionKeys || {};
+  state.completedInstructionKeys[taskInstructionKey(task, step)] = true;
+  saveDraft();
+  render();
 }
 
 function audioKeyForInstruction(task, step = getTaskStep(task)) {
@@ -6949,7 +7172,8 @@ function ensureSerialStepTiming(response, step) {
 }
 
 function finishSerialStepTiming(response, step) {
-  const timing = ensureSerialStepTiming(response, step);
+  const timing = response.behavior.serialStepTimings?.[step];
+  if (!timing) return null;
   const now = Date.now();
   timing.endedAt = new Date().toISOString();
   const startedAtMs = Number(timing.startedAtMs);
