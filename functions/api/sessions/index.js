@@ -10,11 +10,12 @@ import {
 
 const upsertSessionSql = `
   INSERT INTO sessions (
-    id, participant_name, birth_year, participant_age, gender, education_level, participant_json,
+    id, case_number, participant_name, birth_year, participant_age, gender, education_level, participant_json,
     started_at, finished_at, saved_at, total_duration_ms, raw_score,
     education_bonus, total_score, risk_band, domain_scores_json, payload_json
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   ON CONFLICT(id) DO UPDATE SET
+    case_number = excluded.case_number,
     participant_name = excluded.participant_name,
     birth_year = excluded.birth_year,
     participant_age = excluded.participant_age,
@@ -51,6 +52,13 @@ const insertHearingEventSql = `
 async function ensureSessionColumns(db) {
   const { results } = await db.prepare("PRAGMA table_info(sessions)").all();
   const columns = new Set((results || []).map((column) => column.name));
+  if (!columns.has("case_number")) {
+    try {
+      await db.prepare("ALTER TABLE sessions ADD COLUMN case_number TEXT").run();
+    } catch (error) {
+      if (!/duplicate column|already exists/i.test(error?.message || "")) throw error;
+    }
+  }
   if (!columns.has("participant_age")) {
     try {
       await db.prepare("ALTER TABLE sessions ADD COLUMN participant_age INTEGER").run();
@@ -58,6 +66,7 @@ async function ensureSessionColumns(db) {
       if (!/duplicate column|already exists/i.test(error?.message || "")) throw error;
     }
   }
+  await db.prepare("CREATE INDEX IF NOT EXISTS idx_sessions_case_number ON sessions(case_number)").run();
   await db.prepare(`
     CREATE TABLE IF NOT EXISTS hearing_events (
       id TEXT PRIMARY KEY,
@@ -88,6 +97,7 @@ export async function onRequestGet({ env }) {
   const { results } = await env.DB.prepare(`
     SELECT
       s.id,
+      s.case_number,
       s.participant_json,
       s.participant_age,
       s.started_at,

@@ -3076,6 +3076,33 @@ h4 {
   font-weight: 900;
 }
 
+.admin-audio-preview {
+  display: grid;
+  gap: 8px;
+  margin: 0 12px 12px 64px;
+}
+
+.admin-audio-preview label {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f7faf7;
+}
+
+.admin-audio-preview span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.admin-audio-preview audio {
+  width: 100%;
+  min-width: 0;
+}
+
 .item-detail-body {
   display: grid;
   gap: 10px;

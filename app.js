@@ -28,7 +28,10 @@ const MEMORY_WAIT_MS = 5 * 60 * 1000;
 const LOCAL_SESSIONS_KEY = "moca-game-local-sessions";
 const ADMIN_PASSWORD = "123";
 const SERIAL_SUBTRACTION_NUMBER = 7;
-const SETUP_PROMPT_TEXT = "请填写姓名、出生日期、性别和教育水平。";
+const DELAYED_CONFIRM_TASK_IDS = new Set(["trail", "cube", "clock"]);
+const DELAYED_CONFIRM_MS = 10000;
+const SENTENCE_AUTO_STOP_MS = 30000;
+const SETUP_PROMPT_TEXT = "请填写病例号、姓名和教育水平。";
 const LOGO_SRC = "./assets/logo.svg";
 const MOCA_SHEET_IMAGE = "./assets/moca/moca-page.png";
 const MOCA_SCALE_PDF = "./assets/moca/moca-scale.pdf";
@@ -74,12 +77,13 @@ const LOCAL_DEV_API_ORIGIN = "http://127.0.0.1:5178";
 const API_ORIGIN = location.protocol === "file:" ? LOCAL_DEV_API_ORIGIN : "";
 const ASR_ENDPOINT = `${API_ORIGIN}/api/asr`;
 const ASR_TIMEOUT_MS = 90000;
-const FLUENCY_ASR_TIMEOUT_MS = 45000;
+const FLUENCY_ASR_TIMEOUT_MS = 120000;
 const AI_SCORE_TIMEOUT_MS = 45000;
 const FLUENCY_LIVE_ASR_INTERVAL_MS = 5000;
 const FLUENCY_LIVE_ASR_MIN_CHUNKS = 12;
 const PREFER_CLOUDFLARE_ASR = true;
-const MAX_DRAFT_AUDIO_RECORDING_BYTES = 700 * 1024;
+const STORED_AUDIO_SAMPLE_RATE = 8000;
+const MAX_STORED_AUDIO_RECORDING_BYTES = 1100 * 1024;
 const RECORDER_MIME_TYPES = [
   "audio/webm;codecs=opus",
   "audio/webm",
@@ -236,7 +240,7 @@ const animalNameBank = [
   "螃蟹", "虾", "章鱼", "海星", "海马", "海狮", "海豹", "海龟", "金鱼", "鲤鱼", "鲫鱼", "驴",
   "骡子", "牦牛", "羚羊", "梅花鹿", "驯鹿", "麋鹿", "野猪", "豪猪", "刺猬", "松鼠", "仓鼠",
   "蝙蝠", "猎豹", "金钱豹", "美洲豹", "北极熊", "棕熊", "黑熊", "考拉", "树懒", "水獭", "海獭",
-  "鼹鼠", "穿山甲", "食蚁兽", "海牛", "海象", "海鸥", "喜鹊", "乌鸦", "鹤", "天鹅", "火鸡",
+  "鼹鼠", "土拨鼠", "穿山甲", "食蚁兽", "海牛", "海象", "海鸥", "喜鹊", "乌鸦", "鹤", "天鹅", "火鸡",
   "鸵鸟", "啄木鸟", "百灵鸟", "壁虎", "蜥蜴", "变色龙", "蟒蛇", "眼镜蛇", "娃娃鱼", "蝾螈",
   "河豚", "带鱼", "鲈鱼", "鲑鱼", "鲍鱼", "水母", "海胆", "蚯蚓", "螳螂", "蟋蟀", "蝉",
   "蚊子", "苍蝇", "蟑螂", "蜘蛛", "蝎子", "蜈蚣", "蚕", "瓢虫", "甲虫", "蛾子", "蚂蚱",
@@ -272,25 +276,28 @@ const animalAliasPairs = [
 ];
 
 const fluencyAsrAnimalCorrections = [
-  ["老胡", "老虎"], ["脑虎", "老虎"],
+  ["老胡", "老虎"], ["脑虎", "老虎"], ["劳虎", "老虎"], ["牢虎", "老虎"],
   ["西牛", "犀牛"], ["洗牛", "犀牛"],
-  ["骆坨", "骆驼"], ["落驼", "骆驼"],
+  ["骆坨", "骆驼"], ["落驼", "骆驼"], ["洛驼", "骆驼"],
   ["长劲鹿", "长颈鹿"], ["长颈路", "长颈鹿"], ["长景鹿", "长颈鹿"],
   ["斑妈", "斑马"], ["班马", "斑马"],
   ["河嘛", "河马"], ["和马", "河马"],
   ["大想", "大象"], ["大项", "大象"],
   ["毛牛", "牦牛"], ["耗牛", "牦牛"],
-  ["卢鱼", "鲈鱼"], ["归鱼", "鲑鱼"], ["包鱼", "鲍鱼"],
+  ["卢鱼", "鲈鱼"], ["鲈余", "鲈鱼"], ["归鱼", "鲑鱼"], ["桂鱼", "鲑鱼"], ["包鱼", "鲍鱼"],
   ["猴几", "猴子"], ["猴纸", "猴子"],
-  ["兔纸", "兔子"],
-  ["松数", "松鼠"], ["仓数", "仓鼠"],
+  ["兔纸", "兔子"], ["土拨", "土拨鼠"],
+  ["松数", "松鼠"], ["仓数", "仓鼠"], ["苍鼠", "仓鼠"],
   ["小鸟儿", "鸟"], ["鸟鸟", "鸟"],
-  ["蝴铁", "蝴蝶"], ["虎蝶", "蝴蝶"]
+  ["蝴铁", "蝴蝶"], ["虎蝶", "蝴蝶"],
+  ["猫咪", "猫"], ["小猫咪", "猫"], ["狗狗", "狗"],
+  ["鸡鸭鹅", "鸡鸭鹅"], ["鸡鸭", "鸡鸭"], ["鸭鹅", "鸭鹅"]
 ];
 
 const fluencyFillerPhrases = [
   "还有", "然后", "再来", "一个", "一种", "动物", "名字", "名称", "我知道", "想到",
   "比如", "例如", "尽可能", "说出", "说一下", "先说", "最后", "马上", "这个", "那个",
+  "一只", "两只", "三只", "和", "跟", "及", "以及", "还有一个",
   "嗯", "啊", "呃", "额"
 ];
 
@@ -303,8 +310,8 @@ const DRAWING_AI_RUBRICS = {
   ],
   clock: [
     { key: "contour", label: "轮廓", detail: "表盘可以是圆、椭圆或近似圆；允许手抖、轻微开口、变形或不居中。" },
-    { key: "numbers", label: "数字", detail: "1-12 基本写全且能辨认，总体按顺时针顺序分布即可；允许歪斜、大小不一、间距不均或轻微偏离象限。" },
-    { key: "hands", label: "指针", detail: "必须看得到两根明确的指针/线段才可能给分；没有指针或只有一根指针时本项固定 0 分。允许角度小偏差，但需能看出分针指向 2 附近、时针在 11 附近且时针较短。" }
+    { key: "numbers", label: "数字", detail: "1-12 可以用阿拉伯数字、中文数字或罗马数字等可辨认标记表示；基本写全且总体顺时针分布即可，允许歪斜、大小不一、间距不均或轻微偏离象限。" },
+    { key: "hands", label: "指针", detail: "必须看得到两根明确的近似直线指针/线段，普通直线或带箭头直线均可给分；没有指针或只有一根指针时本项固定 0 分。允许角度小偏差，但需能看出分针指向 2 附近、时针在 11 附近且时针较短。" }
   ]
 };
 
@@ -350,7 +357,7 @@ const tasks = [
     modality: "画图",
     prompt: "请画一个钟表，填上所有数字，并指示出 11 点过 10 分。",
     instruction: "请您在此处画一个钟表，填上所有的数字并指示出 11 点 10 分。",
-    scoring: "按 MoCA 标准并考虑手绘误差：轮廓 1 分，圆、椭圆或近似圆均可；数字 1 分，1-12 基本写全、可辨认且总体顺时针即可；指针 1 分，必须看得到两根指针且大致表示 11 点 10 分，时针较短。没有指针或只有一根指针时，指针项为 0 分。"
+    scoring: "按 MoCA 标准并考虑手绘误差：轮廓 1 分，圆、椭圆或近似圆均可；数字 1 分，1-12 基本写全、可辨认且总体顺时针即可，阿拉伯数字、中文数字或罗马数字等可辨认标记均可；指针 1 分，必须看得到两根近似直线或带箭头近似直线，且大致表示 11 点 10 分，时针较短。没有指针或只有一根指针时，指针项为 0 分。"
   },
   {
     id: "naming",
@@ -436,7 +443,7 @@ const tasks = [
     modality: "数字键盘",
     prompt: "请从 100 中连续减 7，一共算 5 次。",
     instruction: "现在请您做一道计算题，从 100 中减 7，而后从得数中再减 7，一直往下减，直到我让您停下为止。",
-    scoring: "4-5 个正确给 3 分，2-3 个正确给 2 分，1 个正确给 1 分，0 个正确给 0 分。"
+    scoring: "每一步独立评定是否在上一个减数基础上减 7；4-5 个正确给 3 分，2-3 个正确给 2 分，1 个正确给 1 分，0 个正确给 0 分。"
   },
   {
     id: "sentence",
@@ -499,7 +506,7 @@ const rubricGroups = [
     items: [
       { title: "交替连线测验", prompt: "请您按照从数字到汉字并逐渐升高的顺序画一条连线。从 1 连向甲，再连向 2，并一直连下去，到戊结束。", scoring: "最终连线序列包含 1-甲-2-乙-3-丙-4-丁-5-戊 的正确顺序即给 1 分。重复点击同一节点不扣分，撤销后按最后留下的序列判分。", image: true },
       { title: "复制立方体", prompt: "请您照着这幅图在下面的空白处再画一遍，并尽可能精确。", scoring: "符合下列标准时给 1 分：图形可辨认为三维结构；主要线条基本存在；无明显无关多余线；相对边大致平行且长度接近。允许手绘线条抖动、重描、轻微断开、角度不完美或小幅长度偏差。", image: true },
-      { title: "画钟表", prompt: "请您在此处画一个钟表，填上所有的数字并指示出 11 点 10 分。", scoring: "轮廓 1 分：圆、椭圆或近似圆均可，允许轻微缺陷。数字 1 分：1-12 基本写全、可辨认、总体顺时针分布即可，允许歪斜、大小不一、间距不均。指针 1 分：必须看得到两根指针并大致表示 11 点 10 分，时针短于分针；没有指针或只有一根指针时，指针项为 0 分。", image: true }
+      { title: "画钟表", prompt: "请您在此处画一个钟表，填上所有的数字并指示出 11 点 10 分。", scoring: "轮廓 1 分：圆、椭圆或近似圆均可，允许轻微缺陷。数字 1 分：1-12 基本写全、可辨认、总体顺时针分布即可，阿拉伯数字、中文数字或罗马数字等可辨认标记均可，允许歪斜、大小不一、间距不均。指针 1 分：必须看得到两根近似直线或带箭头近似直线并大致表示 11 点 10 分，时针短于分针；没有指针或只有一根指针时，指针项为 0 分。", image: true }
     ]
   },
   {
@@ -516,7 +523,7 @@ const rubricGroups = [
       { title: "数字顺背", prompt: "下面我说一些数字，您仔细听。说完后，请按原来的顺序选择出来。", scoring: "复述准确给 1 分。", image: false },
       { title: "数字倒背", prompt: "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。", scoring: "倒背正确回答为 2-4-7，复述准确给 1 分。", image: false },
       { title: "警觉性", prompt: "下面我要读出一系列数字，请注意听。每当我读到 1 的时候，您就敲一下按钮。当我读其他数字时不要敲。", scoring: "完全正确或只有一次错误给 1 分，否则不给分。错误指读 1 时没有敲，或读其他数字时敲了。", image: false },
-      { title: "100 连续减 7", prompt: "从 100 中连续减 7，一共回答 5 步。", scoring: "全部错误记 0 分，1 个正确给 1 分，2-3 个正确给 2 分，4-5 个正确给 3 分。每一步按减 7 单独评定。", image: false }
+      { title: "100 连续减 7", prompt: "从 100 中连续减 7，一共回答 5 步。", scoring: "全部错误记 0 分，1 个正确给 1 分，2-3 个正确给 2 分，4-5 个正确给 3 分。第一步按 100-7 评定，之后每一步按用户上一个减数继续减 7 独立评定。", image: false }
     ]
   },
   {
@@ -536,7 +543,7 @@ const rubricGroups = [
 ];
 
 const root = document.querySelector("#app");
-const educationLevels = ["", "小学", "初中", "中专", "高中", "大专", "本科及以上"];
+const educationLevels = ["", "小学及以下", "初中", "中专", "高中", "大专", "本科及以上"];
 
 localStorage.removeItem("moca-game-draft");
 
@@ -586,6 +593,8 @@ let staticAudioPreloadTimer = null;
 const staticAudioBufferCache = new Map();
 const staticAudioBufferPromiseCache = new Map();
 let instructionTimer = null;
+let delayedConfirmTimer = null;
+let sentenceAutoStopTimer = null;
 let speechPlaybackPurpose = null;
 let speechAudioContext = null;
 let activeSpeechBufferSources = [];
@@ -671,7 +680,7 @@ function createInitialState() {
     sessionId: crypto.randomUUID(),
     startedAt: null,
     finishedAt: null,
-    participant: { name: "", birthYear: "1966-01-01", sex: "", educationLevel: "" },
+    participant: { caseNumber: "", name: "", birthYear: "", sex: "", educationLevel: "" },
     hearingScreening: createHearingScreeningState(),
     responses: {},
     drawings: {},
@@ -681,6 +690,7 @@ function createInitialState() {
     resumeAfterMemory2Index: null,
     playedInstructionKeys: {},
     completedInstructionKeys: {},
+    instructionCompletedAt: {},
     acknowledgedInstructionKeys: {},
     taskSubmitting: null,
     permissions: { microphone: "unknown", location: "unknown" },
@@ -887,7 +897,7 @@ function safeJson(raw) {
 
 function migrateState() {
   state.participant = state.participant || {};
-  if (!state.participant.name && state.participant.code) state.participant.name = state.participant.code;
+  if (!state.participant.caseNumber && state.participant.code) state.participant.caseNumber = state.participant.code;
   if (!state.participant.birthYear && state.participant.age) {
     const age = Number(state.participant.age);
     if (Number.isFinite(age) && age > 0) state.participant.birthYear = String(new Date().getFullYear() - age);
@@ -895,13 +905,14 @@ function migrateState() {
   if (!state.participant.educationLevel && state.participant.educationYears) {
     const years = Number(state.participant.educationYears);
     if (Number.isFinite(years)) {
-      if (years <= 6) state.participant.educationLevel = "小学";
+      if (years <= 6) state.participant.educationLevel = "小学及以下";
       else if (years <= 9) state.participant.educationLevel = "初中";
       else if (years <= 12) state.participant.educationLevel = "高中";
       else if (years <= 15) state.participant.educationLevel = "大专";
       else state.participant.educationLevel = "本科及以上";
     }
   }
+  if (state.participant.educationLevel === "小学") state.participant.educationLevel = "小学及以下";
   delete state.participant.code;
   delete state.participant.age;
   delete state.participant.educationYears;
@@ -918,6 +929,7 @@ function migrateState() {
   state.trail = normalizeTrailState(state.trail);
   state.playedInstructionKeys = state.playedInstructionKeys || {};
   state.completedInstructionKeys = state.completedInstructionKeys || { ...state.playedInstructionKeys };
+  state.instructionCompletedAt = state.instructionCompletedAt || {};
   state.acknowledgedInstructionKeys = state.acknowledgedInstructionKeys || {};
   state.permissions = state.permissions || { microphone: "unknown", location: "unknown" };
   state.voiceProfile = VOICE_PROFILES[state.voiceProfile] ? state.voiceProfile : "cartoon";
@@ -973,7 +985,7 @@ function resetState() {
 }
 
 function isParticipantComplete() {
-  return ["name", "birthYear", "sex", "educationLevel"].every((key) => String(state.participant[key] || "").trim());
+  return ["caseNumber", "name", "educationLevel"].every((key) => String(state.participant[key] || "").trim());
 }
 
 function html(strings, ...values) {
@@ -1180,9 +1192,8 @@ function renderSetup() {
             </div>
           </div>
           <div class="setup-grid">
+            ${inputField("participant.caseNumber", "病例号", state.participant.caseNumber, "", "text", isSetupFieldInvalid("caseNumber"), "participant-case-field")}
             ${inputField("participant.name", "姓名", state.participant.name, "", "text", isSetupFieldInvalid("name"), "participant-name-field")}
-            ${birthDateField(state.participant.birthYear, isSetupFieldInvalid("birthYear"))}
-            ${segmentedField("sex", "性别", state.participant.sex, ["男", "女"], isSetupFieldInvalid("sex"), "sex-field")}
             ${segmentedField("educationLevel", "教育水平", state.participant.educationLevel, educationLevels.filter(Boolean), isSetupFieldInvalid("educationLevel"), "education-field")}
           </div>
           <button class="primary setup-start-button pulse" data-action="startSession">
@@ -1376,6 +1387,9 @@ function stopSetupVoiceCapture({ releaseMic = false } = {}) {
 
 function parseRegistrationVoiceText(text) {
   const normalized = String(text || "").replace(/\s+/g, "");
+  const caseMatch = normalized.match(/(?:病例号|病历号|编号|号码|号是)([A-Za-z0-9\-_.\u4e00-\u9fa5]{2,20})/);
+  if (caseMatch) state.participant.caseNumber = caseMatch[1].replace(/(姓名|名字|教育|学历|文化).*$/, "");
+
   const nameMatch = normalized.match(/(?:我叫|我是|姓名是|姓名叫|名字是|名字叫|名字叫作)([\u4e00-\u9fa5]{2,5})/);
   if (nameMatch) {
     state.participant.name = nameMatch[1].replace(/(今年|性别|出生|学历|文化|的|啊|呢|吧|啦).*$/, "");
@@ -1393,7 +1407,9 @@ function parseRegistrationVoiceText(text) {
   else if (normalized.includes("女")) state.participant.sex = "女";
 
   const eduMap = {
-    小学: "小学",
+    小学: "小学及以下",
+    文盲: "小学及以下",
+    未上学: "小学及以下",
     初中: "初中",
     中专: "中专",
     高中: "高中",
@@ -2035,12 +2051,10 @@ function taskSubmittingLabel(task) {
 
 function renderTask(task) {
   const step = getTaskStep(task);
-  const waitAttr = speechTranscribing || isTaskSubmitting(task) ? "disabled" : "";
   return html`
     <section class="single-page task-page">
       <div class="task-workspace">${renderTaskWorkspace(task, step)}</div>
       ${renderTaskActions(task, step)}
-      <button class="task-skip-link" data-action="skipTask" ${waitAttr}>跳过</button>
     </section>
   `;
 }
@@ -2089,7 +2103,10 @@ function renderTaskActions(task, step) {
   const submitting = isTaskSubmitting(task);
   const response = getResponse(task.id);
   const readyToAnswer = isTaskReadyToAnswer(task, step);
-  const answerReady = readyToAnswer && hasTaskAnswer(task, response, step);
+  const baseAnswerReady = readyToAnswer && hasTaskAnswer(task, response, step);
+  const delayReady = isDelayedConfirmReady(task, step);
+  if (baseAnswerReady && !delayReady) scheduleDelayedConfirmRender(task, step);
+  const answerReady = baseAnswerReady && delayReady;
   const confirmDisabled = speechTranscribing || submitting || !answerReady;
   const confirmClass = `confirm-button ${answerReady ? "answer-ready" : ""} ${shouldNudgeConfirm(task) ? "attention-nudge" : ""}`;
   return html`
@@ -2109,9 +2126,35 @@ function refreshTaskActionButtons() {
   const button = document.querySelector(".confirm-button");
   if (!button) return;
   const submitting = isTaskSubmitting(task);
-  const answerReady = isTaskReadyToAnswer(task, step) && hasTaskAnswer(task, getResponse(task.id), step);
+  const answerReady = isTaskReadyToAnswer(task, step) && hasTaskAnswer(task, getResponse(task.id), step) && isDelayedConfirmReady(task, step);
   button.disabled = speechTranscribing || submitting || !answerReady;
   button.classList.toggle("answer-ready", answerReady);
+}
+
+function isDelayedConfirmTask(task) {
+  return Boolean(task?.id && DELAYED_CONFIRM_TASK_IDS.has(task.id));
+}
+
+function delayedConfirmRemainingMs(task, step = getTaskStep(task)) {
+  if (!isDelayedConfirmTask(task)) return 0;
+  const key = taskInstructionKey(task, step);
+  const completedAt = Number(state.instructionCompletedAt?.[key] || 0);
+  if (!completedAt) return Number.POSITIVE_INFINITY;
+  return Math.max(0, completedAt + DELAYED_CONFIRM_MS - Date.now());
+}
+
+function isDelayedConfirmReady(task, step = getTaskStep(task)) {
+  return delayedConfirmRemainingMs(task, step) <= 0;
+}
+
+function scheduleDelayedConfirmRender(task, step = getTaskStep(task)) {
+  if (!isDelayedConfirmTask(task)) return;
+  const remaining = delayedConfirmRemainingMs(task, step);
+  if (!Number.isFinite(remaining) || remaining <= 0 || delayedConfirmTimer) return;
+  delayedConfirmTimer = window.setTimeout(() => {
+    delayedConfirmTimer = null;
+    if (state.view === "test" && tasks[state.activeTaskIndex]?.id === task.id && getTaskStep(task) === step) render();
+  }, remaining + 20);
 }
 
 function taskActionSecondaryButtons(task) {
@@ -2148,6 +2191,8 @@ function shouldNudgeConfirm(task) {
 function isTaskReadyToAnswer(task, step = getTaskStep(task)) {
   if (task?.type === "drawing" && ["cube", "clock"].includes(task.id)) return true;
   if (task?.type === "naming") return true;
+  if (task?.type === "abstractionChoice" || task?.type === "orientation") return true;
+  if (task?.type === "memory" && task.trial === 2) return true;
   return isInstructionComplete(task, step);
 }
 
@@ -2305,13 +2350,14 @@ function renderDrawingTask(task) {
 function renderTrailCompletionPrompt() {
   const response = getResponse("trail");
   if (!response.behavior.trailCompletionPromptVisible) return "";
+  const ready = isDelayedConfirmReady(tasks.find((task) => task.id === "trail"));
   return html`
     <div class="trail-completion-modal" role="dialog" aria-modal="true" aria-label="连线完成确认">
       <div class="trail-completion-panel">
         <strong>所有圆圈都连完了</strong>
         <p>是否确定提交这一题？</p>
         <div class="trail-completion-actions">
-          <button class="primary" data-action="confirmTrailCompletion">答完了，下一题</button>
+          <button class="primary" data-action="confirmTrailCompletion" ${ready ? "" : "disabled"}>答完了，下一题</button>
           <button class="ghost" data-action="cancelTrailCompletion">取消</button>
         </div>
       </div>
@@ -2467,9 +2513,10 @@ function renderSentenceTask(task, step) {
   const response = getResponse(task.id);
   const live = getLiveTranscript(task, response, step);
   const audioReady = sentenceStepAudioReady(response, step);
+  const instructionReady = isInstructionComplete(task, step);
   const activeVoice = recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending;
   const disabled = isTaskReadyToAnswer(task, step) && audioReady ? "" : "disabled";
-  const control = sentenceControlButton(task, step, audioReady, activeVoice);
+  const control = sentenceControlButton(task, step, audioReady, activeVoice, instructionReady);
   return html`
     <div class="speech-page sentence-page">
       ${renderAudioWave()}
@@ -2480,8 +2527,11 @@ function renderSentenceTask(task, step) {
   `;
 }
 
-function sentenceControlButton(task, step, audioReady, activeVoice) {
+function sentenceControlButton(task, step, audioReady, activeVoice, instructionReady = true) {
   if (!audioReady) {
+    if (!instructionReady) {
+      return `<button class="primary circle-button sound-button" disabled>请听说明</button>`;
+    }
     if (playState === "播放中..." && speechPlaybackPurpose === "sentence") {
       return `<button class="primary circle-button sound-button" disabled>播放中...</button>`;
     }
@@ -2898,11 +2948,11 @@ function renderAdmin() {
       </div>
       <div class="admin-layout">
         <div class="admin-table">
-          <div class="admin-head"><span>参加者</span><span>年龄</span><span>总分</span><span>原始分</span><span>教育加分</span><span>保存时间</span></div>
+          <div class="admin-head"><span>病例号</span><span>姓名</span><span>总分</span><span>原始分</span><span>教育加分</span><span>保存时间</span></div>
           ${(state.adminSessions || []).map((session) => `
             <button type="button" class="admin-row ${session.id === selectedId ? "active" : ""}" data-action="selectSavedSession" data-id="${escapeHtml(session.id)}">
-              <span>${escapeHtml(session.participant?.name || session.id.slice(0, 8))}</span>
-              <span>${formatParticipantAge(session.participant)}</span>
+              <span>${escapeHtml(session.participant?.caseNumber || session.id.slice(0, 8))}</span>
+              <span>${escapeHtml(session.participant?.name || "-")}</span>
               <strong>${session.totalScore ?? "-"}/30</strong>
               <span>${session.rawScore ?? "-"}</span>
               <span>${session.educationBonus ?? 0}</span>
@@ -2965,13 +3015,12 @@ function renderSessionDetail(session) {
         <strong>${escapeHtml(participant.name || session.id || "未命名")}</strong>
       </div>
       <div class="detail-summary">
+        ${detailMetric("病例号", participant.caseNumber || "-")}
+        ${detailMetric("姓名", participant.name || "-")}
         ${detailMetric("总分", `${session.totalScore ?? "-"}/30`)}
         ${detailMetric("原始分", session.rawScore ?? "-")}
         ${detailMetric("教育加分", session.educationBonus ?? "-")}
         ${detailMetric("题目数", itemResponses.length || session.itemCount || "-")}
-        ${detailMetric("出生日期", participant.birthYear || "-")}
-        ${detailMetric("年龄", formatParticipantAge(participant))}
-        ${detailMetric("性别", participant.sex || participant.gender || "-")}
         ${detailMetric("教育水平", participant.educationLevel || "-")}
         ${detailMetric("听力初筛", formatHearingStatus(hearingSummary?.status || hearing.status))}
         ${detailMetric("右耳 4fPTA", formatThreshold(hearingSummary?.ears?.right?.pta4))}
@@ -3014,6 +3063,7 @@ function renderItemDetail(item, index) {
         <em>${escapeHtml(item.score ?? "-")}/${escapeHtml(item.maxScore ?? "-")}</em>
       </div>
       ${visual ? renderAdminDrawingPreview(item) : ""}
+      ${renderAdminAudioPreview(item)}
       <div class="item-answer-summary">
         <span>回答</span>
         <div class="answer-part-list">
@@ -3047,6 +3097,24 @@ function renderAdminDrawingPreview(item = {}) {
   return html`
     <div class="admin-drawing-preview">
       <img src="${escapeHtml(item.drawingImage)}" alt="${escapeHtml(item.title || "作答图案")}" />
+    </div>
+  `;
+}
+
+function renderAdminAudioPreview(item = {}) {
+  const recordings = item.answer?.audioRecordings;
+  if (!recordings || typeof recordings !== "object") return "";
+  const entries = Object.entries(recordings)
+    .filter(([, value]) => typeof value === "string" && value.startsWith("data:audio/"));
+  if (!entries.length) return "";
+  return html`
+    <div class="admin-audio-preview">
+      ${entries.map(([step, source]) => `
+        <label>
+          <span>录音 ${Number(step) + 1}</span>
+          <audio controls preload="metadata" src="${escapeHtml(source)}"></audio>
+        </label>
+      `).join("")}
     </div>
   `;
 }
@@ -3123,7 +3191,7 @@ function visualAnswerParts(item, user) {
 
 function drawingStandardText(taskId) {
   if (taskId === "cube") return "可辨认三维结构、主要线条基本完整、无明显多余线、相对边大致平行且长度接近";
-  if (taskId === "clock") return "圆/椭圆/近似圆表盘、1-12 基本写全且顺时针、必须有两根指针大致表示 11 点 10 分";
+  if (taskId === "clock") return "圆/椭圆/近似圆表盘、1-12 基本写全且顺时针（阿拉伯/中文/罗马数字等均可）、必须有两根近似直线或带箭头近似直线大致表示 11 点 10 分";
   return "";
 }
 
@@ -3291,7 +3359,7 @@ function renderRubricModal(item) {
 function databaseSchemaText() {
   return `Cloudflare D1 后台字段
 sessions:
-  id, participant_name, birth_year, participant_age, gender, education_level
+  id, case_number, participant_name, birth_year, participant_age, gender, education_level
   started_at, finished_at, saved_at, total_duration_ms
   raw_score, education_bonus, total_score, risk_band, domain_scores_json, payload_json
 
@@ -3305,7 +3373,10 @@ hearing_events:
   response_label, environment_status, relative_db, event_at, reaction_ms, payload_json
 
 behavior_json:
-  sequence, errors, undoCount, taps, strokes, voiceEvents, audioRecordings, location`;
+  sequence, errors, undoCount, taps, strokes, voiceEvents, audioRecordings, location
+
+语音题原始音频:
+  answer_json.audioRecordings[step] 保存为 data:audio/... base64，可在后台详情直接播放。`;
 }
 
 function setupTaskGuide(task, step = getTaskStep(task)) {
@@ -4700,8 +4771,6 @@ function taskActionsRequiringInstruction() {
     "confirmTrailCompletion",
     "playCurrentAudio",
     "toggleVoiceInput",
-    "chooseNaming",
-    "toggleMemoryWord",
     "reviewMemoryReplay",
     "confirmMemoryIncorrectSubmit",
     "appendDigit",
@@ -4709,13 +4778,8 @@ function taskActionsRequiringInstruction() {
     "tapVigilance",
     "startFluency",
     "stopFluency",
-    "chooseAbstraction",
     "inputSerialDigit",
     "backspaceSerial",
-    "inputOrientationDigit",
-    "backspaceOrientation",
-    "setOrientationDateField",
-    "chooseOrientation",
     "undoDrawing",
     "undoTrail",
     "clearDrawing",
@@ -5121,6 +5185,10 @@ async function nextTask() {
     render();
     return;
   }
+  if (!isDelayedConfirmReady(task, step)) {
+    render();
+    return;
+  }
   if (!canConfirmTask(task, response)) {
     render();
     return;
@@ -5486,6 +5554,7 @@ function resetInstructionPlayback(task, step = getTaskStep(task)) {
   const key = taskInstructionKey(task, step);
   delete state.playedInstructionKeys[key];
   delete state.completedInstructionKeys[key];
+  delete state.instructionCompletedAt?.[key];
 }
 
 function requestImmediateInstructionPlayback(task, step = getTaskStep(task)) {
@@ -5538,8 +5607,11 @@ function isTaskGuideActive(task, step = getTaskStep(task)) {
 
 function markInstructionComplete(task, step = getTaskStep(task)) {
   if (!task) return;
+  const key = taskInstructionKey(task, step);
   state.completedInstructionKeys = state.completedInstructionKeys || {};
-  state.completedInstructionKeys[taskInstructionKey(task, step)] = true;
+  state.instructionCompletedAt = state.instructionCompletedAt || {};
+  state.completedInstructionKeys[key] = true;
+  state.instructionCompletedAt[key] = Date.now();
   saveDraft();
   render();
 }
@@ -5749,11 +5821,11 @@ function resetSetupPromptPlayback() {
 
 function playSetupPrompt() {
   return speakText(SETUP_PROMPT_TEXT, {
-    audioKey: SETUP_PROMPT_AUDIO_KEY,
+    audioKey: null,
     rate: 0.82,
     pitch: 1.18,
     purpose: "instruction",
-    staticOnly: true,
+    staticOnly: false,
     preferBuffer: true
   });
 }
@@ -6486,9 +6558,11 @@ async function startVoiceInput() {
   if (PREFER_CLOUDFLARE_ASR) {
     recordSpeechRecognitionEvent("cloudflare-asr-preferred");
     const task = tasks[state.activeTaskIndex];
+    const step = getTaskStep(task);
     const recordingStarted = await startAudioRecording({ transcribeOnStop: true, liveAsr: task?.type !== "fluency" });
     speechRecognitionStartPending = false;
     voiceState = recordingStarted ? voicePromptText() : "当前浏览器不能录音或识别";
+    if (recordingStarted) scheduleSentenceAutoStop(task, step);
     render();
     return recordingStarted;
   }
@@ -6515,19 +6589,55 @@ async function startVoiceInput() {
     speechRecognitionBlocked = false;
     recordingAudio = false;
     recordSpeechRecognitionEvent("start-request", { engine: speechRecognition.constructor?.name || "SpeechRecognition" });
+    const task = tasks[state.activeTaskIndex];
+    const step = getTaskStep(task);
     const started = startSpeechRecognitionSafe();
     if (!started) await fallbackToAudioRecording("识别启动失败，已改为录音，可手动修改文字");
+    if (started || recordingAudio) scheduleSentenceAutoStop(task, step);
     if (!started && !recordingAudio) speechRecognitionStartPending = false;
     render();
     return started || recordingAudio;
   }
 
   recordSpeechRecognitionEvent("unsupported", { message: "SpeechRecognition API is not available" });
+  const task = tasks[state.activeTaskIndex];
+  const step = getTaskStep(task);
   const recordingStarted = await startAudioRecording();
   speechRecognitionStartPending = false;
   voiceState = recordingStarted ? "已录音，但此浏览器不支持自动转文字" : "当前浏览器不能录音或识别";
+  if (recordingStarted) scheduleSentenceAutoStop(task, step);
   render();
   return recordingStarted;
+}
+
+function scheduleSentenceAutoStop(task, step = getTaskStep(task)) {
+  clearSentenceAutoStopTimer();
+  if (task?.type !== "sentence") return;
+  const response = getResponse(task.id);
+  response.behavior.sentenceAutoStop = response.behavior.sentenceAutoStop || {};
+  response.behavior.sentenceAutoStop[step] = {
+    timeoutMs: SENTENCE_AUTO_STOP_MS,
+    scheduledAt: new Date().toISOString()
+  };
+  sentenceAutoStopTimer = window.setTimeout(() => {
+    sentenceAutoStopTimer = null;
+    if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
+    if (!(recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending || pcmRecorder || mediaRecorder)) return;
+    const currentResponse = getResponse(task.id);
+    currentResponse.behavior.sentenceAutoStop = currentResponse.behavior.sentenceAutoStop || {};
+    currentResponse.behavior.sentenceAutoStop[step] = {
+      ...currentResponse.behavior.sentenceAutoStop[step],
+      stoppedAt: new Date().toISOString()
+    };
+    stopVoiceInput();
+  }, SENTENCE_AUTO_STOP_MS);
+  saveDraft();
+}
+
+function clearSentenceAutoStopTimer() {
+  if (!sentenceAutoStopTimer) return;
+  window.clearTimeout(sentenceAutoStopTimer);
+  sentenceAutoStopTimer = null;
 }
 
 function startSpeechRecognitionSafe() {
@@ -6580,6 +6690,7 @@ function stopVoiceInput(options = {}) {
   const { releaseMic = false, shouldRender = true } = options;
   const stoppingContext = activeVoiceContext();
   const backgroundFluencyTranscription = stoppingContext.task?.type === "fluency";
+  clearSentenceAutoStopTimer();
   clearSpeechRecognitionRestartTimer();
   const wasRecognitionPending = speechRecognitionStartPending;
   const wasRecording = mediaRecorder && mediaRecorder.state === "recording";
@@ -6813,17 +6924,21 @@ async function finishPcmAudioRecording(recorder) {
     const task = tasks.find((entry) => entry.id === recorder.taskId);
     const response = getResponse(recorder.taskId);
     const blob = wavBlobFromFloat32Chunks(recorder.chunks, recorder.sampleRate);
+    const storedBlob = wavBlobFromFloat32Chunks(recorder.chunks, recorder.sampleRate, { sampleRate: STORED_AUDIO_SAMPLE_RATE });
     response.behavior.audioRecordings = response.behavior.audioRecordings || [];
     response.behavior.audioRecordings.push({
       step: recorder.step,
-      mimeType: blob.type,
-      size: blob.size,
+      mimeType: storedBlob.type,
+      size: storedBlob.size,
+      asrMimeType: blob.type,
+      asrSize: blob.size,
       chunks: recorder.chunks.length,
       recorderMimeType: "audio/wav;codec=pcm",
       inputSampleRate: recorder.sampleRate,
+      storedSampleRate: STORED_AUDIO_SAMPLE_RATE,
       endedAt: new Date().toISOString()
     });
-    storeAudioRecordingDraft(response, recorder.step, blob);
+    storeAudioRecordingDraft(response, recorder.step, storedBlob);
     if (shouldReleaseMic) {
       releaseMicStream();
       micReleased = true;
@@ -6959,9 +7074,10 @@ function applyFluencyLiveText(response, step, text) {
   render();
 }
 
-function wavBlobFromFloat32Chunks(chunks, inputSampleRate) {
+function wavBlobFromFloat32Chunks(chunks, inputSampleRate, options = {}) {
   const merged = mergeFloat32Chunks(chunks);
-  const outputSampleRate = Math.min(16000, Math.max(8000, Math.round(inputSampleRate || 16000)));
+  const targetSampleRate = Math.max(8000, Math.min(16000, Number(options.sampleRate) || 16000));
+  const outputSampleRate = Math.min(targetSampleRate, Math.max(8000, Math.round(inputSampleRate || targetSampleRate)));
   const samples = downsampleFloat32(merged, inputSampleRate || outputSampleRate, outputSampleRate);
   const bytesPerSample = 2;
   const headerBytes = 44;
@@ -7039,9 +7155,14 @@ function storeAudioRecordingDraft(response, step, blob) {
     saveDraft();
     return;
   }
-  if (blob.size > MAX_DRAFT_AUDIO_RECORDING_BYTES) {
+  response.answer.audioRecordings = response.answer.audioRecordings || {};
+  if (blob.size > MAX_STORED_AUDIO_RECORDING_BYTES) {
     response.answer.audioRecordings = response.answer.audioRecordings || {};
-    delete response.answer.audioRecordings[step];
+    response.answer.audioRecordings[step] = {
+      stored: false,
+      bytes: blob.size,
+      note: "录音超过内置保存上限，后台保留转写文本和录音元数据。"
+    };
     saveDraft();
     return;
   }
@@ -8364,7 +8485,7 @@ function drawingAiRubric(task) {
     taskTitle: task.title,
     drawingKind: task.drawingKind,
     maxScore: task.maxScore,
-    instruction: "请只根据用户画布图片评分，按照 MoCA 中文量表分项给出 scoreSuggestion；评分时要考虑老年人手绘误差，不要因为线条抖动、轻微歪斜、椭圆形表盘、数字大小不一或间距不均而扣分。但钟表指针项必须看到两根明确指针/线段才可给分，不得凭猜测补出不存在的指针。",
+    instruction: "请只根据用户画布图片评分，按照 MoCA 中文量表分项给出 scoreSuggestion；评分时要考虑老年人手绘误差，不要因为线条抖动、轻微歪斜、椭圆形表盘、数字大小不一或间距不均而扣分。钟表数字可以是阿拉伯数字、中文数字或罗马数字等可辨认标记。但钟表指针项必须看到两根明确指针/线段才可给分，普通近似直线或带箭头近似直线均可，不得凭猜测补出不存在的指针。",
     outputContract: {
       scoreSuggestion: "整数，范围 0 到 maxScore",
       comment: "只写未得分项目；满分时留空字符串。例如：未得分：指针（未看到两根明确指针）。",
@@ -8382,8 +8503,8 @@ function drawingAiRubric(task) {
       : [
         "钟表总分 0-3 分，每项 1 分。",
         "轮廓：圆、椭圆或近似圆都给 1 分；允许手抖、轻微开口、变形或不居中。明显不像表盘轮廓才 0 分。",
-        "数字：1-12 基本写全且可辨认，总体按顺时针顺序分布在表盘内或附近，就给 1 分；允许歪斜、大小不一、间距不均、轻微偏离象限或个别数字写得潦草。缺多个数字、严重乱序、重复/多余数字导致无法辨认为 1-12 时给 0 分。",
-        "指针：必须看得到两根明确的指针/线段，且大致表示 11 点 10 分，才给 1 分；允许角度小偏差，但应能看出分针指向 2 附近、时针在 11 附近且时针较短。",
+        "数字：1-12 基本写全且可辨认，总体按顺时针顺序分布在表盘内或附近，就给 1 分；阿拉伯数字、中文数字（如一二三）或罗马数字（如 I、II、III）等能表达 1-12 顺序的标记均可；允许歪斜、大小不一、间距不均、轻微偏离象限或个别数字写得潦草。缺多个数字、严重乱序、重复/多余数字导致无法辨认为 1-12 时给 0 分。",
+        "指针：必须看得到两根明确的近似直线指针/线段，普通直线或带箭头直线均可，且大致表示 11 点 10 分，才给 1 分；允许角度小偏差，但应能看出分针指向 2 附近、时针在 11 附近且时针较短。",
         "如果没有指针、只有一根指针、只有数字/表盘，或看不出任何表示时间的线段，指针项必须 0 分；不能因为题目要求 11 点 10 分就推测用户画了指针。",
         "每个分项只按图片证据给分；不要因正常手绘误差扣分。"
       ],
@@ -8576,6 +8697,7 @@ function uniqueWords(words) {
 
 function fluencyAnimalNamesFromResponse(response, live = {}) {
   const text = joinTranscriptText(
+    ...fluencyTranscriptSources(response),
     response.answer?.rawTranscript,
     response.answer?.interimTranscript,
     live.finalText,
@@ -8587,9 +8709,17 @@ function fluencyAnimalNamesFromResponse(response, live = {}) {
 }
 
 function fluencyAnimalCount(response) {
-  const animals = extractAnimalNames(joinTranscriptText(response.answer?.rawTranscript, response.answer?.interimTranscript));
+  const animals = extractAnimalNames(joinTranscriptText(...fluencyTranscriptSources(response), response.answer?.rawTranscript, response.answer?.interimTranscript));
   response.answer.animals = animals;
   return animals.length;
+}
+
+function fluencyTranscriptSources(response = {}) {
+  const events = Array.isArray(response.behavior?.speechRecognition) ? response.behavior.speechRecognition : [];
+  return events
+    .filter((event) => event && /asr-(live-)?result$/.test(String(event.eventType || "")))
+    .map((event) => cleanAsrTranscript(event.text || ""))
+    .filter(Boolean);
 }
 
 function refreshFluencyCountUi(response) {
@@ -8714,7 +8844,7 @@ function computeTotals() {
 }
 
 function educationBonusForLevel(level) {
-  return ["小学", "初中", "中专", "高中"].includes(level) ? 1 : 0;
+  return ["小学及以下", "小学", "初中", "中专", "高中"].includes(level) ? 1 : 0;
 }
 
 function estimatedDataUrlBytes(value) {
@@ -8725,19 +8855,7 @@ function estimatedDataUrlBytes(value) {
 }
 
 function compactAnswerForBackend(answer) {
-  const copy = JSON.parse(JSON.stringify(answer || {}));
-  if (!copy.audioRecordings) return copy;
-  copy.audioRecordings = Object.fromEntries(
-    Object.entries(copy.audioRecordings).map(([step, recording]) => [
-      step,
-      {
-        stored: false,
-        bytes: estimatedDataUrlBytes(recording),
-        note: "后台保留语音识别文本和录音元数据，不保存原始音频文件。"
-      }
-    ])
-  );
-  return copy;
+  return JSON.parse(JSON.stringify(answer || {}));
 }
 
 function answerSummaryForTask(task, response, score) {
@@ -9125,6 +9243,7 @@ function csvRowsForSession(session) {
 
   return itemResponses.map((item) => ({
     session_id: session.id || "",
+    case_number: participant.caseNumber || "",
     participant_name: participant.name || "",
     participant_age: formatParticipantAge(participant),
     birth_year: participant.birthYear || "",
@@ -9212,6 +9331,11 @@ function stopTimers() {
   stopTrailGuide();
   stopHearingTone();
   clearSpeechRecognitionRestartTimer();
+  clearSentenceAutoStopTimer();
+  if (delayedConfirmTimer) {
+    window.clearTimeout(delayedConfirmTimer);
+    delayedConfirmTimer = null;
+  }
   window.clearInterval(vigilanceTimer);
   window.clearInterval(fluencyTimer);
 }

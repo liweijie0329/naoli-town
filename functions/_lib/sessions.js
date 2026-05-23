@@ -165,16 +165,7 @@ function dataUrlBytes(value) {
 }
 
 function compactAudioRecordings(answer) {
-  if (!answer || typeof answer !== "object" || !answer.audioRecordings) return answer;
-  const copy = { ...answer, audioRecordings: {} };
-  Object.entries(answer.audioRecordings).forEach(([step, recording]) => {
-    copy.audioRecordings[step] = {
-      stored: false,
-      bytes: dataUrlBytes(recording),
-      note: "录音原始文件未写入 D1；后台保留语音识别文本和录音元数据。"
-    };
-  });
-  return copy;
+  return answer;
 }
 
 function compactItemResponse(item) {
@@ -225,10 +216,11 @@ export function sessionRowParams(session) {
 
   return [
     session.id,
+    participant.caseNumber || "",
     participant.name || "",
     participantInfo.birthYear,
     participantInfo.age,
-    participant.gender || "",
+    participant.sex || participant.gender || "",
     participant.educationLevel || "",
     jsonString(participantInfo.participant, {}),
     session.startedAt || null,
@@ -288,6 +280,7 @@ export function hearingEventRowParams(sessionId, event, index) {
 
 export function slimSessionFromRow(row) {
   const participant = parseJson(row.participant_json, {});
+  if (!participant.caseNumber && row.case_number) participant.caseNumber = row.case_number;
   if (row.participant_age !== undefined && row.participant_age !== null) participant.age = row.participant_age;
   return {
     id: row.id,
@@ -309,6 +302,7 @@ export function slimSessionFromRow(row) {
 export function fullSessionFromRows(sessionRow, itemRows) {
   const base = parseJson(sessionRow.payload_json, {});
   const participant = parseJson(sessionRow.participant_json, {});
+  if (!participant.caseNumber && sessionRow.case_number) participant.caseNumber = sessionRow.case_number;
   if (sessionRow.participant_age !== undefined && sessionRow.participant_age !== null) participant.age = sessionRow.participant_age;
   return {
     ...base,

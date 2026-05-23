@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
+  case_number TEXT,
   participant_name TEXT,
   birth_year INTEGER,
   participant_age INTEGER,
@@ -19,6 +20,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_saved_at ON sessions(saved_at);
+CREATE INDEX IF NOT EXISTS idx_sessions_case_number ON sessions(case_number);
 CREATE INDEX IF NOT EXISTS idx_sessions_participant_name ON sessions(participant_name);
 
 CREATE TABLE IF NOT EXISTS item_responses (

@@ -29,9 +29,10 @@ git push origin master
 
 创建后打开这个数据库的 `Console` / `Query`，把项目根目录的 `schema.sql` 全部复制进去运行。
 
-如果是已经创建过的旧数据库，保存接口会自动补充 `participant_age` 列；也可以在 D1 Console 手动执行：
+如果是已经创建过的旧数据库，保存接口会自动补充 `case_number` 和 `participant_age` 列；也可以在 D1 Console 手动执行：
 
 ```sql
+ALTER TABLE sessions ADD COLUMN case_number TEXT;
 ALTER TABLE sessions ADD COLUMN participant_age INTEGER;
 ```
 
@@ -101,7 +102,9 @@ https://你的项目名.pages.dev/api/health
 ## 6. 数据表
 
 - `sessions`: 每次测评的参加者信息、总分、原始分、教育加分、总用时、各小类得分。
-- `item_responses`: 每道题的答案、得分、开始结束时间、题目用时、行为指标、画图图片和 AI 评分结果。
+- `item_responses`: 每道题的答案、得分、开始结束时间、题目用时、行为指标、画图图片、语音题音频和 AI 评分结果。
 - `hearing_events`: 听力环境检测、声道检查、练习反应、正式测试每一次“听到了/没听到”反应，便于 D1 SQL 查询。
 
-录音原始 base64 不写入 D1，避免数据库膨胀；后台保留语音识别文本、录音时长/大小等行为元数据。正式研究如果需要保存原始音频，建议下一步接 Cloudflare R2。
+语音题原始音频会写入 `item_responses.answer_json.audioRecordings`，后台详情可直接播放；如后续样本量很大或希望长期保存无压缩音频，建议下一步接 Cloudflare R2。
+
+当前网页会把语音题保存音频压到 8 kHz WAV，句子复述单段 30 秒自动停止，动物词语流畅性 60 秒自动停止，单题音频 JSON 控制在 D1 单行/字符串限制以内。Cloudflare D1 免费库总容量适合小规模试用；样本量扩大后，原始音频建议迁移到 R2，D1 只保留音频 URL、转写文本和评分数据。

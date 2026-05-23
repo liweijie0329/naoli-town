@@ -7,7 +7,7 @@
 - 网页后台查看：打开网页左上角菜单，进入「后台」，输入后台密码后可刷新、选择单条记录查看测评详情。
 - 网页后台导出：在「后台」点击「导出 CSV」，会导出所有已保存测评；听力环境和听力逐次反应在 `hearing_environment_checks_json`、`hearing_events_json`、`hearing_screening_json` 中。
 - 本地开发查看：`data/sessions.json` 保存本地 JSON 会话。
-- Cloudflare D1 查询：`sessions` 保存会话汇总和完整 `payload_json`，`item_responses` 保存认知题目明细，`hearing_events` 保存听力环境检测、声道检查、练习和正式测试每次反应。
+- Cloudflare D1 查询：`sessions` 保存会话汇总和精简 `payload_json`，`item_responses` 保存认知题目明细、画图图片和语音题音频，`hearing_events` 保存听力环境检测、声道检查、练习和正式测试每次反应。
 
 示例查询：
 
@@ -23,10 +23,11 @@ ORDER BY event_at;
 | 变量名 | 变量说明 | 单位 |
 |---|---|---|
 | `session_id` / `id` | 单次测评会话唯一编号 | 无 |
+| `case_number` / `participant.caseNumber` | 病例号 | 无 |
 | `participant_name` | 参加者姓名 | 无 |
-| `birth_year` | 出生年份，来自出生日期解析 | 年 |
-| `participant_age` / `participant.ageAtTest` | 测评时年龄 | 岁 |
-| `gender` | 性别 | 无 |
+| `birth_year` | 出生年份；新版登记页不再要求填写，通常为空 | 年 |
+| `participant_age` / `participant.ageAtTest` | 测评时年龄；新版登记页不再要求填写，通常为空 | 岁 |
+| `gender` | 性别；新版登记页不再要求填写，通常为空 | 无 |
 | `education_level` | 教育水平 | 无 |
 | `targetAgeEligible` | 是否满足 60 岁及以上目标人群 | 布尔值 |
 | `session_started_at` / `started_at` | 会话开始时间 | ISO 8601 时间 |
@@ -38,7 +39,7 @@ ORDER BY event_at;
 | `total_score` | 加教育分后的总分 | 分 |
 | `risk_band` | 认知风险分层 | 无 |
 | `domain_scores_json` | 各认知域得分 JSON | JSON |
-| `payload_json` | 完整会话 JSON，含听力与题目明细 | JSON |
+| `payload_json` | 会话汇总 JSON；题目完整答案见 `item_responses.answer_json` | JSON |
 | `storageMode` | 数据存储方式，如 `cloudflare-d1`、`browser-local` | 无 |
 | `ttsManifestVersion` | 本地语音包清单版本 | 无 |
 
@@ -136,8 +137,9 @@ ORDER BY event_at;
 | `standard_answer` | 标准答案摘要 | 无 |
 | `user_answer` | 用户答案摘要 | 无 |
 | `correctness_json` | 分项正确性 JSON | JSON |
-| `answer_json` | 题目答案 JSON | JSON |
+| `answer_json` | 题目答案 JSON；选择题保存所选选项/序列，语音题保存转写文本和 `audioRecordings` 原始音频 data URL | JSON |
 | `behavior_json` | 行为过程 JSON，如连线、撤销、敲击、语音事件、定位等 | JSON |
 | `ai_json` | AI 评分结果 JSON | JSON |
 | `drawing_image` | 画图/连线题保存的图片 data URL | data URL |
 | `has_drawing` | 是否有画图图片 | 0-1 |
+| `answer_json.audioRecordings` | 句子复述、动物词语流畅性等语音题答题音频，按步骤保存为 `data:audio/...;base64,...` | data URL |

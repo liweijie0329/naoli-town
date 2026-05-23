@@ -65,7 +65,7 @@ npm run generate:audio -- --dry-run
 - `stimulus:digitBackward:bank:01`: 数字倒背 50 道题本中的第 1 道，固定 3 位
 - `instruction:serialSubtraction:3:0`: 随机减数为 3 时第一步题干，“100 减 3 等于多少？”
 - `stimulus:sentence:0`: 句子复述材料
-- `setup:intro` / `setup:option:*`: 登录页提示语和性别、教育水平选项语音
+- `setup:intro` / `setup:option:*`: 登录页提示语和教育水平选项语音
 - `hearing:intro` / `hearing:channel:*` / `hearing:practice` / `hearing:test` / `hearing:summary`: 听力测试流程提示语
 
 改完文本后重新运行 `npm run generate:audio -- --force`。

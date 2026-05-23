@@ -1416,7 +1416,7 @@
     },
     {
       "key": "setup:intro",
-      "text": "请填写姓名、出生日期、性别和教育水平。"
+      "text": "请填写病例号、姓名和教育水平。"
     },
     {
       "key": "setup:option:e0japi",
@@ -1427,8 +1427,8 @@
       "text": "女"
     },
     {
-      "key": "setup:option:1i4nq6g",
-      "text": "小学"
+      "key": "setup:option:1y37ed2",
+      "text": "小学及以下"
     },
     {
       "key": "setup:option:yoy3pb",

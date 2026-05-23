@@ -35,11 +35,11 @@
 ### sessions
 
 - `id`: 测评唯一 ID
-- `participant`: 参加者姓名、年龄、性别、教育水平
+- `participant`: 病例号、参加者姓名、教育水平；旧数据可包含年龄和性别
 - `startedAt`, `finishedAt`: 测评开始和结束时间
 - `totalDurationMs`: 总答题时长
 - `rawScore`: 原始 30 分内得分
-- `educationBonus`: 教育水平对应受教育年限≤12 年加分；小学、初中、中专、高中加 1 分，大专、本科及以上不加分
+- `educationBonus`: 教育水平对应受教育年限≤12 年加分；小学及以下、初中、中专、高中加 1 分，大专、本科及以上不加分
 - `totalScore`: 加分后总分，最高 30
 - `riskBand`: ≥26 正常，否则建议进一步评估
 - `domainScores`: 各认知领域得分
