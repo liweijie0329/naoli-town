@@ -68,10 +68,6 @@
       "text": "告诉我今天是什么日期。然后请告诉我这是什么地方，它在哪个城市。"
     },
     {
-      "key": "stimulus:naming:question",
-      "text": "这是什么动物？"
-    },
-    {
       "key": "volume:sample",
       "text": "请调到您觉得清楚、舒服的音量。"
     },

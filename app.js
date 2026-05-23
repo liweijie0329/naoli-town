@@ -78,7 +78,6 @@ const SELF_SELECTED_AUDIO_STEP_DB_HL = 5;
 const VOLUME_SAMPLE_TEXT = "请调到您觉得清楚、舒服的音量。";
 const VOLUME_SAMPLE_AUDIO_KEY = "volume:sample";
 const NAMING_QUESTION_TEXT = "这是什么动物？";
-const NAMING_QUESTION_AUDIO_KEY = "stimulus:naming:question";
 const STATIC_TTS_MANIFEST_SRC = "./assets/audio/manifest.json";
 const STATIC_AUDIO_BUFFER_CACHE_LIMIT = 96;
 const LOCAL_DEV_API_ORIGIN = "http://127.0.0.1:5178";
@@ -668,6 +667,7 @@ let staticAudioPreloadTimer = null;
 const staticAudioBufferCache = new Map();
 const staticAudioBufferPromiseCache = new Map();
 let instructionTimer = null;
+let pendingInstructionPlaybackKey = "";
 let activeInstructionPlaybackKey = "";
 let postSurveyAudioTimer = null;
 let delayedConfirmTimer = null;
@@ -3888,27 +3888,7 @@ function nearestTrailGuidePracticeNode(point, canvas) {
 function setupCurrentTask(task) {
   if (task.type === "drawing") setupFreeCanvas(task);
   if (task.type === "trail") setupTrailCanvas();
-  if (task.type === "naming") scheduleNamingQuestionPrompt(task, getTaskStep(task));
   if (task.type === "orientation") prepareLocationAnswer();
-}
-
-function scheduleNamingQuestionPrompt(task, step) {
-  const response = getResponse(task.id);
-  response.behavior.namingQuestionAudioPlayed = response.behavior.namingQuestionAudioPlayed || {};
-  if (response.behavior.namingQuestionAudioPlayed[step]) return;
-  response.behavior.namingQuestionAudioPlayed[step] = new Date().toISOString();
-  saveDraft();
-  window.setTimeout(() => {
-    if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
-    speakText(NAMING_QUESTION_TEXT, {
-      audioKey: NAMING_QUESTION_AUDIO_KEY,
-      rate: 0.82,
-      pitch: 1.18,
-      purpose: "instruction",
-      staticOnly: true,
-      preferBuffer: true
-    });
-  }, 180);
 }
 
 function setupFreeCanvas(task) {
@@ -6003,7 +5983,10 @@ function scheduleTaskInstruction(task) {
   const alreadyComplete = isInstructionComplete(task, step);
   const instructionPending = Boolean(instructionTimer) || (playState === "播放中..." && speechPlaybackPurpose === "instruction");
   if (activeInstructionPlaybackKey === key && instructionPending) return;
-  if (state.playedInstructionKeys[key] && !force && (alreadyComplete || instructionPending)) return;
+  if (state.playedInstructionKeys[key] && !force) {
+    if (!alreadyComplete && !instructionPending) markInstructionKeyComplete(key, { render: false });
+    return;
+  }
   const text = taskGuideText(task, step);
   if (!text) {
     markInstructionComplete(task, step);
@@ -6013,8 +5996,10 @@ function scheduleTaskInstruction(task) {
   delete state.completedInstructionKeys[key];
   saveDraft();
   clearInstructionTimer();
+  pendingInstructionPlaybackKey = key;
   instructionTimer = window.setTimeout(() => {
     instructionTimer = null;
+    if (pendingInstructionPlaybackKey === key) pendingInstructionPlaybackKey = "";
     if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
     if (task.id === "memory1" && getResponse(task.id).answer.wordsPlaybackStarted) return;
     activeInstructionPlaybackKey = key;
@@ -6024,6 +6009,7 @@ function scheduleTaskInstruction(task) {
       purpose: "instruction",
       audioKey: audioKeyForInstruction(task, step),
       preferBuffer: true,
+      preserveActiveInstruction: true,
       done: () => {
         if (activeInstructionPlaybackKey === key) activeInstructionPlaybackKey = "";
         markInstructionComplete(task, step);
@@ -6063,9 +6049,17 @@ function resetInstructionPlayback(task, step = getTaskStep(task)) {
   delete state.playedInstructionKeys[key];
   delete state.completedInstructionKeys[key];
   delete state.instructionCompletedAt?.[key];
+  if (pendingInstructionPlaybackKey === key) pendingInstructionPlaybackKey = "";
+  if (activeInstructionPlaybackKey === key) activeInstructionPlaybackKey = "";
 }
 
 function requestImmediateInstructionPlayback(task, step = getTaskStep(task)) {
+  if (!task) return;
+  const key = taskInstructionKey(task, step);
+  if (state.playedInstructionKeys?.[key] || state.completedInstructionKeys?.[key]) {
+    immediateInstructionPlayback = false;
+    return;
+  }
   resetInstructionPlayback(task, step);
   immediateInstructionPlayback = true;
 }
@@ -6115,13 +6109,26 @@ function isTaskGuideActive(task, step = getTaskStep(task)) {
 
 function markInstructionComplete(task, step = getTaskStep(task)) {
   if (!task) return;
-  const key = taskInstructionKey(task, step);
+  markInstructionKeyComplete(taskInstructionKey(task, step));
+}
+
+function markInstructionKeyComplete(key, options = {}) {
+  const { render: shouldRender = true } = options;
+  if (!key) return;
   state.completedInstructionKeys = state.completedInstructionKeys || {};
   state.instructionCompletedAt = state.instructionCompletedAt || {};
   state.completedInstructionKeys[key] = true;
-  state.instructionCompletedAt[key] = Date.now();
+  state.instructionCompletedAt[key] = state.instructionCompletedAt[key] || Date.now();
   saveDraft();
-  render();
+  if (shouldRender) render();
+}
+
+function settleCurrentInstructionPlayback() {
+  const key = activeInstructionPlaybackKey || pendingInstructionPlaybackKey;
+  if (!key) return;
+  activeInstructionPlaybackKey = "";
+  pendingInstructionPlaybackKey = "";
+  markInstructionKeyComplete(key, { render: false });
 }
 
 function audioKeyForInstruction(task, step = getTaskStep(task)) {
@@ -6400,8 +6407,8 @@ async function playStaticPrompt(audioKey, purpose = "speech") {
 }
 
 async function speakText(text, options = {}) {
-  const { rate = 0.82, pitch = 1.18, done, onStart, fallbackMs = 0, purpose = "speech", audioKey = null, staticOnly = false, preferBuffer = false } = options;
-  const playbackId = beginAudioPlayback();
+  const { rate = 0.82, pitch = 1.18, done, onStart, fallbackMs = 0, purpose = "speech", audioKey = null, staticOnly = false, preferBuffer = false, preserveActiveInstruction = false } = options;
+  const playbackId = beginAudioPlayback({ preserveActiveInstruction });
   const speechParams = speechParamsFor(rate, pitch);
   startPlaybackUi(playbackId, purpose);
   let finished = false;
@@ -6902,7 +6909,8 @@ function stopActiveSpeechAudio() {
   activeSpeechAudio = null;
 }
 
-function beginAudioPlayback() {
+function beginAudioPlayback(options = {}) {
+  if (!options.preserveActiveInstruction) settleCurrentInstructionPlayback();
   speechPlaybackId += 1;
   clearInstructionTimer();
   clearPostSurveyAudioTimer();
@@ -6927,8 +6935,10 @@ function prepareAudioOutputMode() {
 }
 
 function stopAudioPlayback() {
+  settleCurrentInstructionPlayback();
   clearInstructionTimer();
   activeInstructionPlaybackKey = "";
+  pendingInstructionPlaybackKey = "";
   clearPostSurveyAudioTimer();
   const stoppedHearingTone = stopHearingTone();
   if (!("speechSynthesis" in window) && !activeSpeechAudio && !speechItemTimer && playState !== "播放中..." && !stoppedHearingTone) return;
