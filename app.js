@@ -907,6 +907,10 @@ function migrateState() {
   delete state.participant.expectedPlace;
   delete state.participant.expectedCity;
   state.hearingScreening = normalizeHearingScreening(state.hearingScreening);
+  if (state.view === "volume") {
+    state.view = "hearing";
+    state.hearingScreening.selfSelectedAudioConfirmedAt = state.hearingScreening.selfSelectedAudioConfirmedAt || new Date().toISOString();
+  }
   state.responses = state.responses || {};
   state.drawings = state.drawings || {};
   state.taskRuntime = normalizeTaskRuntime(state.taskRuntime);
@@ -2147,6 +2151,7 @@ function shouldNudgeConfirm(task) {
 
 function isTaskReadyToAnswer(task, step = getTaskStep(task)) {
   if (task?.type === "drawing" && ["cube", "clock"].includes(task.id)) return true;
+  if (task?.type === "naming") return true;
   return isInstructionComplete(task, step);
 }
 
@@ -5030,11 +5035,15 @@ function playVolumeSample() {
 }
 
 function continueToHearing() {
+  enterHearingFlow(currentSelfSelectedAudioLevelDbHl());
+}
+
+function enterHearingFlow(audioLevel = MOCA_AUDIO_DEFAULT_LEVEL_DB_HL) {
   window.clearTimeout(volumeSampleTimer);
   volumeSampleTimer = null;
   state.hearingScreening = {
     ...normalizeHearingScreening(state.hearingScreening),
-    selfSelectedAudioLevelDbHl: currentSelfSelectedAudioLevelDbHl(),
+    selfSelectedAudioLevelDbHl: clampSelfSelectedAudioLevelDbHl(audioLevel),
     selfSelectedAudioConfirmedAt: new Date().toISOString()
   };
   state.view = "hearing";
@@ -5059,9 +5068,8 @@ async function startNewSession(participant) {
   state.startedAt = new Date().toISOString();
   state.activeTaskIndex = 0;
   state.hearingScreening = createHearingScreeningState();
-  state.view = "volume";
   cognitionMenuOpen = false;
-  render();
+  enterHearingFlow(MOCA_AUDIO_DEFAULT_LEVEL_DB_HL);
 }
 
 async function requestStartupPermissions(options = {}) {
@@ -5454,7 +5462,9 @@ function scheduleTaskInstruction(task) {
   const key = taskInstructionKey(task, step);
   const force = immediateInstructionPlayback;
   immediateInstructionPlayback = false;
-  if (state.playedInstructionKeys[key] && !force) return;
+  const alreadyComplete = isInstructionComplete(task, step);
+  const instructionPending = Boolean(instructionTimer) || (playState === "播放中..." && speechPlaybackPurpose === "instruction");
+  if (state.playedInstructionKeys[key] && !force && (alreadyComplete || instructionPending)) return;
   const text = taskGuideText(task, step);
   if (!text) {
     markInstructionComplete(task, step);
@@ -5491,13 +5501,17 @@ function requestImmediateInstructionPlayback(task, step = getTaskStep(task)) {
 }
 
 function taskGuideText(task, step = getTaskStep(task)) {
-  if (task.type === "naming") return task.instruction || "请您告诉我这个动物的名字。";
+  if (task.type === "naming") {
+    const instruction = task.instruction || "请您告诉我这个动物的名字。";
+    return instruction.includes(NAMING_QUESTION_TEXT) ? instruction : `${instruction}${NAMING_QUESTION_TEXT}`;
+  }
   if (task.type === "serial7") return task.instruction || `请从 100 开始连续减 ${serialSubtractionNumber()}。`;
   if (task.id === "digitBackward") return "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。例如，听到一二三，您就选择三二一。";
   return task.instruction || task.prompt;
 }
 
 function taskInstructionKey(task, step = getTaskStep(task)) {
+  if (task?.type === "naming") return `${task.id}:guide:${step}`;
   return task ? `${task.id}:guide` : "";
 }
 
@@ -5524,6 +5538,7 @@ function markInstructionComplete(task, step = getTaskStep(task)) {
 }
 
 function audioKeyForInstruction(task, step = getTaskStep(task)) {
+  if (task?.type === "naming") return `instruction:naming:${step}`;
   if (task?.type === "serial7") return "instruction:serial7:0";
   if (task?.type === "orientation") return "instruction:orientation:guide";
   if (task?.type === "abstractionChoice") return "instruction:abstraction:guide";
