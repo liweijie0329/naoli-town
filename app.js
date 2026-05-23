@@ -2502,22 +2502,14 @@ function renderFluencyTask() {
   const remaining = response.answer.remaining ?? 60;
   const running = Boolean(response.answer.running);
   const completed = Boolean(response.answer.completedAt);
-  const waiting = speechTranscribing && tasks[state.activeTaskIndex]?.id === "fluency";
-  const live = getLiveTranscript(tasks.find((task) => task.id === "fluency"), response, 0);
-  const animals = fluencyAnimalNamesFromResponse(response, live);
   const readyToAnswer = isTaskReadyToAnswer(tasks[state.activeTaskIndex]);
-  const statusText = fluencyUploadStatusText(response, waiting);
   return html`
     <div class="fluency-page">
       ${renderAudioWave()}
       ${completed ? "" : `<div class="speech-controls">
-        <button class="timer-button ${running ? "running" : waiting || !readyToAnswer ? "" : "pulse"}" ${waiting || !readyToAnswer ? "disabled" : `data-action="${running ? "stopFluency" : "startFluency"}"`}>${waiting ? "请稍等" : readyToAnswer ? running ? "停止" : "开始" : "请听说明"}</button>
+        <button class="timer-button ${running ? "running" : readyToAnswer ? "pulse" : ""}" ${readyToAnswer ? `data-action="${running ? "stopFluency" : "startFluency"}"` : "disabled"}>${readyToAnswer ? running ? "停止" : "开始" : "请听说明"}</button>
       </div>`}
-      <strong class="fluency-count-status">${fluencyStatusText(response, animals)}</strong>
-      ${statusText ? `<p class="fluency-upload-status">${escapeHtml(statusText)}</p>` : ""}
-      <div class="animal-count-list">${renderAnimalCountChips(animals)}</div>
-      ${completed ? renderTranscriptEditor(live, "fluency", waiting ? "disabled" : "") : ""}
-      ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
+      ${completed ? "" : `<strong class="fluency-timer-status">${running ? `剩余 ${remaining} 秒` : "准备开始"}</strong>`}
     </div>
   `;
 }
@@ -5444,6 +5436,9 @@ async function submitActiveTask() {
     scheduleDrawingAiScore(task);
     return;
   }
+  if (task.type === "fluency") {
+    response.behavior.backgroundFluencyStatus = response.answer.transcriptionStatus === "completed" ? "completed" : "processing";
+  }
   if (needsBlockingAiScore(task)) response.ai = await scoreTaskWithAi(task);
   response.score = computeTaskScore(task, response);
   saveDraft();
@@ -6583,6 +6578,8 @@ async function fallbackToAudioRecording(reason) {
 
 function stopVoiceInput(options = {}) {
   const { releaseMic = false, shouldRender = true } = options;
+  const stoppingContext = activeVoiceContext();
+  const backgroundFluencyTranscription = stoppingContext.task?.type === "fluency";
   clearSpeechRecognitionRestartTimer();
   const wasRecognitionPending = speechRecognitionStartPending;
   const wasRecording = mediaRecorder && mediaRecorder.state === "recording";
@@ -6603,7 +6600,7 @@ function stopVoiceInput(options = {}) {
   }
   if (wasPcmRecording) {
     releaseMicAfterRecordingStop = releaseMic;
-    if (recordingWillTranscribe) {
+    if (recordingWillTranscribe && !backgroundFluencyTranscription) {
       speechTranscribing = true;
       voiceState = "请稍等";
     }
@@ -6611,7 +6608,7 @@ function stopVoiceInput(options = {}) {
     pcmRecorder = null;
   } else if (wasRecording) {
     releaseMicAfterRecordingStop = releaseMic;
-    if (recordingWillTranscribe) {
+    if (recordingWillTranscribe && !backgroundFluencyTranscription) {
       speechTranscribing = true;
       voiceState = "请稍等";
     }
@@ -6689,13 +6686,14 @@ async function startAudioRecording(options = {}) {
         if (transcribeOnStop && blob.size) {
           await transcribeAudioBlob(blob, task.id, step);
         } else if (transcribeOnStop) {
-          speechTranscribing = false;
-          voiceState = "未录到声音，请再说一次";
-          setSpeechWarning(response, step, "未录到声音，请再说一次");
+          if (task.id !== "fluency") {
+            speechTranscribing = false;
+            voiceState = "未录到声音，请再说一次";
+            setSpeechWarning(response, step, "未录到声音，请再说一次");
+          }
           saveDraft();
-          if (task.id === "fluency" && response.answer.completedAt) {
-            const advanced = await autoAdvanceFluencyAfterTranscription();
-            if (!advanced) render();
+          if (task.id === "fluency") {
+            finalizeFluencyBackgroundProcessing(response);
           } else {
             render();
           }
@@ -6833,24 +6831,26 @@ async function finishPcmAudioRecording(recorder) {
     if (recorder.transcribeOnStop && blob.size && task) {
       await transcribeAudioBlob(blob, recorder.taskId, recorder.step);
     } else if (recorder.transcribeOnStop) {
-      speechTranscribing = false;
-      voiceState = "未录到声音，请再说一次";
-      setSpeechWarning(response, recorder.step, "未录到声音，请再说一次");
+      if (recorder.taskId !== "fluency") {
+        speechTranscribing = false;
+        voiceState = "未录到声音，请再说一次";
+        setSpeechWarning(response, recorder.step, "未录到声音，请再说一次");
+      }
       saveDraft();
-      if (recorder.taskId === "fluency" && response.answer.completedAt) {
-        const advanced = await autoAdvanceFluencyAfterTranscription();
-        if (!advanced) render();
+      if (recorder.taskId === "fluency") {
+        finalizeFluencyBackgroundProcessing(response);
       } else {
         render();
       }
     }
   } catch (error) {
-    speechTranscribing = false;
-    voiceState = "录音处理失败，请重试";
+    if (recorder.taskId !== "fluency") {
+      speechTranscribing = false;
+      voiceState = "录音处理失败，请重试";
+    }
     saveDraft();
-    if (recorder.taskId === "fluency" && getResponse("fluency").answer.completedAt) {
-      const advanced = await autoAdvanceFluencyAfterTranscription();
-      if (!advanced) render();
+    if (recorder.taskId === "fluency") {
+      finalizeFluencyBackgroundProcessing(getResponse("fluency"));
     } else {
       render();
     }
@@ -7076,10 +7076,11 @@ async function transcribeAudioBlob(blob, taskId, step) {
     return;
   }
   const response = getResponse(task.id);
-  const transcriptionId = activeTranscriptionId + 1;
-  activeTranscriptionId = transcriptionId;
+  const backgroundFluency = task.type === "fluency";
+  const transcriptionId = backgroundFluency ? null : activeTranscriptionId + 1;
+  if (!backgroundFluency) activeTranscriptionId = transcriptionId;
   const transcriptionStartedAt = Date.now();
-  speechTranscribing = true;
+  if (!backgroundFluency) speechTranscribing = true;
   response.behavior.speechRecognition = response.behavior.speechRecognition || [];
   response.behavior.asrStartedAt = response.behavior.asrStartedAt || {};
   response.behavior.asrStartedAt[step] = transcriptionStartedAt;
@@ -7094,8 +7095,10 @@ async function transcribeAudioBlob(blob, taskId, step) {
     size: blob.size,
     at: new Date().toISOString()
   });
-  voiceState = "请稍等";
-  render();
+  if (!backgroundFluency) {
+    voiceState = "请稍等";
+    render();
+  }
   try {
     const result = await requestAsrJson(task, step, blob, {
       timeoutMs: task.type === "fluency" ? FLUENCY_ASR_TIMEOUT_MS : ASR_TIMEOUT_MS
@@ -7116,14 +7119,18 @@ async function transcribeAudioBlob(blob, taskId, step) {
         response.answer.transcriptionMessage = "计数完成";
       }
     } else {
-      setSpeechWarning(response, step, "未录到声音，请再说一次");
+      if (!backgroundFluency) setSpeechWarning(response, step, "未录到声音，请再说一次");
       if (task.type === "fluency") {
         response.answer.transcriptionStatus = "empty";
         response.answer.transcriptionMessage = "未识别到动物名称，可手动修改后继续";
       }
     }
-    voiceState = text ? "转文字完成" : "未录到声音，请再说一次";
-    render();
+    if (backgroundFluency) {
+      finalizeFluencyBackgroundProcessing(response);
+    } else {
+      voiceState = text ? "转文字完成" : "未录到声音，请再说一次";
+      render();
+    }
   } catch (error) {
     response.behavior.speechRecognition.push({
       step,
@@ -7135,17 +7142,32 @@ async function transcribeAudioBlob(blob, taskId, step) {
       response.answer.transcriptionStatus = "error";
       response.answer.transcriptionMessage = "计数失败，可手动修改后继续";
     }
-    voiceState = "转文字失败，可手动输入";
-    saveDraft();
-    render();
-  } finally {
-    if (activeTranscriptionId === transcriptionId) {
-      speechTranscribing = false;
-      const advanced = task.type === "fluency" && response.answer.completedAt
-        ? await autoAdvanceFluencyAfterTranscription()
-        : false;
-      if (!advanced) render();
+    if (backgroundFluency) {
+      finalizeFluencyBackgroundProcessing(response);
+    } else {
+      voiceState = "转文字失败，可手动输入";
     }
+    saveDraft();
+    if (!backgroundFluency) render();
+  } finally {
+    if (!backgroundFluency && activeTranscriptionId === transcriptionId) {
+      speechTranscribing = false;
+      render();
+    }
+  }
+}
+
+function finalizeFluencyBackgroundProcessing(response = getResponse("fluency")) {
+  const task = tasks.find((entry) => entry.id === "fluency");
+  if (!task) return;
+  response.answer.animals = extractAnimalNames(response.answer.rawTranscript || "");
+  response.score = computeTaskScore(task, response);
+  response.behavior.backgroundFluencyStatus = response.answer.transcriptionStatus === "error" ? "error" : "completed";
+  response.behavior.backgroundFluencyProcessedAt = new Date().toISOString();
+  saveDraft();
+  if (state.sessionSaveStatus === "saved" || state.view === "results" || state.view === "admin") {
+    scheduleBackgroundSessionSave();
+    render();
   }
 }
 
@@ -7997,13 +8019,10 @@ function completeFluency(reason) {
   window.clearInterval(fluencyTimer);
   stopVoiceInput();
   saveDraft();
-  render();
-  if (!recordingAudio && !pcmRecorder && !mediaRecorder && !speechTranscribing) {
-    void autoAdvanceFluencyAfterTranscription();
-  }
+  void advanceFluencyImmediately();
 }
 
-async function autoAdvanceFluencyAfterTranscription() {
+async function advanceFluencyImmediately() {
   const task = tasks.find((entry) => entry.id === "fluency");
   if (!task || fluencyAutoAdvanceInProgress) return false;
   const response = getResponse("fluency");
@@ -8251,7 +8270,7 @@ async function scoreTaskWithAi(task) {
 }
 
 function needsAiScore(task) {
-  return ["trail", "drawing", "fluency"].includes(task.type);
+  return ["trail", "drawing"].includes(task.type);
 }
 
 function isAsyncDrawingAiTask(task) {
