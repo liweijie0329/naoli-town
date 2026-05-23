@@ -2525,7 +2525,7 @@ function renderMemoryTask(task) {
         <div class="option-grid memory-options">
           ${options.map((word) => `<button class="option ${selected.includes(word) ? "picked" : ""}" data-action="toggleMemoryWord" data-word="${escapeHtml(word)}" ${inputDisabled}${speechAttrs(word, memoryWordAudioKey(word))}>${escapeHtml(word)}</button>`).join("")}
         </div>
-        ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
+        ${response.behavior.selectionWarning && !response.behavior.memoryReviewPromptVisible ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
         ${response.behavior.memoryReviewPromptVisible ? renderMemoryReviewPrompt(response) : ""}
       ` : `<p class="memory-wait-copy">请先点击开始，听完 5 个词后再选择。</p>`}
     </div>
@@ -2534,12 +2534,14 @@ function renderMemoryTask(task) {
 
 function renderMemoryReviewPrompt() {
   return html`
-    <div class="memory-review-panel">
-      <strong>要再听一遍吗？</strong>
-      <p>这次选择和刚刚读到的词不完全一致。</p>
-      <div class="memory-review-actions">
-        <button class="secondary" data-action="reviewMemoryReplay">再听一遍</button>
-        <button class="primary" data-action="confirmMemoryIncorrectSubmit">提交</button>
+    <div class="memory-review-modal" role="dialog" aria-modal="true" aria-labelledby="memory-review-title">
+      <div class="memory-review-panel">
+        <strong id="memory-review-title">要再听一遍吗？</strong>
+        <p>这次选择和刚刚读到的词不完全一致。</p>
+        <div class="memory-review-actions">
+          <button class="secondary memory-review-button" data-action="reviewMemoryReplay">再听一遍</button>
+          <button class="confirm-button answer-ready memory-review-button" data-action="confirmMemoryIncorrectSubmit">提交</button>
+        </div>
       </div>
     </div>
   `;
@@ -5155,7 +5157,7 @@ function requiresDrawerAdminPassword(action, target) {
   if (protectedViewsUnlocked) return false;
   if (!target.closest(".drawer-panel")) return false;
   if (action === "goHome") return false;
-  return ["navView", "toggleCognitionMenu", "selectTask"].includes(action);
+  return ["navView", "toggleCognitionMenu", "selectTask", "navPostSurveySection"].includes(action);
 }
 
 function openAdminPasswordDialog(target) {
@@ -5171,7 +5173,8 @@ function drawerAdminActionFromTarget(target) {
   return {
     action: target.dataset.action || "",
     view: target.dataset.view || "",
-    index: target.dataset.index || ""
+    index: target.dataset.index || "",
+    step: target.dataset.step || ""
   };
 }
 
@@ -5204,6 +5207,10 @@ async function runDrawerAdminAction(pending) {
     if (state.view === "test") requestImmediateInstructionPlayback(tasks[state.activeTaskIndex]);
     if (state.view === "admin") await loadSessions(false);
     render();
+    return;
+  }
+  if (pending.action === "navPostSurveySection") {
+    navPostSurveySection(Number(pending.step || 0));
     return;
   }
   if (pending.action === "selectTask") {

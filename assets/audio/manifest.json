@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-17T08:38:07.655Z",
+  "generatedAt": "2026-05-23T17:29:11.131Z",
   "provider": "doubao",
   "source": "data/tts-texts.json",
   "entries": {
@@ -3015,6 +3015,204 @@
       "text": "菜市场",
       "profile": "gentle",
       "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:intro": {
+      "src": "assets/audio/survey-intro.mp3",
+      "text": "下面我将问一些问题，有关您刚才答题时的感觉。请根据您的真实感受回答，答案没有对错之分，当您准备好了请按开始",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:option:1": {
+      "src": "assets/audio/survey-sus-option-1.mp3",
+      "text": "非常不同意",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:option:2": {
+      "src": "assets/audio/survey-sus-option-2.mp3",
+      "text": "不同意",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:option:3": {
+      "src": "assets/audio/survey-sus-option-3.mp3",
+      "text": "一般",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:option:4": {
+      "src": "assets/audio/survey-sus-option-4.mp3",
+      "text": "同意",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:option:5": {
+      "src": "assets/audio/survey-sus-option-5.mp3",
+      "text": "非常同意",
+      "profile": "gentle",
+      "speedRatio": 1,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:1": {
+      "src": "assets/audio/survey-sus-1.mp3",
+      "text": "我愿意经常使用刚才的答题系统。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:2": {
+      "src": "assets/audio/survey-sus-2.mp3",
+      "text": "我觉得刚才的答题系统过于复杂。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:3": {
+      "src": "assets/audio/survey-sus-3.mp3",
+      "text": "我觉得刚才的答题系统容易使用。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:4": {
+      "src": "assets/audio/survey-sus-4.mp3",
+      "text": "我觉得需要工作人员帮助，才能顺利使用刚才的答题系统。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:5": {
+      "src": "assets/audio/survey-sus-5.mp3",
+      "text": "我觉得刚才的答题系统的各项功能配合得很好。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:6": {
+      "src": "assets/audio/survey-sus-6.mp3",
+      "text": "我觉得刚才的答题系统前后不太一致。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:7": {
+      "src": "assets/audio/survey-sus-7.mp3",
+      "text": "我觉得大多数人可以很快学会使用刚才的答题系统。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:8": {
+      "src": "assets/audio/survey-sus-8.mp3",
+      "text": "我觉得刚才的答题系统使用起来比较麻烦。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:9": {
+      "src": "assets/audio/survey-sus-9.mp3",
+      "text": "我使用刚才的答题系统时很有信心。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:sus:10": {
+      "src": "assets/audio/survey-sus-10.mp3",
+      "text": "我觉得在使用刚才的答题系统前，需要先学习很多东西。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:nasa-tlx:1": {
+      "src": "assets/audio/survey-nasa-tlx-1.mp3",
+      "text": "您刚才做测试付出了多少脑力？0是最少，100是最多，请选择一个数字。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:nasa-tlx:2": {
+      "src": "assets/audio/survey-nasa-tlx-2.mp3",
+      "text": "您刚才做测试付出了多少体力？0是最少，100是最多，请选择一个数字。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:nasa-tlx:3": {
+      "src": "assets/audio/survey-nasa-tlx-3.mp3",
+      "text": "您觉得刚才的测试有多花时间？0是最少，100是最多，请选择一个数字。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:nasa-tlx:4": {
+      "src": "assets/audio/survey-nasa-tlx-4.mp3",
+      "text": "您觉得刚才的测试有多费力？0是最少，100是最多，请选择一个数字。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:nasa-tlx:5": {
+      "src": "assets/audio/survey-nasa-tlx-5.mp3",
+      "text": "您觉得刚才的测试您完成得有多好？0是最好，100是最差，请选择一个数字。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
+      "provider": "doubao-v3",
+      "voiceType": "zh_female_peiqi_uranus_bigtts",
+      "format": "mp3"
+    },
+    "survey:nasa-tlx:6": {
+      "src": "assets/audio/survey-nasa-tlx-6.mp3",
+      "text": "您刚才做测试有多沮丧或烦恼？0是最少，100是最多，请选择一个数字。",
+      "profile": "gentle",
+      "speedRatio": 0.9,
       "provider": "doubao-v3",
       "voiceType": "zh_female_peiqi_uranus_bigtts",
       "format": "mp3"
