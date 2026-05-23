@@ -1752,7 +1752,6 @@ function renderHearingSummary(screening) {
   const summary = screening.summary || summarizeHearingScreening(screening);
   const ears = summary.ears || {};
   const audioLevel = summary.mocaAudioLevelDbHl ?? screening.mocaAudioLevelDbHl ?? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL;
-  const selectedAudioLevel = summary.selfSelectedAudioLevelDbHl ?? screening.selfSelectedAudioLevelDbHl ?? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL;
   return html`
     <div class="hearing-card hearing-summary-card">
       <div class="hearing-complete-animation" aria-hidden="true">
@@ -1767,10 +1766,6 @@ function renderHearingSummary(screening) {
             <strong>${formatThreshold(ears[side.key]?.pta4)}</strong>
           </div>
         `).join("")}
-        <div class="hearing-summary-item">
-          <span>自选音量</span>
-          <strong>${formatAudioLevel(selectedAudioLevel)}</strong>
-        </div>
         <div class="hearing-summary-item">
           <span>认知测试音量</span>
           <strong>${formatAudioLevel(audioLevel)}</strong>
