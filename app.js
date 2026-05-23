@@ -9841,9 +9841,22 @@ async function loadSessions(shouldRender = false) {
   state.adminSessions = sessions;
   const selectedId = state.selectedSession?.id;
   const next = sessions.find((session) => session.id === selectedId) || sessions[0] || null;
-  state.selectedSession = next ? (sessionDetailCache.get(next.id) || next) : null;
-  state.selectedSessionLoading = false;
+  if (!next) {
+    state.selectedSession = null;
+    state.selectedSessionLoading = false;
+    if (shouldRender) render();
+    return;
+  }
+  const cached = sessionDetailCache.get(next.id);
+  state.selectedSession = cached || next;
+  state.selectedSessionLoading = !cached;
   if (shouldRender) render();
+  if (cached) return;
+  const detail = await loadSessionDetail(next.id);
+  if (state.selectedSession?.id !== next.id) return;
+  state.selectedSession = detail || state.selectedSession;
+  state.selectedSessionLoading = false;
+  if (shouldRender || state.view === "admin") render();
 }
 
 function cacheSessionDetail(session) {
