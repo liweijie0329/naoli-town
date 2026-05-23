@@ -600,6 +600,7 @@ let vigilanceTimer = null;
 let vigilanceAutoAdvanceTimer = null;
 let vigilancePointerTapAt = 0;
 let fluencyTimer = null;
+let fluencyAutoAdvanceInProgress = false;
 let trailGuideFrame = null;
 let trailGuideTick = 0;
 let trailDragStart = null;
@@ -964,6 +965,7 @@ function resetState() {
   adminPasswordDialog = null;
   manualTranscriptComposing = false;
   resetSetupPromptPlayback();
+  fluencyAutoAdvanceInProgress = false;
   hearingIntroPromptStartedAt = 0;
   playState = "开始";
   voiceState = "待说";
@@ -1147,7 +1149,6 @@ function render() {
   activeCanvasTaskId = null;
   if (state.view === "setup") {
     root.innerHTML = renderSetup();
-    queueSetupPrompt();
     queueVisibleSpeechAudioPreload();
     return;
   }
@@ -2528,7 +2529,7 @@ function renderFluencyTask() {
 
 function fluencyStatusText(response, animals) {
   const countText = `已识别 ${animals.length} 个`;
-  if (response.answer?.completedAt) return `${countText} · ${speechTranscribing ? "正在计数" : "请确认"}`;
+  if (response.answer?.completedAt) return `${countText} · ${speechTranscribing ? "正在计数" : "正在进入下一题"}`;
   return response.answer?.running ? `剩余 ${response.answer.remaining ?? 60} 秒 · ${countText}` : countText;
 }
 
@@ -4866,7 +4867,8 @@ function buttonSpeechData(target) {
 }
 
 function speakButtonSelection({ text, audioKey, action }) {
-  if (state.view === "setup" || state.view === "hearing") {
+  if (state.view === "setup") return;
+  if (state.view === "hearing") {
     speakText(text, { audioKey, rate: 0.82, pitch: 1.1, purpose: "option", staticOnly: true, preferBuffer: true });
     return;
   }
@@ -5060,6 +5062,7 @@ async function startNewSession(participant) {
   state = createInitialState();
   drawingUndoStacks = {};
   pendingAiScoreTaskIds = new Set();
+  fluencyAutoAdvanceInProgress = false;
   if (backgroundSessionSaveTimer) window.clearTimeout(backgroundSessionSaveTimer);
   backgroundSessionSaveTimer = null;
   hearingIntroPromptStartedAt = 0;
@@ -5505,13 +5508,27 @@ function taskGuideText(task, step = getTaskStep(task)) {
     const instruction = task.instruction || "请您告诉我这个动物的名字。";
     return instruction.includes(NAMING_QUESTION_TEXT) ? instruction : `${instruction}${NAMING_QUESTION_TEXT}`;
   }
+  if (task.type === "abstractionChoice") return abstractionInstructionText(task, step);
+  if (task.type === "orientation") return orientationInstructionText(step);
   if (task.type === "serial7") return task.instruction || `请从 100 开始连续减 ${serialSubtractionNumber()}。`;
   if (task.id === "digitBackward") return "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。例如，听到一二三，您就选择三二一。";
   return task.instruction || task.prompt;
 }
 
+function abstractionInstructionText(task, step = getTaskStep(task)) {
+  const item = task.items?.[step];
+  if (!item) return task.instruction || task.prompt;
+  if (item.practice) return "先看一个例子。桔子和香蕉在什么方面相类似？请选择水果。";
+  return `请您说说${item.words.join("和")}在什么方面相类似？`;
+}
+
+function orientationInstructionText(step = getTaskStep(tasks[state.activeTaskIndex])) {
+  return orientationPrompts[step]?.label || tasks.find((task) => task.id === "orientation")?.instruction || "";
+}
+
 function taskInstructionKey(task, step = getTaskStep(task)) {
   if (task?.type === "naming") return `${task.id}:guide:${step}`;
+  if (task?.type === "abstractionChoice" || task?.type === "orientation") return `${task.id}:guide:${step}`;
   return task ? `${task.id}:guide` : "";
 }
 
@@ -5539,9 +5556,9 @@ function markInstructionComplete(task, step = getTaskStep(task)) {
 
 function audioKeyForInstruction(task, step = getTaskStep(task)) {
   if (task?.type === "naming") return `instruction:naming:${step}`;
+  if (task?.type === "abstractionChoice") return `instruction:abstraction:${step}`;
+  if (task?.type === "orientation") return `instruction:orientation:${step}`;
   if (task?.type === "serial7") return "instruction:serial7:0";
-  if (task?.type === "orientation") return "instruction:orientation:guide";
-  if (task?.type === "abstractionChoice") return "instruction:abstraction:guide";
   return task ? `instruction:${task.id}:0` : null;
 }
 
@@ -6681,7 +6698,12 @@ async function startAudioRecording(options = {}) {
           voiceState = "未录到声音，请再说一次";
           setSpeechWarning(response, step, "未录到声音，请再说一次");
           saveDraft();
-          render();
+          if (task.id === "fluency" && response.answer.completedAt) {
+            const advanced = await autoAdvanceFluencyAfterTranscription();
+            if (!advanced) render();
+          } else {
+            render();
+          }
         }
       } finally {
         recordingWillTranscribe = false;
@@ -6820,13 +6842,23 @@ async function finishPcmAudioRecording(recorder) {
       voiceState = "未录到声音，请再说一次";
       setSpeechWarning(response, recorder.step, "未录到声音，请再说一次");
       saveDraft();
-      render();
+      if (recorder.taskId === "fluency" && response.answer.completedAt) {
+        const advanced = await autoAdvanceFluencyAfterTranscription();
+        if (!advanced) render();
+      } else {
+        render();
+      }
     }
   } catch (error) {
     speechTranscribing = false;
     voiceState = "录音处理失败，请重试";
     saveDraft();
-    render();
+    if (recorder.taskId === "fluency" && getResponse("fluency").answer.completedAt) {
+      const advanced = await autoAdvanceFluencyAfterTranscription();
+      if (!advanced) render();
+    } else {
+      render();
+    }
   } finally {
     recordingWillTranscribe = false;
     if (shouldReleaseMic && !micReleased) releaseMicStream();
@@ -7114,7 +7146,10 @@ async function transcribeAudioBlob(blob, taskId, step) {
   } finally {
     if (activeTranscriptionId === transcriptionId) {
       speechTranscribing = false;
-      render();
+      const advanced = task.type === "fluency" && response.answer.completedAt
+        ? await autoAdvanceFluencyAfterTranscription()
+        : false;
+      if (!advanced) render();
     }
   }
 }
@@ -7959,6 +7994,7 @@ function completeFluency(reason) {
   response.answer.running = false;
   response.answer.completedAt = Date.now();
   response.answer.completedReason = reason;
+  response.behavior.autoAdvanceRequestedAt = response.behavior.autoAdvanceRequestedAt || new Date().toISOString();
   if (recordingAudio || pcmRecorder || mediaRecorder) {
     response.answer.transcriptionStatus = "uploading";
     response.answer.transcriptionMessage = "正在上传录音并计数...";
@@ -7967,6 +8003,42 @@ function completeFluency(reason) {
   stopVoiceInput();
   saveDraft();
   render();
+  if (!recordingAudio && !pcmRecorder && !mediaRecorder && !speechTranscribing) {
+    void autoAdvanceFluencyAfterTranscription();
+  }
+}
+
+async function autoAdvanceFluencyAfterTranscription() {
+  const task = tasks.find((entry) => entry.id === "fluency");
+  if (!task || fluencyAutoAdvanceInProgress) return false;
+  const response = getResponse("fluency");
+  if (!response.answer.completedAt || response.submitted) return false;
+  if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== "fluency") {
+    saveDraft();
+    return false;
+  }
+  fluencyAutoAdvanceInProgress = true;
+  response.behavior.autoAdvanceStartedAt = new Date().toISOString();
+  try {
+    const submitted = await submitActiveTaskWithFeedback(task);
+    if (!submitted) {
+      render();
+      return false;
+    }
+    response.behavior.autoAdvanceCompletedAt = new Date().toISOString();
+    const nextIndex = nextTaskIndexAfterSubmit(task);
+    if (nextIndex < 0) {
+      await finishSessionAndShowResults();
+      return true;
+    }
+    state.activeTaskIndex = nextIndex;
+    requestImmediateInstructionPlayback(tasks[nextIndex]);
+    saveDraft();
+    render();
+    return true;
+  } finally {
+    fluencyAutoAdvanceInProgress = false;
+  }
 }
 
 function memoryWaitRemaining() {
