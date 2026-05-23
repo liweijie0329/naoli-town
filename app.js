@@ -61,6 +61,10 @@ const MOCA_AUDIO_OFFSET_DB = 30;
 const MOCA_AUDIO_REFERENCE_LEVEL_DB_HL = 65;
 const MOCA_AUDIO_REFERENCE_VOLUME = 0.72;
 const MOCA_AUDIO_MAX_LEVEL_DB_HL = 95;
+const SELF_SELECTED_AUDIO_MIN_DB_HL = 20;
+const SELF_SELECTED_AUDIO_MAX_DB_HL = 80;
+const SELF_SELECTED_AUDIO_STEP_DB_HL = 5;
+const VOLUME_SAMPLE_TEXT = "请调到您听起来清楚、舒服的音量。";
 const STATIC_TTS_MANIFEST_SRC = "./assets/audio/manifest.json";
 const STATIC_AUDIO_BUFFER_CACHE_LIMIT = 96;
 const LOCAL_DEV_API_ORIGIN = "http://127.0.0.1:5178";
@@ -668,6 +672,7 @@ function createInitialState() {
     resumeAfterMemory2Index: null,
     playedInstructionKeys: {},
     completedInstructionKeys: {},
+    acknowledgedInstructionKeys: {},
     taskSubmitting: null,
     permissions: { microphone: "unknown", location: "unknown" },
     voiceProfile: "cartoon",
@@ -717,6 +722,8 @@ function createHearingScreeningState(overrides = {}) {
     responses: [],
     thresholds: { right: {}, left: {} },
     summary: null,
+    selfSelectedAudioLevelDbHl: MOCA_AUDIO_DEFAULT_LEVEL_DB_HL,
+    selfSelectedAudioConfirmedAt: null,
     mocaAudioLevelDbHl: MOCA_AUDIO_DEFAULT_LEVEL_DB_HL,
     mocaAudioAdjustedAt: null,
     trials: createHearingTrials(),
@@ -759,6 +766,8 @@ function normalizeHearingScreening(screening = {}) {
   };
   base.mocaAudioLevelDbHl = clampMocaAudioLevelDbHl(base.summary?.mocaAudioLevelDbHl ?? base.mocaAudioLevelDbHl);
   base.mocaAudioAdjustedAt = base.mocaAudioAdjustedAt || null;
+  base.selfSelectedAudioLevelDbHl = clampSelfSelectedAudioLevelDbHl(base.summary?.selfSelectedAudioLevelDbHl ?? base.selfSelectedAudioLevelDbHl);
+  base.selfSelectedAudioConfirmedAt = base.selfSelectedAudioConfirmedAt || null;
   return base;
 }
 
@@ -775,6 +784,13 @@ function clampMocaAudioLevelDbHl(value) {
     MOCA_AUDIO_DEFAULT_LEVEL_DB_HL,
     Math.min(MOCA_AUDIO_MAX_LEVEL_DB_HL, Math.round(level))
   );
+}
+
+function clampSelfSelectedAudioLevelDbHl(value) {
+  const level = Number(value);
+  if (!Number.isFinite(level)) return MOCA_AUDIO_DEFAULT_LEVEL_DB_HL;
+  const stepped = Math.round(level / SELF_SELECTED_AUDIO_STEP_DB_HL) * SELF_SELECTED_AUDIO_STEP_DB_HL;
+  return Math.max(SELF_SELECTED_AUDIO_MIN_DB_HL, Math.min(SELF_SELECTED_AUDIO_MAX_DB_HL, stepped));
 }
 
 function normalizeTrailState(trail = {}) {
@@ -889,6 +905,7 @@ function migrateState() {
   state.trail = normalizeTrailState(state.trail);
   state.playedInstructionKeys = state.playedInstructionKeys || {};
   state.completedInstructionKeys = state.completedInstructionKeys || { ...state.playedInstructionKeys };
+  state.acknowledgedInstructionKeys = state.acknowledgedInstructionKeys || {};
   state.permissions = state.permissions || { microphone: "unknown", location: "unknown" };
   state.voiceProfile = VOICE_PROFILES[state.voiceProfile] ? state.voiceProfile : "cartoon";
   state.setupAttempted = Boolean(state.setupAttempted);
@@ -1122,13 +1139,19 @@ function render() {
     queueVisibleSpeechAudioPreload();
     return;
   }
+  if (state.view === "volume") {
+    root.innerHTML = renderVolumeSetup();
+    queueVisibleSpeechAudioPreload();
+    return;
+  }
 
   ensureRenderableTask();
   const current = tasks[state.activeTaskIndex] || tasks[0];
   root.innerHTML = renderShell(current);
   if (state.view === "test") {
-    setupCurrentTask(current);
-    scheduleTaskInstruction(current);
+    const step = getTaskStep(current);
+    if (isTaskGuideActive(current, step)) scheduleTaskInstruction(current, step);
+    else setupCurrentTask(current);
   }
   queueVisibleSpeechAudioPreload();
   focusAdminPasswordInput();
@@ -1154,7 +1177,43 @@ function renderSetup() {
             <span>开始游戏</span>
           </button>
         </div>
-        <button class="skip-login-button" data-action="skipLogin">跳过登录</button>
+      </section>
+    </div>
+  `;
+}
+
+function renderVolumeSetup() {
+  const screening = normalizeHearingScreening(state.hearingScreening);
+  const level = clampSelfSelectedAudioLevelDbHl(screening.selfSelectedAudioLevelDbHl);
+  return html`
+    <div class="volume-setup-screen">
+      <section class="volume-setup-panel">
+        <div class="volume-setup-copy">
+          <span>音量选择</span>
+          <h2>请选择清楚、舒服的说明音量</h2>
+          <p>接下来的听力测试说明会按这个音量播放。认知测试音量会在听力测试结束后按结果自动调整。</p>
+        </div>
+        <div class="volume-slider-card">
+          <strong class="volume-level-value" data-volume-value>${formatAudioLevel(level)}</strong>
+          <input
+            class="volume-slider"
+            data-audio-volume
+            type="range"
+            min="${SELF_SELECTED_AUDIO_MIN_DB_HL}"
+            max="${SELF_SELECTED_AUDIO_MAX_DB_HL}"
+            step="${SELF_SELECTED_AUDIO_STEP_DB_HL}"
+            value="${level}"
+            aria-label="选择说明音量"
+          />
+          <div class="volume-slider-scale">
+            <span>轻一点</span>
+            <span>响一点</span>
+          </div>
+          <div class="volume-setup-actions">
+            <button class="secondary big-button" data-action="playVolumeSample">试听</button>
+            <button class="primary big-button pulse" data-action="continueToHearing">继续</button>
+          </div>
+        </div>
       </section>
     </div>
   `;
@@ -1683,6 +1742,7 @@ function renderHearingSummary(screening) {
   const summary = screening.summary || summarizeHearingScreening(screening);
   const ears = summary.ears || {};
   const audioLevel = summary.mocaAudioLevelDbHl ?? screening.mocaAudioLevelDbHl ?? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL;
+  const selectedAudioLevel = summary.selfSelectedAudioLevelDbHl ?? screening.selfSelectedAudioLevelDbHl ?? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL;
   return html`
     <div class="hearing-card hearing-summary-card">
       <div class="hearing-complete-animation" aria-hidden="true">
@@ -1698,7 +1758,11 @@ function renderHearingSummary(screening) {
           </div>
         `).join("")}
         <div class="hearing-summary-item">
-          <span>系统音量</span>
+          <span>自选音量</span>
+          <strong>${formatAudioLevel(selectedAudioLevel)}</strong>
+        </div>
+        <div class="hearing-summary-item">
+          <span>认知测试音量</span>
           <strong>${formatAudioLevel(audioLevel)}</strong>
         </div>
       </div>
@@ -1915,7 +1979,10 @@ function summarizeHearingScreening(screening = state.hearingScreening) {
     worsePta4: worsePta,
     mocaAudioBaselineDbHl,
     mocaAudioOffsetDb: MOCA_AUDIO_OFFSET_DB,
+    selfSelectedAudioLevelDbHl: clampSelfSelectedAudioLevelDbHl(screening.selfSelectedAudioLevelDbHl),
+    hearingInstructionAudioLevelDbHl: clampSelfSelectedAudioLevelDbHl(screening.selfSelectedAudioLevelDbHl),
     mocaAudioLevelDbHl,
+    cognitionTestAudioLevelDbHl: mocaAudioLevelDbHl,
     responseCounts,
     completedTrialCount: hearingCompletedTrialCount(screening),
     totalTrialCount: createHearingTrials().length
@@ -1963,6 +2030,7 @@ function taskSubmittingLabel(task) {
 
 function renderTask(task) {
   const step = getTaskStep(task);
+  if (isTaskGuideActive(task, step)) return renderTaskGuide(task, step);
   const waitAttr = speechTranscribing || isTaskSubmitting(task) ? "disabled" : "";
   return html`
     <section class="single-page task-page">
@@ -1970,6 +2038,56 @@ function renderTask(task) {
       ${renderTaskActions(task, step)}
       <button class="task-skip-link" data-action="skipTask" ${waitAttr}>跳过</button>
     </section>
+  `;
+}
+
+function renderTaskGuide(task, step) {
+  const ready = isInstructionComplete(task, step);
+  const trailReady = task.type !== "trail" || isTrailGuidePracticeComplete();
+  const canProceed = ready && trailReady;
+  const playLabel = playState === "播放中..." ? "播放中..." : "再听一遍";
+  return html`
+    <section class="single-page task-guide-page">
+      <div class="task-guide-card">
+        <div class="task-guide-copy">
+          <span>第 ${state.activeTaskIndex + 1} 题</span>
+          <h2>${escapeHtml(task.title)}</h2>
+          <p>${escapeHtml(taskGuideText(task, step))}</p>
+        </div>
+        ${task.type === "trail" ? renderTrailGuidePractice(ready) : ""}
+        ${renderAudioWave()}
+        <div class="task-guide-actions">
+          <button class="secondary big-button" data-action="replayTaskGuide" ${ready ? "" : "disabled"}>${playLabel}</button>
+          <button class="primary big-button ${canProceed ? "pulse" : ""}" data-action="acknowledgeTaskGuide" ${canProceed ? "" : "disabled"}>我明白了</button>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderTrailGuidePractice(instructionReady) {
+  const progress = trailGuidePracticeSequence();
+  const complete = isTrailGuidePracticeComplete();
+  const disabled = instructionReady ? "" : "disabled";
+  const hasFirst = progress.includes("1");
+  const hasSecond = progress.includes("甲");
+  const hasThird = progress.includes("2");
+  return html`
+    <div class="trail-guide-practice ${complete ? "complete" : ""}">
+      <p>请按手指方向连线</p>
+      <div class="trail-guide-board">
+        <svg class="trail-guide-lines" viewBox="0 0 100 100" aria-hidden="true">
+          <path class="${hasSecond ? "drawn" : ""}" d="M22 52 L50 26" />
+          <path class="${hasThird ? "drawn" : ""}" d="M50 26 L78 52" />
+          <path class="guide-arrow" d="M22 52 L50 26 L78 52" />
+        </svg>
+        <button class="trail-guide-node node-1 ${hasFirst ? "picked" : ""}" data-action="touchTrailGuideNode" data-label="1" ${disabled}>1</button>
+        <button class="trail-guide-node node-jia ${hasSecond ? "picked" : ""}" data-action="touchTrailGuideNode" data-label="甲" ${disabled}>甲</button>
+        <button class="trail-guide-node node-2 ${hasThird ? "picked" : ""}" data-action="touchTrailGuideNode" data-label="2" ${disabled}>2</button>
+        <span class="trail-guide-finger" aria-hidden="true">👉</span>
+      </div>
+      <strong>${complete ? "练习完成" : instructionReady ? "请依次点击 1、甲、2" : "请先听完说明"}</strong>
+    </div>
   `;
 }
 
@@ -2037,13 +2155,14 @@ function shouldNudgeConfirm(task) {
 }
 
 function isTaskReadyToAnswer(task, step = getTaskStep(task)) {
-  return isInstructionComplete(task, step);
+  return isTaskGuideAcknowledged(task, step);
 }
 
 function hasTaskAnswer(task, response = getResponse(task.id), step = getTaskStep(task)) {
   if (!task) return false;
-  if (task.type === "trail") return trailCompletionEdgeCount() > 0;
+  if (task.type === "trail") return true;
   if (task.type === "drawing") {
+    if (task.id === "cube" || task.id === "clock") return true;
     return Boolean(response.drawingImage || state.drawings[task.id] || Number(response.behavior.strokes || 0));
   }
   if (task.type === "naming") {
@@ -2303,7 +2422,36 @@ function renderSerial7Task(step) {
 
 function renderSentenceTask(task, step) {
   const response = getResponse(task.id);
-  return renderSpeechCard(getLiveTranscript(task, response, step));
+  const live = getLiveTranscript(task, response, step);
+  const audioReady = sentenceStepAudioReady(response, step);
+  const activeVoice = recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending;
+  const disabled = isTaskReadyToAnswer(task, step) && audioReady ? "" : "disabled";
+  const control = sentenceControlButton(task, step, audioReady, activeVoice);
+  return html`
+    <div class="speech-page sentence-page">
+      ${renderAudioWave()}
+      <div class="speech-controls">${control}</div>
+      ${live?.warningText ? `<p class="task-warning">${escapeHtml(live.warningText)}</p>` : ""}
+      ${audioReady ? renderTranscriptEditor(live, "sentence", disabled) : `<p class="sentence-wait-copy">请先听题，听完后手动开始复述。</p>`}
+    </div>
+  `;
+}
+
+function sentenceControlButton(task, step, audioReady, activeVoice) {
+  if (!audioReady) {
+    if (playState === "播放中..." && speechPlaybackPurpose === "sentence") {
+      return `<button class="primary circle-button sound-button" disabled>播放中...</button>`;
+    }
+    return `<button class="primary circle-button pulse sound-button" data-action="playCurrentAudio">听题</button>`;
+  }
+  if (speechTranscribing) return `<button class="secondary circle-button sound-button" disabled>请稍等</button>`;
+  if (activeVoice) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">结束</button>`;
+  const attempted = sentenceStepHasSpeechAttempt(task, step);
+  return `<button class="primary circle-button pulse sound-button" data-action="toggleVoiceInput">${attempted ? "再说一次" : "开始复述"}</button>`;
+}
+
+function sentenceStepAudioReady(response, step) {
+  return Boolean(response.answer.sentenceAudioReady?.[step]);
 }
 
 function renderFluencyTask() {
@@ -2783,7 +2931,8 @@ function renderSessionDetail(session) {
         ${detailMetric("听力初筛", formatHearingStatus(hearingSummary?.status || hearing.status))}
         ${detailMetric("右耳 4fPTA", formatThreshold(hearingSummary?.ears?.right?.pta4))}
         ${detailMetric("左耳 4fPTA", formatThreshold(hearingSummary?.ears?.left?.pta4))}
-        ${detailMetric("MoCA 音量", formatAudioLevel(hearingSummary?.mocaAudioLevelDbHl ?? hearing.mocaAudioLevelDbHl))}
+        ${detailMetric("自选音量", formatAudioLevel(hearingSummary?.selfSelectedAudioLevelDbHl ?? hearing.selfSelectedAudioLevelDbHl))}
+        ${detailMetric("测试音量", formatAudioLevel(hearingSummary?.mocaAudioLevelDbHl ?? hearing.mocaAudioLevelDbHl))}
         ${detailMetric("保存时间", session.savedAt ? new Date(session.savedAt).toLocaleString() : "-")}
       </div>
       <div class="item-detail-list">
@@ -3590,6 +3739,8 @@ function startHearingCalibration() {
   state.hearingScreening = createHearingScreeningState({
     environment: previous.environment,
     environmentChecks: previous.environmentChecks,
+    selfSelectedAudioLevelDbHl: previous.selfSelectedAudioLevelDbHl,
+    selfSelectedAudioConfirmedAt: previous.selfSelectedAudioConfirmedAt,
     phase: "channel",
     status: "in_progress",
     startedAt: new Date().toISOString()
@@ -3609,7 +3760,9 @@ function skipHearingCalibration() {
       protocolVersion: HEARING_PROTOCOL_VERSION,
       status: "skipped",
       pass: null,
+      selfSelectedAudioLevelDbHl: normalizeHearingScreening(state.hearingScreening).selfSelectedAudioLevelDbHl,
       mocaAudioLevelDbHl: MOCA_AUDIO_DEFAULT_LEVEL_DB_HL,
+      cognitionTestAudioLevelDbHl: MOCA_AUDIO_DEFAULT_LEVEL_DB_HL,
       note: "用户跳过听力测试"
     }
   };
@@ -3620,7 +3773,9 @@ function restartHearingCalibration() {
   const previous = normalizeHearingScreening(state.hearingScreening);
   state.hearingScreening = createHearingScreeningState({
     environment: previous.environment,
-    environmentChecks: previous.environmentChecks
+    environmentChecks: previous.environmentChecks,
+    selfSelectedAudioLevelDbHl: previous.selfSelectedAudioLevelDbHl,
+    selfSelectedAudioConfirmedAt: previous.selfSelectedAudioConfirmedAt
   });
   saveDraft();
   render();
@@ -4057,7 +4212,7 @@ root.addEventListener("click", async (event) => {
   if (shouldStartTaskTimingForAction(action, current)) beginTask(current.id);
   if (action === "startSession") playSfx("start");
   else if (["skipTask", "nextTask", "skipLogin", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
-  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu"].includes(action)) playSfx("pick");
+  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu", "playVolumeSample", "continueToHearing", "replayTaskGuide", "acknowledgeTaskGuide", "touchTrailGuideNode"].includes(action)) playSfx("pick");
 
   if (shouldStopAudioForAction(action, target)) stopAudioPlayback();
   if (buttonSpeech) speakButtonSelection(buttonSpeech);
@@ -4068,6 +4223,14 @@ root.addEventListener("click", async (event) => {
     return;
   }
   if (action === "toggleSetupVoice") {
+    return;
+  }
+  if (action === "playVolumeSample") {
+    playVolumeSample();
+    return;
+  }
+  if (action === "continueToHearing") {
+    continueToHearing();
     return;
   }
   if (action === "checkHearingEnvironment") {
@@ -4196,6 +4359,9 @@ root.addEventListener("click", async (event) => {
     render();
   }
   if (action === "playCurrentAudio") playCurrentAudio();
+  if (action === "replayTaskGuide") replayTaskGuide();
+  if (action === "acknowledgeTaskGuide") acknowledgeTaskGuide();
+  if (action === "touchTrailGuideNode") touchTrailGuideNode(target.dataset.label);
   if (action === "toggleVoiceInput") toggleVoiceInput();
   if (action === "appendDigit") await appendDigit(target.dataset.digit);
   if (action === "backspaceDigit") backspaceDigit();
@@ -4472,6 +4638,9 @@ root.addEventListener("input", (event) => {
     state.participant[key] = target.value;
     saveDraft();
   }
+  if (target.dataset.audioVolume !== undefined) {
+    updateSelfSelectedAudioLevel(target.value);
+  }
   if (target.dataset.voiceManual !== undefined) {
     if (manualTranscriptComposing || event.isComposing) return;
     const task = tasks[state.activeTaskIndex];
@@ -4543,12 +4712,54 @@ root.addEventListener("change", (event) => {
     render();
     return;
   }
+  if (target.dataset.audioVolume !== undefined) {
+    updateSelfSelectedAudioLevel(target.value, { saveOnly: true });
+    return;
+  }
   if (target.dataset.bind) {
     const [, key] = target.dataset.bind.split(".");
     state.participant[key] = target.value;
     saveDraft();
   }
 });
+
+function updateSelfSelectedAudioLevel(value, options = {}) {
+  const level = clampSelfSelectedAudioLevelDbHl(value);
+  state.hearingScreening = {
+    ...normalizeHearingScreening(state.hearingScreening),
+    selfSelectedAudioLevelDbHl: level
+  };
+  const label = document.querySelector("[data-volume-value]");
+  if (label) label.textContent = formatAudioLevel(level);
+  saveDraft();
+  if (!options.saveOnly) queueVisibleSpeechAudioPreload();
+}
+
+function playVolumeSample() {
+  updateSelfSelectedAudioLevel(state.hearingScreening?.selfSelectedAudioLevelDbHl ?? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL, { saveOnly: true });
+  return speakText(VOLUME_SAMPLE_TEXT, {
+    rate: 0.82,
+    pitch: 1.18,
+    purpose: "instruction",
+    staticOnly: false,
+    fallbackMs: browserSpeechFallbackMs(VOLUME_SAMPLE_TEXT)
+  });
+}
+
+function continueToHearing() {
+  state.hearingScreening = {
+    ...normalizeHearingScreening(state.hearingScreening),
+    selfSelectedAudioLevelDbHl: currentSelfSelectedAudioLevelDbHl(),
+    selfSelectedAudioConfirmedAt: new Date().toISOString()
+  };
+  state.view = "hearing";
+  saveDraft();
+  render();
+  playHearingIntroPromptNow();
+  window.setTimeout(() => {
+    if (state.view === "hearing") void requestStartupPermissions();
+  }, 2800);
+}
 
 async function startNewSession(participant) {
   const adminSessions = state.adminSessions || [];
@@ -4563,13 +4774,9 @@ async function startNewSession(participant) {
   state.startedAt = new Date().toISOString();
   state.activeTaskIndex = 0;
   state.hearingScreening = createHearingScreeningState();
-  state.view = "hearing";
+  state.view = "volume";
   cognitionMenuOpen = false;
   render();
-  playHearingIntroPromptNow();
-  window.setTimeout(() => {
-    if (state.view === "hearing") void requestStartupPermissions();
-  }, 2800);
 }
 
 async function requestStartupPermissions(options = {}) {
@@ -4598,7 +4805,7 @@ async function finishSessionAndShowResults() {
 }
 
 async function submitActiveTaskWithFeedback(task) {
-  if (task.type === "drawing" || task.type === "trail") {
+  if ((task.type === "drawing" || task.type === "trail") && hasDrawableResponse(task)) {
     refreshDrawingImage(task.id);
   }
   state.taskSubmitting = {
@@ -4680,8 +4887,16 @@ async function skipTask() {
     window.clearTimeout(vigilanceAutoAdvanceTimer);
     vigilanceAutoAdvanceTimer = null;
   }
-  if (task.type === "drawing" || task.type === "trail") response.drawingImage = currentDrawingImage(task.id);
+  if ((task.type === "drawing" || task.type === "trail") && hasDrawableResponse(task, response)) {
+    response.drawingImage = currentDrawingImage(task.id);
+  }
   finishTask(task.id);
+  if ((task.type === "drawing" || task.type === "trail") && !hasDrawableResponse(task, response)) {
+    response.ai = { mode: "blank-response", taskId: task.id, scoreSuggestion: 0, confidence: 1, requiresHumanReview: false };
+    response.score = 0;
+    saveDraft();
+    return;
+  }
   response.ai = { mode: "skipped", taskId: task.id, scoreSuggestion: 0, confidence: 1, requiresHumanReview: false };
   response.score = 0;
   if (task.id === "memory1" && !state.memoryWaitStartedAt) state.memoryWaitStartedAt = Date.now();
@@ -4925,7 +5140,9 @@ async function submitActiveTask() {
     window.clearTimeout(vigilanceAutoAdvanceTimer);
     vigilanceAutoAdvanceTimer = null;
   }
-  if (task.type === "drawing" || task.type === "trail") response.drawingImage = currentDrawingImage(task.id);
+  if ((task.type === "drawing" || task.type === "trail") && hasDrawableResponse(task, response)) {
+    response.drawingImage = currentDrawingImage(task.id);
+  }
   finishTask(task.id);
   if (isAsyncDrawingAiTask(task)) {
     markDrawingAiPending(task, response);
@@ -4939,13 +5156,19 @@ async function submitActiveTask() {
   saveDraft();
 }
 
+function hasDrawableResponse(task, response = getResponse(task.id)) {
+  if (task.type === "trail") return trailCompletionEdgeCount() > 0 || Boolean(response.drawingImage || state.drawings.trail);
+  if (task.type === "drawing") return Boolean(response.drawingImage || state.drawings[task.id] || Number(response.behavior.strokes || 0));
+  return false;
+}
+
 function scheduleTaskInstruction(task) {
   const step = getTaskStep(task);
   const key = taskInstructionKey(task, step);
   const force = immediateInstructionPlayback;
   immediateInstructionPlayback = false;
   if (state.playedInstructionKeys[key] && !force) return;
-  const text = taskInstructionText(task, step);
+  const text = taskGuideText(task, step);
   if (!text) {
     markInstructionComplete(task, step);
     return;
@@ -4980,35 +5203,29 @@ function requestImmediateInstructionPlayback(task, step = getTaskStep(task)) {
   immediateInstructionPlayback = true;
 }
 
-function taskInstructionText(task, step) {
+function taskGuideText(task, step = getTaskStep(task)) {
   if (task.type === "naming") return "请您告诉我这个动物的名字。这是什么动物？";
-  if (task.type === "sentence") {
-    return step === 0
-      ? "现在我要对您说一句话，我说完后请您把我说的话尽可能原原本本地重复出来。"
-      : "现在我再说另一句话，我说完后请您也把它尽可能原原本本地重复出来。";
-  }
-  if (task.type === "serial7") {
-    const subtractBy = serialSubtractionNumber();
-    return step === 0 ? `100 减 ${subtractBy} 等于多少？` : `再减 ${subtractBy}，等于多少？`;
-  }
+  if (task.type === "serial7") return task.instruction || `请从 100 开始连续减 ${serialSubtractionNumber()}。`;
   if (task.id === "digitBackward") return "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。例如，听到一二三，您就选择三二一。";
-  if (task.type === "abstractionChoice") {
-    const item = task.items[step];
-    return item.practice
-      ? "先看一个例子。桔子和香蕉在什么方面相类似？请选择水果。"
-      : `请您说说${item.words.join("和")}在什么方面相类似？`;
-  }
-  if (task.type === "orientation") return orientationPrompts[step].label;
   return task.instruction || task.prompt;
 }
 
 function taskInstructionKey(task, step = getTaskStep(task)) {
-  return task ? `${task.id}:${step}` : "";
+  return task ? `${task.id}:guide` : "";
 }
 
 function isInstructionComplete(task, step = getTaskStep(task)) {
   if (!task) return true;
   return Boolean(state.completedInstructionKeys?.[taskInstructionKey(task, step)]);
+}
+
+function isTaskGuideAcknowledged(task, step = getTaskStep(task)) {
+  if (!task) return true;
+  return Boolean(state.acknowledgedInstructionKeys?.[taskInstructionKey(task, step)]);
+}
+
+function isTaskGuideActive(task, step = getTaskStep(task)) {
+  return state.view === "test" && Boolean(task) && !isTaskGuideAcknowledged(task, step);
 }
 
 function markInstructionComplete(task, step = getTaskStep(task)) {
@@ -5020,8 +5237,65 @@ function markInstructionComplete(task, step = getTaskStep(task)) {
 }
 
 function audioKeyForInstruction(task, step = getTaskStep(task)) {
-  if (task?.type === "serial7") return `instruction:serialSubtraction:${serialSubtractionNumber()}:${step}`;
-  return task ? `instruction:${task.id}:${step}` : null;
+  if (task?.type === "serial7") return `instruction:serialSubtraction:${serialSubtractionNumber()}:0`;
+  return task ? `instruction:${task.id}:0` : null;
+}
+
+function replayTaskGuide() {
+  const task = tasks[state.activeTaskIndex];
+  if (!task) return;
+  resetInstructionPlayback(task);
+  immediateInstructionPlayback = true;
+  render();
+}
+
+function acknowledgeTaskGuide() {
+  const task = tasks[state.activeTaskIndex];
+  const step = getTaskStep(task);
+  if (!task || !isInstructionComplete(task, step)) return;
+  if (task.type === "trail" && !isTrailGuidePracticeComplete()) return;
+  state.acknowledgedInstructionKeys = state.acknowledgedInstructionKeys || {};
+  state.acknowledgedInstructionKeys[taskInstructionKey(task, step)] = true;
+  const response = getResponse(task.id);
+  response.behavior.guideAcknowledgedAt = response.behavior.guideAcknowledgedAt || new Date().toISOString();
+  beginTask(task.id);
+  saveDraft();
+  render();
+}
+
+function trailGuidePracticeSequence() {
+  const sequence = getResponse("trail").behavior.trailGuidePracticeSequence;
+  return Array.isArray(sequence) ? sequence : [];
+}
+
+function isTrailGuidePracticeComplete() {
+  const response = getResponse("trail");
+  return Boolean(response.behavior.trailGuidePracticeCompletedAt);
+}
+
+function touchTrailGuideNode(label) {
+  const task = tasks[state.activeTaskIndex];
+  if (task?.type !== "trail" || !isInstructionComplete(task)) return;
+  const expected = ["1", "甲", "2"];
+  const response = getResponse("trail");
+  if (isTrailGuidePracticeComplete()) return;
+  const current = trailGuidePracticeSequence();
+  const nextExpected = expected[current.length];
+  let next = current;
+  if (label === nextExpected) {
+    next = [...current, label];
+  } else {
+    next = label === "1" ? ["1"] : [];
+  }
+  response.behavior.trailGuidePracticeSequence = next;
+  response.behavior.trailGuidePracticeAttempts = Number(response.behavior.trailGuidePracticeAttempts || 0) + 1;
+  if (next.length >= expected.length) {
+    response.behavior.trailGuidePracticeCompletedAt = new Date().toISOString();
+  } else {
+    delete response.behavior.trailGuidePracticeCompletedAt;
+  }
+  saveDraft();
+  render();
 }
 
 function playCurrentAudio() {
@@ -5065,7 +5339,7 @@ function playMemoryWords(response) {
 
 function markCurrentInstructionHandled(task, step = getTaskStep(task)) {
   if (!task) return;
-  state.playedInstructionKeys[`${task.id}:${step}`] = true;
+  state.playedInstructionKeys[taskInstructionKey(task, step)] = true;
   immediateInstructionPlayback = false;
   saveDraft();
 }
@@ -5080,24 +5354,24 @@ function playSentenceForRepeat(task, step) {
   const text = task.sentences[step];
   prepareSpeechInputBeforePlayback();
   if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
-  let started = false;
-  const fallbackTimer = window.setTimeout(() => {
-    if (started) return;
-    started = true;
-    startSentenceRepeat(task, step);
-  }, sentencePlaybackFallbackMs(text) + 1200);
-  const startRepeatOnce = () => {
-    if (started) return;
-    started = true;
-    window.clearTimeout(fallbackTimer);
-    startSentenceRepeat(task, step);
-  };
+  const response = getResponse(task.id);
+  response.answer.sentenceAudioReady = response.answer.sentenceAudioReady || {};
+  response.answer.sentenceAudioReady[step] = false;
+  response.behavior.sentencePlayback = response.behavior.sentencePlayback || [];
+  response.behavior.sentencePlayback.push({ step, at: new Date().toISOString() });
+  saveDraft();
   return speakText(text, {
     audioKey: `stimulus:sentence:${step}`,
     rate: 0.86,
     purpose: "sentence",
     fallbackMs: sentencePlaybackFallbackMs(text),
-    done: startRepeatOnce
+    done: () => {
+      if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
+      response.answer.sentenceAudioReady = response.answer.sentenceAudioReady || {};
+      response.answer.sentenceAudioReady[step] = true;
+      saveDraft();
+      render();
+    }
   });
 }
 
@@ -5188,7 +5462,7 @@ async function playStaticPrompt(audioKey, purpose = "speech") {
     finished = true;
     playState = "开始";
     speechPlaybackPurpose = null;
-    render();
+    if (state.view !== "setup") render();
   };
   const started = await playStaticTtsAudio(audioKey, {
     playbackId,
@@ -5212,7 +5486,7 @@ async function speakText(text, options = {}) {
     clearSpeechTextFallbackTimer();
     playState = "开始";
     speechPlaybackPurpose = null;
-    render();
+    if (state.view !== "setup") render();
     if (done) done();
   };
 
@@ -5242,7 +5516,7 @@ function startPlaybackUi(playbackId, purpose) {
   if (playbackId !== speechPlaybackId) return;
   playState = "播放中...";
   speechPlaybackPurpose = purpose;
-  render();
+  if (state.view !== "setup") render();
 }
 
 function speakTextWithBrowser(text, { playbackId, speechParams, onStart, finish }) {
@@ -5257,7 +5531,7 @@ function speakTextWithBrowser(text, { playbackId, speechParams, onStart, finish 
     if (playbackId !== speechPlaybackId) return;
     playState = "播放中...";
     if (onStart) onStart();
-    render();
+    if (state.view !== "setup") render();
   };
   utterance.onend = finish;
   utterance.onerror = finish;
@@ -5379,10 +5653,21 @@ function speechParamsFor(rate, pitch) {
 }
 
 function mocaSpeechVolume() {
-  const level = currentMocaAudioLevelDbHl();
+  const level = currentSpeechAudioLevelDbHl();
   const volume = MOCA_AUDIO_REFERENCE_VOLUME
     + ((level - MOCA_AUDIO_REFERENCE_LEVEL_DB_HL) / 30) * (1 - MOCA_AUDIO_REFERENCE_VOLUME);
   return clampSpeech(volume, 0.45, 0.95);
+}
+
+function currentSpeechAudioLevelDbHl() {
+  if (state.view === "hearing" || state.view === "volume") return currentSelfSelectedAudioLevelDbHl();
+  return currentMocaAudioLevelDbHl();
+}
+
+function currentSelfSelectedAudioLevelDbHl() {
+  const screeningLevel = Number(state.hearingScreening?.selfSelectedAudioLevelDbHl);
+  if (Number.isFinite(screeningLevel)) return clampSelfSelectedAudioLevelDbHl(screeningLevel);
+  return MOCA_AUDIO_DEFAULT_LEVEL_DB_HL;
 }
 
 function currentMocaAudioLevelDbHl() {
@@ -5845,7 +6130,8 @@ async function startVoiceInput() {
   beginLiveTranscriptSession({ resetFinal: true });
   if (PREFER_CLOUDFLARE_ASR) {
     recordSpeechRecognitionEvent("cloudflare-asr-preferred");
-    const recordingStarted = await startAudioRecording({ transcribeOnStop: true });
+    const task = tasks[state.activeTaskIndex];
+    const recordingStarted = await startAudioRecording({ transcribeOnStop: true, liveAsr: task?.type !== "fluency" });
     voiceState = recordingStarted ? voicePromptText() : "当前浏览器不能录音或识别";
     render();
     return recordingStarted;
@@ -5979,9 +6265,9 @@ function stopVoiceInput(options = {}) {
 }
 
 async function startAudioRecording(options = {}) {
-  const { transcribeOnStop = false } = options;
+  const { transcribeOnStop = false, liveAsr = true } = options;
   if (transcribeOnStop) {
-    const pcmStarted = await startPcmAudioRecording({ transcribeOnStop });
+    const pcmStarted = await startPcmAudioRecording({ transcribeOnStop, liveAsr });
     if (pcmStarted !== null) return pcmStarted;
   }
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
@@ -6073,7 +6359,7 @@ async function startAudioRecording(options = {}) {
 }
 
 async function startPcmAudioRecording(options = {}) {
-  const { transcribeOnStop = false } = options;
+  const { transcribeOnStop = false, liveAsr = true } = options;
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!navigator.mediaDevices?.getUserMedia || !AudioContextClass) return null;
   if (!AudioContextClass.prototype?.createScriptProcessor) return null;
@@ -6122,7 +6408,7 @@ async function startPcmAudioRecording(options = {}) {
     recordingAudio = true;
     playSfx("recordStart");
     voiceState = voicePromptText();
-    if (task.type === "fluency" && transcribeOnStop) startFluencyLiveAsr(pcmRecorder);
+    if (task.type === "fluency" && transcribeOnStop && liveAsr) startFluencyLiveAsr(pcmRecorder);
     render();
     return true;
   } catch (error) {
@@ -7098,14 +7384,36 @@ async function appendDigit(digit) {
   const response = getResponse(task.id);
   response.answer.sequence = response.answer.sequence || [];
   if (response.answer.sequence.length < activeDigitItem(task).answer.length) response.answer.sequence.push(digit);
-  render();
+  saveDraft();
+  refreshDigitChoiceUi(task, response);
+  refreshTaskActionButtons();
 }
 
 function backspaceDigit() {
-  const response = getResponse(tasks[state.activeTaskIndex].id);
+  const task = tasks[state.activeTaskIndex];
+  const response = getResponse(task.id);
   response.answer.sequence = response.answer.sequence || [];
   response.answer.sequence.pop();
-  render();
+  saveDraft();
+  refreshDigitChoiceUi(task, response);
+  refreshTaskActionButtons();
+}
+
+function refreshDigitChoiceUi(task, response = getResponse(task.id)) {
+  if (!task || task.type !== "choice") return;
+  const sequence = response.answer.sequence || [];
+  const answerLength = activeDigitItem(task).answer.length;
+  const row = document.querySelector(".digit-answer-squares");
+  if (!row) return;
+  Array.from(row.children).forEach((entry, index) => {
+    const value = sequence[index] || " ";
+    entry.textContent = value;
+    entry.classList.toggle("empty", !sequence[index]);
+  });
+  const full = sequence.length >= answerLength;
+  document.querySelectorAll(".digit-keypad button[data-action='appendDigit']").forEach((button) => {
+    button.disabled = full;
+  });
 }
 
 function inputSerialDigit(digit) {
@@ -8130,7 +8438,9 @@ function compactHearingScreeningForPayload(screening) {
     protocolVersion: HEARING_PROTOCOL_VERSION,
     status: copy.status === "skipped" ? "skipped" : "incomplete",
     pass: null,
+    selfSelectedAudioLevelDbHl: copy.selfSelectedAudioLevelDbHl ?? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL,
     mocaAudioLevelDbHl: copy.mocaAudioLevelDbHl ?? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL,
+    cognitionTestAudioLevelDbHl: copy.mocaAudioLevelDbHl ?? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL,
     responseCounts: copy.responseCounts,
     completedTrialCount: hearingCompletedTrialCount(copy),
     totalTrialCount: createHearingTrials().length
@@ -8161,6 +8471,10 @@ function buildSessionPayload({ includeAudioBlobs = false } = {}) {
     totalScore: totals.totalScore,
     riskBand: totals.riskBand,
     domainScores: totals.domainScores,
+    audioLevels: {
+      selfSelectedAudioLevelDbHl: currentSelfSelectedAudioLevelDbHl(),
+      cognitionTestAudioLevelDbHl: currentMocaAudioLevelDbHl()
+    },
     hearingScreening: compactHearingScreeningForPayload(state.hearingScreening),
     taskRuntime: ensureTaskRuntime(),
     ttsManifestVersion: staticTtsManifest?.version ?? null,
@@ -8358,7 +8672,9 @@ function csvRowsForSession(session) {
     hearing_right_pta4: hearingSummary.ears?.right?.pta4 ?? "",
     hearing_left_pta4: hearingSummary.ears?.left?.pta4 ?? "",
     hearing_worse_ear: formatWorseEarLabel(hearingSummary.worseEar),
+    hearing_self_selected_audio_level: hearingSummary.selfSelectedAudioLevelDbHl ?? hearing?.selfSelectedAudioLevelDbHl ?? session.audioLevels?.selfSelectedAudioLevelDbHl ?? "",
     hearing_moca_audio_level: hearingSummary.mocaAudioLevelDbHl ?? hearing?.mocaAudioLevelDbHl ?? "",
+    hearing_test_audio_level: hearingSummary.cognitionTestAudioLevelDbHl ?? hearingSummary.mocaAudioLevelDbHl ?? hearing?.mocaAudioLevelDbHl ?? session.audioLevels?.cognitionTestAudioLevelDbHl ?? "",
     hearing_environment_status: hearing?.environment?.status || "",
     hearing_environment_relative_db: hearing?.environment?.relativeDb ?? "",
     hearing_environment_checked_at: hearing?.environment?.checkedAt || "",
