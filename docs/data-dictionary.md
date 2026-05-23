@@ -5,9 +5,9 @@
 ## 查看与导出位置
 
 - 网页后台查看：打开网页左上角菜单，进入「后台」，输入后台密码后可刷新、选择单条记录查看测评详情。
-- 网页后台导出：在「后台」点击「导出 CSV」，会导出所有已保存测评；听力环境和听力逐次反应在 `hearing_environment_checks_json`、`hearing_events_json`、`hearing_screening_json` 中。
+- 网页后台导出：在「后台」点击「导出 CSV」，会导出所有已保存测评；听力环境和听力逐次反应在 `hearing_environment_checks_json`、`hearing_events_json`、`hearing_screening_json` 中，完成后问卷在 `post_test_survey_json` 中。
 - 本地开发查看：`data/sessions.json` 保存本地 JSON 会话。
-- Cloudflare D1 查询：`sessions` 保存会话汇总和精简 `payload_json`，`item_responses` 保存认知题目明细、画图图片和语音题音频，`hearing_events` 保存听力环境检测、声道检查、练习和正式测试每次反应。
+- Cloudflare D1 查询：`sessions` 保存会话汇总和精简 `payload_json`，其中 `payload_json.postTestSurvey` 保存 SUS 和 NASA-TLX；`item_responses` 保存认知题目明细、画图图片和语音题音频，`hearing_events` 保存听力环境检测、声道检查、练习和正式测试每次反应。
 
 示例查询：
 
@@ -120,6 +120,21 @@ ORDER BY event_at;
 | `hearingScreening.events[].environmentStatus` / `environment_status` | 环境事件的检测状态 | 无 |
 | `hearingScreening.events[].relativeDb` / `relative_db` | 环境事件相对噪声值 | relative dBFS |
 | `hearing_events_json` | 环境、声道、练习、正式测试全部听力事件 JSON | JSON |
+
+## 完成后问卷变量
+
+| 变量名 | 变量说明 | 单位 |
+|---|---|---|
+| `post_test_survey_status` / `postTestSurvey.status` | 问卷状态：`not_started`、`in_progress`、`completed` | 无 |
+| `post_test_survey_started_at` / `postTestSurvey.startedAt` | 问卷开始时间 | ISO 8601 时间 |
+| `post_test_survey_completed_at` / `postTestSurvey.completedAt` | 问卷完成时间 | ISO 8601 时间 |
+| `postTestSurvey.responses[]` | 16 道问卷逐题答案，含量表、题干、分值、标签和作答时间 | JSON |
+| `postTestSurvey.responses[].instrument` | 问卷类型：`sus` 或 `nasa-tlx` | 无 |
+| `postTestSurvey.responses[].value` | SUS 为 1-5 分，NASA-TLX 为 0-100 分 | 分 |
+| `sus_score` / `postTestSurvey.scores.susScore` | SUS 标准总分 | 0-100 |
+| `sus_raw_score` / `postTestSurvey.scores.susRaw` | SUS 原始换算前总分 | 0-40 |
+| `nasa_tlx_raw_score` / `postTestSurvey.scores.nasaTlxRawScore` | NASA-TLX 6 个维度原始均分 | 0-100 |
+| `post_test_survey_json` | 完整 SUS 和 NASA-TLX 问卷 JSON | JSON |
 
 ## 认知题目变量
 

@@ -1529,6 +1529,111 @@
     {
       "key": "text:1xl3g8j",
       "text": "菜市场"
+    },
+    {
+      "key": "survey:intro",
+      "text": "下面我将问一些问题，有关您刚才答题时的感觉。请根据您的真实感受回答，答案没有对错之分，当您准备好了请按开始",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:sus:option:1",
+      "text": "非常不同意"
+    },
+    {
+      "key": "survey:sus:option:2",
+      "text": "不同意"
+    },
+    {
+      "key": "survey:sus:option:3",
+      "text": "一般"
+    },
+    {
+      "key": "survey:sus:option:4",
+      "text": "同意"
+    },
+    {
+      "key": "survey:sus:option:5",
+      "text": "非常同意"
+    },
+    {
+      "key": "survey:sus:1",
+      "text": "我愿意经常使用这个答题系统。",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:sus:2",
+      "text": "我觉得这个答题系统过于复杂。",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:sus:3",
+      "text": "我觉得这个答题系统容易使用。",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:sus:4",
+      "text": "我觉得需要工作人员帮助，才能顺利使用这个答题系统。",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:sus:5",
+      "text": "我觉得这个答题系统的各项功能配合得很好。",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:sus:6",
+      "text": "我觉得这个答题系统前后不太一致。",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:sus:7",
+      "text": "我觉得大多数人可以很快学会使用这个答题系统。",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:sus:8",
+      "text": "我觉得这个答题系统使用起来比较麻烦。",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:sus:9",
+      "text": "我使用这个答题系统时很有信心。",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:sus:10",
+      "text": "我觉得在使用这个答题系统前，需要先学习很多东西。",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:nasa-tlx:1",
+      "text": "刚才答题时，需要您记忆、思考、计算或判断的程度有多高？",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:nasa-tlx:2",
+      "text": "刚才答题时，需要您动手、点击、拖动或说话的程度有多高？",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:nasa-tlx:3",
+      "text": "刚才答题时，您感觉时间紧迫、需要赶快完成的程度有多高？",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:nasa-tlx:4",
+      "text": "刚才答题时，您觉得自己完成得不理想的程度有多高？",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:nasa-tlx:5",
+      "text": "为了完成刚才的答题，您需要付出的努力有多大？",
+      "speedRatio": 0.9
+    },
+    {
+      "key": "survey:nasa-tlx:6",
+      "text": "刚才答题时，您感到紧张、烦躁、沮丧或不安的程度有多高？",
+      "speedRatio": 0.9
     }
   ]
 }

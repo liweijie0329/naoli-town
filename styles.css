@@ -6134,6 +6134,262 @@ body,
   color: #c23b3b;
 }
 
+.continue-survey-button,
+.final-results-actions .continue-survey-button {
+  min-width: min(420px, 86vw);
+  min-height: 88px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ff7f66, #ec5a45);
+  color: #fff;
+  font-size: 2.25rem;
+  box-shadow: 0 10px 0 #b94736, 0 18px 32px rgba(185, 71, 54, 0.22);
+}
+
+.continue-survey-button:disabled,
+.final-results-actions .continue-survey-button:disabled {
+  box-shadow: none;
+}
+
+.post-survey-intro-page,
+.post-survey-page,
+.post-survey-done-page {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 24px;
+  padding: 32px;
+  text-align: center;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 242, 0.96), rgba(239, 249, 255, 0.96));
+}
+
+.post-survey-intro-copy,
+.post-survey-done-panel {
+  display: grid;
+  gap: 16px;
+  width: min(960px, 94%);
+}
+
+.post-survey-intro-copy span,
+.post-survey-done-panel span,
+.post-survey-question-head span {
+  color: var(--leaf-dark);
+  font-size: 1.25rem;
+  font-weight: 950;
+}
+
+.post-survey-intro-copy h2,
+.post-survey-question,
+.post-survey-done-panel h2 {
+  max-width: 980px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 2.6rem;
+  font-weight: 1000;
+  line-height: 1.22;
+}
+
+.post-survey-start-button {
+  min-width: min(360px, 78vw);
+  min-height: 96px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #37b77f, #209a65);
+  color: #fff;
+  font-size: 2.35rem;
+  box-shadow: 0 10px 0 #13764b, 0 18px 32px rgba(32, 154, 101, 0.22);
+}
+
+.post-survey-question-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(1000px, 94%);
+  color: var(--muted);
+}
+
+.post-survey-question-head strong {
+  color: var(--ink);
+  font-size: 1.6rem;
+  font-weight: 1000;
+}
+
+.sus-likert-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  width: min(1080px, 96%);
+}
+
+.sus-likert-option {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 132px;
+  padding: 18px 12px;
+  border: 3px solid var(--soft-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 1.35rem;
+  font-weight: 950;
+  line-height: 1.18;
+  box-shadow: 0 6px 0 rgba(36, 52, 71, 0.12);
+}
+
+.sus-likert-option strong {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--sun);
+  color: var(--ink);
+  font-size: 1.5rem;
+}
+
+.sus-likert-option.picked {
+  border-color: var(--leaf);
+  background: #effbf4;
+  box-shadow: 0 6px 0 #97cdae;
+}
+
+.nasa-slider-panel {
+  display: grid;
+  gap: 22px;
+  width: min(980px, 94%);
+  padding: 26px;
+  border: 3px solid var(--soft-line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(36, 52, 71, 0.08);
+}
+
+.nasa-value-readout {
+  color: var(--leaf-dark);
+  font-size: 4rem;
+  font-weight: 1000;
+  line-height: 1;
+}
+
+.nasa-slider {
+  width: 100%;
+  min-height: 52px;
+  accent-color: var(--leaf);
+}
+
+.nasa-slider::-webkit-slider-thumb {
+  width: 52px;
+  height: 52px;
+}
+
+.nasa-slider::-moz-range-thumb {
+  width: 52px;
+  height: 52px;
+}
+
+.nasa-slider-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  color: var(--ink);
+  font-size: 1.7rem;
+  font-weight: 950;
+  line-height: 1.2;
+}
+
+.nasa-slider-labels span:first-child {
+  text-align: left;
+}
+
+.nasa-slider-labels span:last-child {
+  text-align: right;
+}
+
+.post-survey-actions {
+  display: flex;
+  justify-content: center;
+  width: min(900px, 94%);
+}
+
+.post-survey-actions .big-button {
+  min-width: min(460px, 86vw);
+  min-height: 82px;
+  border-radius: 8px;
+  font-size: 2rem;
+}
+
+.post-survey-score-strip {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.post-survey-score-strip b {
+  padding: 12px 18px;
+  border: 2px solid var(--soft-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 1.3rem;
+}
+
+@media (max-width: 760px) {
+  .post-survey-intro-page,
+  .post-survey-page,
+  .post-survey-done-page {
+    gap: 12px;
+    padding: 18px;
+  }
+
+  .post-survey-intro-copy h2,
+  .post-survey-question,
+  .post-survey-done-panel h2 {
+    font-size: 2rem;
+  }
+
+  .post-survey-question-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .sus-likert-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .sus-likert-option {
+    min-height: 60px;
+    grid-template-columns: 56px 1fr;
+    justify-items: start;
+    padding: 8px 10px;
+    font-size: 1.25rem;
+    text-align: left;
+  }
+
+  .sus-likert-option strong {
+    width: 40px;
+    height: 40px;
+    font-size: 1.3rem;
+  }
+
+  .nasa-value-readout {
+    font-size: 3.1rem;
+  }
+
+  .nasa-slider-labels {
+    font-size: 1.35rem;
+  }
+
+  .continue-survey-button,
+  .post-survey-start-button,
+  .post-survey-actions .big-button {
+    min-height: 68px;
+    font-size: 1.8rem;
+  }
+}
+
 @keyframes fireworkBurst {
   0% {
     transform: scale(0.15) rotate(0deg);

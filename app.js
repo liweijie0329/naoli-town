@@ -32,6 +32,14 @@ const DELAYED_CONFIRM_TASK_IDS = new Set(["trail", "cube", "clock"]);
 const DELAYED_CONFIRM_MS = 10000;
 const SENTENCE_AUTO_STOP_MS = 30000;
 const SETUP_PROMPT_TEXT = "请填写病例号、姓名和教育水平。";
+const POST_TEST_SURVEY_INTRO_TEXT = "下面我将问一些问题，有关您刚才答题时的感觉。请根据您的真实感受回答，答案没有对错之分，当您准备好了请按开始";
+const SUS_LIKERT_OPTIONS = [
+  { value: 1, label: "非常不同意" },
+  { value: 2, label: "不同意" },
+  { value: 3, label: "一般" },
+  { value: 4, label: "同意" },
+  { value: 5, label: "非常同意" }
+];
 const LOGO_SRC = "./assets/logo.svg";
 const MOCA_SHEET_IMAGE = "./assets/moca/moca-page.png";
 const MOCA_SCALE_PDF = "./assets/moca/moca-scale.pdf";
@@ -142,6 +150,73 @@ const HEARING_PROMPT_AUDIO_KEYS = {
   }
 };
 const HEARING_INTRO_PROMPT_TEXT = "请戴上耳机，保持安静。";
+
+const POST_TEST_SURVEY_ITEMS = [
+  { id: "sus1", instrument: "sus", index: 1, prompt: "我愿意经常使用这个答题系统。", polarity: "positive" },
+  { id: "sus2", instrument: "sus", index: 2, prompt: "我觉得这个答题系统过于复杂。", polarity: "negative" },
+  { id: "sus3", instrument: "sus", index: 3, prompt: "我觉得这个答题系统容易使用。", polarity: "positive" },
+  { id: "sus4", instrument: "sus", index: 4, prompt: "我觉得需要工作人员帮助，才能顺利使用这个答题系统。", polarity: "negative" },
+  { id: "sus5", instrument: "sus", index: 5, prompt: "我觉得这个答题系统的各项功能配合得很好。", polarity: "positive" },
+  { id: "sus6", instrument: "sus", index: 6, prompt: "我觉得这个答题系统前后不太一致。", polarity: "negative" },
+  { id: "sus7", instrument: "sus", index: 7, prompt: "我觉得大多数人可以很快学会使用这个答题系统。", polarity: "positive" },
+  { id: "sus8", instrument: "sus", index: 8, prompt: "我觉得这个答题系统使用起来比较麻烦。", polarity: "negative" },
+  { id: "sus9", instrument: "sus", index: 9, prompt: "我使用这个答题系统时很有信心。", polarity: "positive" },
+  { id: "sus10", instrument: "sus", index: 10, prompt: "我觉得在使用这个答题系统前，需要先学习很多东西。", polarity: "negative" },
+  {
+    id: "nasaMentalDemand",
+    instrument: "nasa-tlx",
+    index: 1,
+    prompt: "刚才答题时，需要您记忆、思考、计算或判断的程度有多高？",
+    lowLabel: "非常低",
+    highLabel: "非常高",
+    dimension: "脑力需求"
+  },
+  {
+    id: "nasaPhysicalDemand",
+    instrument: "nasa-tlx",
+    index: 2,
+    prompt: "刚才答题时，需要您动手、点击、拖动或说话的程度有多高？",
+    lowLabel: "非常低",
+    highLabel: "非常高",
+    dimension: "身体需求"
+  },
+  {
+    id: "nasaTemporalDemand",
+    instrument: "nasa-tlx",
+    index: 3,
+    prompt: "刚才答题时，您感觉时间紧迫、需要赶快完成的程度有多高？",
+    lowLabel: "完全不紧迫",
+    highLabel: "非常紧迫",
+    dimension: "时间需求"
+  },
+  {
+    id: "nasaPerformance",
+    instrument: "nasa-tlx",
+    index: 4,
+    prompt: "刚才答题时，您觉得自己完成得不理想的程度有多高？",
+    lowLabel: "非常理想",
+    highLabel: "很不理想",
+    dimension: "完成情况"
+  },
+  {
+    id: "nasaEffort",
+    instrument: "nasa-tlx",
+    index: 5,
+    prompt: "为了完成刚才的答题，您需要付出的努力有多大？",
+    lowLabel: "非常少",
+    highLabel: "非常多",
+    dimension: "努力程度"
+  },
+  {
+    id: "nasaFrustration",
+    instrument: "nasa-tlx",
+    index: 6,
+    prompt: "刚才答题时，您感到紧张、烦躁、沮丧或不安的程度有多高？",
+    lowLabel: "非常低",
+    highLabel: "非常高",
+    dimension: "挫折感"
+  }
+];
 
 const TRADITIONAL_PHRASE_REPLACEMENTS = [
   ["甚麼", "什么"],
@@ -593,6 +668,7 @@ let staticAudioPreloadTimer = null;
 const staticAudioBufferCache = new Map();
 const staticAudioBufferPromiseCache = new Map();
 let instructionTimer = null;
+let postSurveyAudioTimer = null;
 let delayedConfirmTimer = null;
 let sentenceAutoStopTimer = null;
 let speechPlaybackPurpose = null;
@@ -684,6 +760,7 @@ function createInitialState() {
     hearingScreening: createHearingScreeningState(),
     responses: {},
     drawings: {},
+    postTestSurvey: createPostTestSurveyState(),
     trail: createTrailState(),
     taskRuntime: createTaskRuntime(),
     memoryWaitStartedAt: null,
@@ -716,6 +793,27 @@ function createTrailState(overrides = {}) {
     correctStep: 0,
     ...overrides
   };
+}
+
+function createPostTestSurveyState(overrides = {}) {
+  return {
+    status: "not_started",
+    step: 0,
+    startedAt: null,
+    completedAt: null,
+    answers: {},
+    audioPlayedKeys: {},
+    ...overrides
+  };
+}
+
+function normalizePostTestSurveyState(value = {}) {
+  const base = createPostTestSurveyState(value && typeof value === "object" ? value : {});
+  base.step = Math.max(0, Math.min(POST_TEST_SURVEY_ITEMS.length - 1, Number(base.step || 0)));
+  base.answers = base.answers && typeof base.answers === "object" ? base.answers : {};
+  base.audioPlayedKeys = base.audioPlayedKeys && typeof base.audioPlayedKeys === "object" ? base.audioPlayedKeys : {};
+  if (!["not_started", "in_progress", "completed"].includes(base.status)) base.status = "not_started";
+  return base;
 }
 
 function createHearingScreeningState(overrides = {}) {
@@ -925,6 +1023,7 @@ function migrateState() {
   }
   state.responses = state.responses || {};
   state.drawings = state.drawings || {};
+  state.postTestSurvey = normalizePostTestSurveyState(state.postTestSurvey);
   state.taskRuntime = normalizeTaskRuntime(state.taskRuntime);
   state.trail = normalizeTrailState(state.trail);
   state.playedInstructionKeys = state.playedInstructionKeys || {};
@@ -1177,6 +1276,7 @@ function render() {
     setupCurrentTask(current);
     scheduleTaskInstruction(current);
   }
+  if (state.view === "surveyIntro" || state.view === "survey") schedulePostSurveyAudio();
   queueVisibleSpeechAudioPreload();
   focusAdminPasswordInput();
 }
@@ -1527,6 +1627,16 @@ function headerProgressState() {
     };
   }
   if (state.view === "results") return { label: "完成", width: 100 };
+  if (state.view === "surveyIntro") return { label: `问卷 0/${POST_TEST_SURVEY_ITEMS.length}`, width: 0 };
+  if (state.view === "survey") {
+    const survey = getPostTestSurveyState();
+    const current = Math.min(POST_TEST_SURVEY_ITEMS.length, survey.step + 1);
+    return {
+      label: `问卷 ${current}/${POST_TEST_SURVEY_ITEMS.length}`,
+      width: (current / POST_TEST_SURVEY_ITEMS.length) * 100
+    };
+  }
+  if (state.view === "surveyDone") return { label: "问卷完成", width: 100 };
   return { label: "", width: 0 };
 }
 
@@ -1548,6 +1658,9 @@ function renderTaskNav(task, index) {
 function viewTitle() {
   if (state.view === "hearing") return "听力测试";
   if (state.view === "results") return "闯关成功";
+  if (state.view === "surveyIntro") return "使用感受问卷";
+  if (state.view === "survey") return "使用感受问卷";
+  if (state.view === "surveyDone") return "全部完成";
   if (state.view === "admin") return "后台";
   if (state.view === "design") return "评分标准";
   return "当前任务";
@@ -1589,6 +1702,9 @@ function renderAdminPasswordDialog() {
 function renderMainView(current) {
   if (state.view === "hearing") return renderHearingCalibration();
   if (state.view === "results") return renderResults();
+  if (state.view === "surveyIntro") return renderPostSurveyIntro();
+  if (state.view === "survey") return renderPostSurveyQuestion();
+  if (state.view === "surveyDone") return renderPostSurveyDone();
   if (state.view === "admin") return renderAdmin();
   if (state.view === "design") return renderDesign();
   return renderTask(current);
@@ -2854,6 +2970,18 @@ function setupAudioKeyForText(text) {
   return `setup:option:${textKey(text)}`;
 }
 
+function surveyIntroAudioKey() {
+  return "survey:intro";
+}
+
+function surveyQuestionAudioKey(item) {
+  return item ? `survey:${item.instrument}:${item.index}` : "";
+}
+
+function surveyOptionAudioKey(kind, value) {
+  return `survey:${kind}:option:${value}`;
+}
+
 function textKey(text) {
   let hash = 2166136261;
   Array.from(String(text || "")).forEach((char) => {
@@ -2879,13 +3007,195 @@ function renderResults() {
         <p>谢谢您的参与！</p>
       </div>
       <div class="control-row results-actions final-results-actions">
-        <button class="secondary big-button" data-action="goHome" ${saved ? "" : "disabled"}>退出</button>
+        <button class="primary big-button continue-survey-button pulse" data-action="continueToPostSurvey" ${saved ? "" : "disabled"}>继续</button>
       </div>
       ${saving ? `<p class="save-status">正在自动保存...</p>` : ""}
       ${saved ? `<p class="save-status">数据已保存到后台${state.sessionSavedAt ? `：${escapeHtml(new Date(state.sessionSavedAt).toLocaleString())}` : ""}</p>` : ""}
       ${saveFailed ? `<p class="save-status error">自动保存失败，请进入后台重试。</p>` : ""}
     </section>
   `;
+}
+
+function renderPostSurveyIntro() {
+  return html`
+    <section class="single-page post-survey-intro-page">
+      <div class="post-survey-intro-copy">
+        <span>使用感受问卷</span>
+        <h2>${escapeHtml(POST_TEST_SURVEY_INTRO_TEXT)}</h2>
+      </div>
+      <button class="primary big-button post-survey-start-button pulse" data-action="startPostSurvey">开始</button>
+    </section>
+  `;
+}
+
+function renderPostSurveyQuestion() {
+  const survey = getPostTestSurveyState();
+  const item = POST_TEST_SURVEY_ITEMS[survey.step] || POST_TEST_SURVEY_ITEMS[0];
+  const answer = survey.answers[item.id] || {};
+  return html`
+    <section class="single-page post-survey-page">
+      <div class="post-survey-question-head">
+        <span>${escapeHtml(postSurveySectionLabel(item))}</span>
+        <strong>${survey.step + 1}/${POST_TEST_SURVEY_ITEMS.length}</strong>
+      </div>
+      <h2 class="post-survey-question">${escapeHtml(item.prompt)}</h2>
+      ${item.instrument === "sus" ? renderSusQuestion(item, answer) : renderNasaTlxQuestion(item, answer)}
+      <div class="post-survey-actions">
+        <button class="primary big-button" data-action="nextPostSurveyQuestion" ${hasPostSurveyAnswer(item, answer) ? "" : "disabled"}>答完了，下一题</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderSusQuestion(item, answer) {
+  return html`
+    <div class="sus-likert-grid" role="radiogroup" aria-label="${escapeHtml(item.prompt)}">
+      ${SUS_LIKERT_OPTIONS.map((option) => `
+        <button
+          class="sus-likert-option ${Number(answer.value) === option.value ? "picked" : ""}"
+          data-action="chooseSusAnswer"
+          data-question-id="${escapeHtml(item.id)}"
+          data-value="${option.value}"
+          ${speechAttrs(option.label, surveyOptionAudioKey("sus", option.value))}
+        >
+          <strong>${option.value}</strong>
+          <span>${escapeHtml(option.label)}</span>
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderNasaTlxQuestion(item, answer) {
+  const value = Number.isFinite(Number(answer.value)) ? Number(answer.value) : 50;
+  return html`
+    <div class="nasa-slider-panel">
+      <div class="nasa-value-readout">${value}</div>
+      <input
+        class="nasa-slider"
+        type="range"
+        min="0"
+        max="100"
+        step="5"
+        value="${value}"
+        data-survey-range
+        data-question-id="${escapeHtml(item.id)}"
+        aria-label="${escapeHtml(item.prompt)}"
+      />
+      <div class="nasa-slider-labels">
+        <span>0<br />${escapeHtml(item.lowLabel)}</span>
+        <span>100<br />${escapeHtml(item.highLabel)}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderPostSurveyDone() {
+  const survey = postTestSurveyPayload();
+  const saved = state.sessionSaveStatus === "saved";
+  const saving = state.sessionSaveStatus === "saving";
+  return html`
+    <section class="single-page post-survey-done-page">
+      <div class="post-survey-done-panel">
+        <span>全部完成</span>
+        <h2>谢谢，您的回答已记录。</h2>
+        <div class="post-survey-score-strip">
+          <b>SUS ${formatSurveyScore(survey.scores.susScore, 100)}</b>
+          <b>NASA-TLX ${formatSurveyScore(survey.scores.nasaTlxRawScore, 100)}</b>
+        </div>
+      </div>
+      <div class="control-row results-actions final-results-actions">
+        <button class="primary big-button" data-action="goHome" ${saving ? "disabled" : ""}>完成</button>
+      </div>
+      ${saving ? `<p class="save-status">正在保存问卷...</p>` : ""}
+      ${saved ? `<p class="save-status">问卷数据已保存到后台${state.sessionSavedAt ? `：${escapeHtml(new Date(state.sessionSavedAt).toLocaleString())}` : ""}</p>` : ""}
+      ${state.sessionSaveStatus === "error" ? `<p class="save-status error">问卷保存失败，请进入后台重试。</p>` : ""}
+    </section>
+  `;
+}
+
+function formatSurveyScore(value, max) {
+  const numericValue = surveyNumericValue(value);
+  return numericValue !== null ? `${numericValue.toFixed(1)}/${max}` : `-/${max}`;
+}
+
+function getPostTestSurveyState() {
+  state.postTestSurvey = normalizePostTestSurveyState(state.postTestSurvey);
+  return state.postTestSurvey;
+}
+
+function postSurveySectionLabel(item) {
+  if (item.instrument === "sus") return "System Usability Scale";
+  return `NASA-TLX · ${item.dimension || ""}`;
+}
+
+function hasPostSurveyAnswer(item, answer = {}) {
+  if (item.instrument === "sus") {
+    const value = surveyNumericValue(answer.value);
+    return value !== null && value >= 1 && value <= 5;
+  }
+  return true;
+}
+
+function postTestSurveyPayload() {
+  const survey = getPostTestSurveyState();
+  const responses = POST_TEST_SURVEY_ITEMS.map((item, index) => {
+    const answer = survey.answers[item.id] || {};
+    const value = surveyNumericValue(answer.value);
+    const hasValue = value !== null;
+    return {
+      id: item.id,
+      order: index + 1,
+      instrument: item.instrument,
+      index: item.index,
+      dimension: item.dimension || null,
+      prompt: item.prompt,
+      value: hasValue ? value : null,
+      label: answer.label || (hasValue ? postSurveyAnswerLabel(item, value) : ""),
+      answeredAt: answer.answeredAt || null
+    };
+  });
+  return {
+    status: survey.status,
+    startedAt: survey.startedAt || null,
+    completedAt: survey.completedAt || null,
+    step: survey.step,
+    totalQuestions: POST_TEST_SURVEY_ITEMS.length,
+    responses,
+    scores: postTestSurveyScores(responses)
+  };
+}
+
+function postSurveyAnswerLabel(item, value) {
+  const numericValue = surveyNumericValue(value);
+  if (numericValue === null) return "";
+  if (item.instrument === "sus") return SUS_LIKERT_OPTIONS.find((option) => option.value === numericValue)?.label || "";
+  return String(numericValue);
+}
+
+function postTestSurveyScores(responses) {
+  const susResponses = responses.filter((entry) => entry.instrument === "sus");
+  const susRaw = susResponses.reduce((sum, entry) => {
+    const value = surveyNumericValue(entry.value);
+    if (value === null) return sum;
+    return sum + (entry.index % 2 === 1 ? value - 1 : 5 - value);
+  }, 0);
+  const susComplete = susResponses.length === 10 && susResponses.every((entry) => surveyNumericValue(entry.value) !== null);
+  const nasaResponses = responses.filter((entry) => entry.instrument === "nasa-tlx");
+  const nasaValues = nasaResponses.map((entry) => surveyNumericValue(entry.value)).filter((value) => value !== null);
+  const nasaRaw = nasaValues.length ? nasaValues.reduce((sum, value) => sum + value, 0) / nasaValues.length : null;
+  return {
+    susScore: susComplete ? susRaw * 2.5 : null,
+    susRaw,
+    nasaTlxRawScore: nasaValues.length === 6 ? nasaRaw : null,
+    nasaTlxAnsweredCount: nasaValues.length
+  };
+}
+
+function surveyNumericValue(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
 }
 
 function renderConfetti() {
@@ -3007,6 +3317,8 @@ function renderSessionDetail(session) {
   const itemResponses = Array.isArray(session.itemResponses) ? session.itemResponses : [];
   const hearing = session.hearingScreening || {};
   const hearingSummary = hearing.summary || null;
+  const postSurvey = session.postTestSurvey || {};
+  const postSurveyScores = postSurvey.scores || {};
   const loading = state.selectedSessionLoading && state.selectedSession?.id === session.id && !itemResponses.length;
   return html`
     <aside class="admin-detail">
@@ -3027,6 +3339,9 @@ function renderSessionDetail(session) {
         ${detailMetric("左耳 4fPTA", formatThreshold(hearingSummary?.ears?.left?.pta4))}
         ${detailMetric("自选音量", formatAudioLevel(hearingSummary?.selfSelectedAudioLevelDbHl ?? hearing.selfSelectedAudioLevelDbHl))}
         ${detailMetric("测试音量", formatAudioLevel(hearingSummary?.mocaAudioLevelDbHl ?? hearing.mocaAudioLevelDbHl))}
+        ${detailMetric("问卷状态", formatPostSurveyStatus(postSurvey.status))}
+        ${detailMetric("SUS", formatSurveyScore(postSurveyScores.susScore, 100))}
+        ${detailMetric("NASA-TLX", formatSurveyScore(postSurveyScores.nasaTlxRawScore, 100))}
         ${detailMetric("保存时间", session.savedAt ? new Date(session.savedAt).toLocaleString() : "-")}
       </div>
       <div class="item-detail-list">
@@ -3049,6 +3364,13 @@ function formatHearingStatus(status) {
   if (status === "incomplete") return "未完成";
   if (status === "completed") return "已完成";
   if (status === "in_progress") return "进行中";
+  return "-";
+}
+
+function formatPostSurveyStatus(status) {
+  if (status === "completed") return "已完成";
+  if (status === "in_progress") return "进行中";
+  if (status === "not_started") return "未开始";
   return "-";
 }
 
@@ -3376,7 +3698,10 @@ behavior_json:
   sequence, errors, undoCount, taps, strokes, voiceEvents, audioRecordings, location
 
 语音题原始音频:
-  answer_json.audioRecordings[step] 保存为 data:audio/... base64，可在后台详情直接播放。`;
+  answer_json.audioRecordings[step] 保存为 data:audio/... base64，可在后台详情直接播放。
+
+完成后问卷:
+  postTestSurvey.responses 保存 SUS 和 NASA-TLX 每题答案，postTestSurvey.scores 保存 SUS 总分和 NASA-TLX 原始均分。`;
 }
 
 function setupTaskGuide(task, step = getTaskStep(task)) {
@@ -4525,8 +4850,8 @@ root.addEventListener("click", async (event) => {
   }
   if (shouldStartTaskTimingForAction(action, current)) beginTask(current.id);
   if (action === "startSession") playSfx("start");
-  else if (["skipTask", "nextTask", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
-  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "reviewMemoryReplay", "confirmMemoryIncorrectSubmit", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu", "playVolumeSample", "continueToHearing", "replayTaskGuide", "acknowledgeTaskGuide", "touchTrailGuideNode"].includes(action)) playSfx("pick");
+  else if (["skipTask", "nextTask", "goHome", "navView", "closeMenu", "openMenu", "continueToPostSurvey", "startPostSurvey", "nextPostSurveyQuestion"].includes(action)) playSfx("nav");
+  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "reviewMemoryReplay", "confirmMemoryIncorrectSubmit", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu", "playVolumeSample", "continueToHearing", "replayTaskGuide", "acknowledgeTaskGuide", "touchTrailGuideNode", "chooseSusAnswer"].includes(action)) playSfx("pick");
 
   if (shouldStopAudioForAction(action, target)) stopAudioPlayback();
   if (buttonSpeech) speakButtonSelection(buttonSpeech);
@@ -4586,6 +4911,22 @@ root.addEventListener("click", async (event) => {
   }
   if (action === "answerHearingTrial") {
     answerHearingTrial(target.dataset.heard === "true");
+    return;
+  }
+  if (action === "continueToPostSurvey") {
+    continueToPostSurvey();
+    return;
+  }
+  if (action === "startPostSurvey") {
+    startPostSurvey();
+    return;
+  }
+  if (action === "nextPostSurveyQuestion") {
+    await nextPostSurveyQuestion();
+    return;
+  }
+  if (action === "chooseSusAnswer") {
+    chooseSusAnswer(target.dataset.questionId, target.dataset.value);
     return;
   }
 
@@ -4923,6 +5264,10 @@ function speakButtonSelection({ text, audioKey, action }) {
     speakText(text, { audioKey, rate: 0.82, pitch: 1.1, purpose: "option", staticOnly: true, preferBuffer: true });
     return;
   }
+  if (state.view === "surveyIntro" || state.view === "survey") {
+    speakText(text, { audioKey, rate: 0.82, pitch: 1.1, purpose: "option", staticOnly: true, preferBuffer: true });
+    return;
+  }
   const task = tasks[state.activeTaskIndex];
   if (!task || ["playCurrentAudio", "toggleVoiceInput", "tapVigilance"].includes(action)) return;
   if (task.type === "choice" && ["appendDigit", "backspaceDigit"].includes(action)) return;
@@ -4957,6 +5302,9 @@ root.addEventListener("input", (event) => {
   if (target.dataset.audioVolume !== undefined) {
     updateSelfSelectedAudioLevel(target.value);
     scheduleVolumeSamplePlayback();
+  }
+  if (target.dataset.surveyRange !== undefined) {
+    inputNasaTlxAnswer(target.dataset.questionId, target.value);
   }
   if (target.dataset.voiceManual !== undefined) {
     if (manualTranscriptComposing || event.isComposing) return;
@@ -5149,6 +5497,108 @@ async function finishSessionAndShowResults() {
     state.sessionSaveError = error?.message || String(error || "保存失败");
     render();
   }
+}
+
+function continueToPostSurvey() {
+  if (state.sessionSaveStatus !== "saved") return;
+  const survey = getPostTestSurveyState();
+  if (survey.status === "completed") {
+    state.view = "surveyDone";
+  } else {
+    state.view = "surveyIntro";
+  }
+  saveDraft();
+  render();
+}
+
+function startPostSurvey() {
+  const survey = getPostTestSurveyState();
+  survey.status = "in_progress";
+  survey.startedAt = survey.startedAt || new Date().toISOString();
+  survey.step = Math.max(0, Math.min(survey.step || 0, POST_TEST_SURVEY_ITEMS.length - 1));
+  state.view = "survey";
+  saveDraft();
+  render();
+}
+
+async function nextPostSurveyQuestion() {
+  let survey = getPostTestSurveyState();
+  const item = POST_TEST_SURVEY_ITEMS[survey.step];
+  if (!item) return;
+  ensurePostSurveyAnswer(item);
+  survey = getPostTestSurveyState();
+  const answer = survey.answers[item.id] || {};
+  if (!hasPostSurveyAnswer(item, answer)) {
+    render();
+    return;
+  }
+  if (survey.step < POST_TEST_SURVEY_ITEMS.length - 1) {
+    survey.step += 1;
+    saveDraft();
+    render();
+    return;
+  }
+  survey.status = "completed";
+  survey.completedAt = survey.completedAt || new Date().toISOString();
+  state.view = "surveyDone";
+  state.sessionSaveStatus = "idle";
+  state.sessionSaveError = "";
+  saveDraft();
+  render();
+  try {
+    await saveSession({ stayOnCurrentView: true });
+  } catch (error) {
+    state.sessionSaveStatus = "error";
+    state.sessionSaveError = error?.message || String(error || "保存失败");
+    render();
+  }
+}
+
+function chooseSusAnswer(questionId, value) {
+  const item = POST_TEST_SURVEY_ITEMS.find((entry) => entry.id === questionId && entry.instrument === "sus");
+  if (!item) return;
+  const numericValue = Math.max(1, Math.min(5, Number(value)));
+  const option = SUS_LIKERT_OPTIONS.find((entry) => entry.value === numericValue);
+  recordPostSurveyAnswer(item, numericValue, option?.label || "");
+  render();
+}
+
+function inputNasaTlxAnswer(questionId, value) {
+  const item = POST_TEST_SURVEY_ITEMS.find((entry) => entry.id === questionId && entry.instrument === "nasa-tlx");
+  if (!item) return;
+  const numericValue = Math.max(0, Math.min(100, Math.round(Number(value) / 5) * 5));
+  recordPostSurveyAnswer(item, numericValue, String(numericValue));
+  refreshNasaSliderUi(numericValue);
+}
+
+function ensurePostSurveyAnswer(item) {
+  if (!item || item.instrument !== "nasa-tlx") return;
+  const survey = getPostTestSurveyState();
+  if (surveyNumericValue(survey.answers[item.id]?.value) !== null) return;
+  recordPostSurveyAnswer(item, 50, "50");
+}
+
+function recordPostSurveyAnswer(item, value, label) {
+  const survey = getPostTestSurveyState();
+  survey.answers[item.id] = {
+    instrument: item.instrument,
+    index: item.index,
+    dimension: item.dimension || null,
+    prompt: item.prompt,
+    value,
+    label,
+    answeredAt: new Date().toISOString()
+  };
+  saveDraft();
+}
+
+function refreshNasaSliderUi(value) {
+  const readout = document.querySelector(".nasa-value-readout");
+  if (readout) readout.textContent = String(value);
+  const slider = document.querySelector("[data-survey-range]");
+  if (slider) slider.value = String(value);
+  const nextButton = document.querySelector("[data-action='nextPostSurveyQuestion']");
+  if (nextButton) nextButton.disabled = false;
 }
 
 async function submitActiveTaskWithFeedback(task) {
@@ -5547,6 +5997,31 @@ function scheduleTaskInstruction(task) {
       done: () => markInstructionComplete(task, step)
     });
   }, force ? 0 : 260);
+}
+
+function schedulePostSurveyAudio() {
+  const survey = getPostTestSurveyState();
+  const item = state.view === "survey" ? POST_TEST_SURVEY_ITEMS[survey.step] : null;
+  const key = state.view === "surveyIntro" ? surveyIntroAudioKey() : surveyQuestionAudioKey(item);
+  const text = state.view === "surveyIntro" ? POST_TEST_SURVEY_INTRO_TEXT : item?.prompt;
+  if (!key || !text || survey.audioPlayedKeys[key]) return;
+  survey.audioPlayedKeys[key] = true;
+  saveDraft();
+  clearPostSurveyAudioTimer();
+  postSurveyAudioTimer = window.setTimeout(() => {
+    postSurveyAudioTimer = null;
+    const currentSurvey = getPostTestSurveyState();
+    const currentItem = state.view === "survey" ? POST_TEST_SURVEY_ITEMS[currentSurvey.step] : null;
+    const currentKey = state.view === "surveyIntro" ? surveyIntroAudioKey() : surveyQuestionAudioKey(currentItem);
+    if (currentKey !== key || (state.view !== "surveyIntro" && state.view !== "survey")) return;
+    speakText(text, {
+      rate: 0.82,
+      pitch: 1.18,
+      purpose: "instruction",
+      audioKey: key,
+      preferBuffer: true
+    });
+  }, 260);
 }
 
 function resetInstructionPlayback(task, step = getTaskStep(task)) {
@@ -6389,6 +6864,7 @@ function stopActiveSpeechAudio() {
 function beginAudioPlayback() {
   speechPlaybackId += 1;
   clearInstructionTimer();
+  clearPostSurveyAudioTimer();
   clearSpeechTextFallbackTimer();
   stopActiveSpeechAudio();
   stopStaticSpeechSources();
@@ -6411,6 +6887,7 @@ function prepareAudioOutputMode() {
 
 function stopAudioPlayback() {
   clearInstructionTimer();
+  clearPostSurveyAudioTimer();
   const stoppedHearingTone = stopHearingTone();
   if (!("speechSynthesis" in window) && !activeSpeechAudio && !speechItemTimer && playState !== "播放中..." && !stoppedHearingTone) return;
   speechPlaybackId += 1;
@@ -6430,6 +6907,12 @@ function clearInstructionTimer() {
   if (!instructionTimer) return;
   window.clearTimeout(instructionTimer);
   instructionTimer = null;
+}
+
+function clearPostSurveyAudioTimer() {
+  if (!postSurveyAudioTimer) return;
+  window.clearTimeout(postSurveyAudioTimer);
+  postSurveyAudioTimer = null;
 }
 
 function clearSpeechTextFallbackTimer() {
@@ -9065,6 +9548,7 @@ function buildSessionPayload({ includeAudioBlobs = false } = {}) {
       cognitionTestAudioLevelDbHl: currentMocaAudioLevelDbHl()
     },
     hearingScreening: compactHearingScreeningForPayload(state.hearingScreening),
+    postTestSurvey: postTestSurveyPayload(),
     taskRuntime: ensureTaskRuntime(),
     ttsManifestVersion: staticTtsManifest?.version ?? null,
     itemResponses: tasks.map((task) => {
@@ -9133,11 +9617,12 @@ async function saveSessionInBackground() {
 }
 
 async function saveSession(options = {}) {
-  const { stayOnResults = false } = options;
+  const { stayOnResults = false, stayOnCurrentView = false } = options;
+  const previousView = state.view;
   state.finishedAt = state.finishedAt || new Date().toISOString();
   state.sessionSaveStatus = "saving";
   state.sessionSaveError = "";
-  if (stayOnResults) render();
+  if (stayOnResults || stayOnCurrentView) render();
   const payload = buildSessionPayload();
   const saved = await requestJson("/api/sessions", {
     method: "POST",
@@ -9152,7 +9637,7 @@ async function saveSession(options = {}) {
   state.sessionSavedAt = savedDetail.savedAt || new Date().toISOString();
   cacheSessionDetail(savedDetail);
   upsertAdminSessionSummary(savedDetail);
-  state.view = stayOnResults ? "results" : "admin";
+  state.view = stayOnCurrentView ? previousView : stayOnResults ? "results" : "admin";
   render();
 }
 
@@ -9235,6 +9720,8 @@ function csvRowsForSession(session) {
   const participant = session.participant || {};
   const hearing = session.hearingScreening || null;
   const hearingSummary = hearing?.summary || {};
+  const postSurvey = session.postTestSurvey || {};
+  const postSurveyScores = postSurvey.scores || {};
   const hearingResponseCounts = hearing?.responseCounts || hearingSummary.responseCounts || (hearing ? summarizeHearingResponses(hearing) : {});
   const hearingEvents = Array.isArray(hearing?.events) ? hearing.events : (hearing ? hearingEventsForExport(hearing) : []);
   const itemResponses = Array.isArray(session.itemResponses) && session.itemResponses.length
@@ -9274,6 +9761,13 @@ function csvRowsForSession(session) {
     hearing_environment_checks_json: hearing ? stringifyForCsv(hearing.environmentChecks || []) : "",
     hearing_events_json: hearing ? stringifyForCsv(hearingEvents) : "",
     hearing_screening_json: hearing ? stringifyForCsv(hearing) : "",
+    post_test_survey_status: postSurvey.status || "",
+    post_test_survey_started_at: postSurvey.startedAt || "",
+    post_test_survey_completed_at: postSurvey.completedAt || "",
+    sus_score: postSurveyScores.susScore ?? "",
+    sus_raw_score: postSurveyScores.susRaw ?? "",
+    nasa_tlx_raw_score: postSurveyScores.nasaTlxRawScore ?? "",
+    post_test_survey_json: postSurvey.status ? stringifyForCsv(postSurvey) : "",
     task_id: item.taskId || "",
     task_title: item.title || "",
     domain: item.domain || "",
@@ -9330,6 +9824,7 @@ function downloadTextFile(filename, content, mimeType) {
 function stopTimers() {
   stopTrailGuide();
   stopHearingTone();
+  clearPostSurveyAudioTimer();
   clearSpeechRecognitionRestartTimer();
   clearSentenceAutoStopTimer();
   if (delayedConfirmTimer) {

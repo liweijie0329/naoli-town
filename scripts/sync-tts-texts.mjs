@@ -19,6 +19,7 @@ syncDigitBanks();
 syncDigitPad();
 syncSerialSubtractionPrompts();
 syncStaticTextOptions();
+syncPostTestSurveyTexts();
 
 const nextText = `${JSON.stringify(ttsSource, null, 2)}\n`;
 
@@ -113,6 +114,22 @@ function syncStaticTextOptions() {
   });
 }
 
+function syncPostTestSurveyTexts() {
+  upsertEntry("survey:intro", {
+    text: extractStringConstant("POST_TEST_SURVEY_INTRO_TEXT"),
+    speedRatio: 0.9
+  });
+  extractSusLikertOptions().forEach((option) => {
+    upsertEntry(`survey:sus:option:${option.value}`, { text: option.label });
+  });
+  extractPostTestSurveyItems().forEach((item) => {
+    upsertEntry(`survey:${item.instrument}:${item.index}`, {
+      text: item.prompt,
+      speedRatio: 0.9
+    });
+  });
+}
+
 function upsertEntry(key, values) {
   const entry = entries.find((item) => item.key === key);
   if (!entry) {
@@ -126,6 +143,51 @@ function upsertEntry(key, values) {
     changes.push(`${key} ${field}: ${JSON.stringify(entry[field])} -> ${JSON.stringify(value)}`);
     entry[field] = value;
   }
+}
+
+function extractSusLikertOptions() {
+  const body = extractArrayBodyConstant("SUS_LIKERT_OPTIONS");
+  const options = [];
+  const pattern = /\{\s*value:\s*(\d+),\s*label:\s*"((?:\\.|[^"\\])*)"\s*\}/g;
+  let match;
+  while ((match = pattern.exec(body))) {
+    options.push({
+      value: Number(match[1]),
+      label: JSON.parse(`"${match[2]}"`)
+    });
+  }
+  if (!options.length) throw new Error("SUS_LIKERT_OPTIONS 没有可同步的选项。");
+  return options;
+}
+
+function extractPostTestSurveyItems() {
+  const body = extractArrayBodyConstant("POST_TEST_SURVEY_ITEMS");
+  const items = [];
+  const pattern = /\{([\s\S]*?)\}/g;
+  let match;
+  while ((match = pattern.exec(body))) {
+    const block = match[1];
+    const instrument = matchStringProperty(block, "instrument");
+    const prompt = matchStringProperty(block, "prompt");
+    const indexMatch = block.match(/\bindex:\s*(\d+)/);
+    if (!instrument || !prompt || !indexMatch) continue;
+    items.push({ instrument, prompt, index: Number(indexMatch[1]) });
+  }
+  if (items.length !== 16) throw new Error(`POST_TEST_SURVEY_ITEMS 应有 16 条，实际找到 ${items.length} 条。`);
+  return items;
+}
+
+function matchStringProperty(source, name) {
+  const pattern = new RegExp(`\\b${name}:\\s*"((?:\\\\.|[^"\\\\])*)"`);
+  const match = source.match(pattern);
+  return match ? JSON.parse(`"${match[1]}"`) : "";
+}
+
+function extractArrayBodyConstant(name) {
+  const pattern = new RegExp(`const\\s+${name}\\s*=\\s*\\[([\\s\\S]*?)\\]\\s*;`);
+  const match = appSource.match(pattern);
+  if (!match) throw new Error(`无法在 app.js 中找到 ${name}。`);
+  return match[1];
 }
 
 function digitSequenceText(value) {
