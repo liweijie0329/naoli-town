@@ -2226,7 +2226,8 @@ function renderTaskActions(task, step) {
   const baseAnswerReady = readyToAnswer && hasTaskAnswer(task, response, step);
   const delayReady = isDelayedConfirmReady(task, step);
   if (baseAnswerReady && !delayReady) scheduleDelayedConfirmRender(task, step);
-  const answerReady = baseAnswerReady && delayReady;
+  const blockedByMemoryReview = isMemoryReviewModalOpen(task, response);
+  const answerReady = baseAnswerReady && delayReady && !blockedByMemoryReview;
   const confirmDisabled = speechTranscribing || submitting || !answerReady;
   const confirmClass = `confirm-button ${answerReady ? "answer-ready" : ""} ${shouldNudgeConfirm(task) ? "attention-nudge" : ""}`;
   return html`
@@ -2246,7 +2247,8 @@ function refreshTaskActionButtons() {
   const button = document.querySelector(".confirm-button");
   if (!button) return;
   const submitting = isTaskSubmitting(task);
-  const answerReady = isTaskReadyToAnswer(task, step) && hasTaskAnswer(task, getResponse(task.id), step) && isDelayedConfirmReady(task, step);
+  const response = getResponse(task.id);
+  const answerReady = isTaskReadyToAnswer(task, step) && hasTaskAnswer(task, response, step) && isDelayedConfirmReady(task, step) && !isMemoryReviewModalOpen(task, response);
   button.disabled = speechTranscribing || submitting || !answerReady;
   button.classList.toggle("answer-ready", answerReady);
 }
@@ -2510,7 +2512,8 @@ function renderMemoryTask(task) {
   const selected = response.answer.selectedWords || [];
   const options = memoryCandidateWords(task.id);
   const ready = task.trial === 2 || Boolean(response.answer.audioReady);
-  const inputDisabled = isTaskReadyToAnswer(task) ? "" : "disabled";
+  const reviewModalOpen = isMemoryReviewModalOpen(task, response);
+  const inputDisabled = isTaskReadyToAnswer(task) && !reviewModalOpen ? "" : "disabled";
   return html`
     <div class="memory-page ${ready ? "ready" : ""}">
       ${ready ? "" : `<div class="memory-audio">
@@ -2539,8 +2542,8 @@ function renderMemoryReviewPrompt() {
         <strong id="memory-review-title">要再听一遍吗？</strong>
         <p>这次选择和刚刚读到的词不完全一致。</p>
         <div class="memory-review-actions">
-          <button class="secondary memory-review-button" data-action="reviewMemoryReplay">再听一遍</button>
-          <button class="confirm-button answer-ready memory-review-button" data-action="confirmMemoryIncorrectSubmit">提交</button>
+          <button class="secondary pulse memory-review-button" data-action="reviewMemoryReplay">再听一遍</button>
+          <button class="confirm-button memory-review-button" data-action="confirmMemoryIncorrectSubmit">提交</button>
         </div>
       </div>
     </div>
@@ -4829,6 +4832,10 @@ root.addEventListener("click", async (event) => {
     openAdminPasswordDialog(target);
     return;
   }
+  if (isBlockedBehindMemoryReviewModal(action, current)) {
+    event.preventDefault();
+    return;
+  }
   if (isTaskActionBlockedUntilInstructionComplete(action, current)) {
     render();
     return;
@@ -5103,6 +5110,17 @@ function isTaskActionBlockedUntilInstructionComplete(action, task) {
   return !isTaskReadyToAnswer(task);
 }
 
+function isMemoryReviewModalOpen(task = tasks[state.activeTaskIndex], response = null) {
+  if (state.view !== "test" || task?.id !== "memory1") return false;
+  const memoryResponse = response || getResponse("memory1");
+  return Boolean(memoryResponse.behavior.memoryReviewPromptVisible);
+}
+
+function isBlockedBehindMemoryReviewModal(action, task = tasks[state.activeTaskIndex]) {
+  if (!isMemoryReviewModalOpen(task)) return false;
+  return !["reviewMemoryReplay", "confirmMemoryIncorrectSubmit"].includes(action);
+}
+
 function taskActionsRequiringInstruction() {
   return new Set([
     "nextTask",
@@ -5150,6 +5168,7 @@ function shouldStopAudioForAction(action, target) {
   if (["closeAdminPasswordDialog", "submitAdminPasswordDialog"].includes(action)) return false;
   if (["openMenu", "closeMenu", "toggleCognitionMenu"].includes(action)) return false;
   if (target.closest(".hidden-drawer") && ["navView", "selectTask"].includes(action)) return false;
+  if (isMemoryWordOptionAudioSuppressed(action)) return false;
   return true;
 }
 
@@ -5272,11 +5291,20 @@ function speakButtonSelection({ text, audioKey, action }) {
   }
   const task = tasks[state.activeTaskIndex];
   if (!task || ["playCurrentAudio", "toggleVoiceInput", "tapVigilance"].includes(action)) return;
+  if (isMemoryWordOptionAudioSuppressed(action, task)) return;
   if (task.type === "choice" && ["appendDigit", "backspaceDigit"].includes(action)) return;
   const response = getResponse(task.id);
   response.behavior.optionAudioPlayback = response.behavior.optionAudioPlayback || [];
   response.behavior.optionAudioPlayback.push({ text, audioKey, action, at: new Date().toISOString() });
   playQuickOptionAudio(audioKey);
+}
+
+function isMemoryWordOptionAudioSuppressed(action, task = tasks[state.activeTaskIndex]) {
+  return state.view === "test"
+    && task?.id === "memory1"
+    && action === "toggleMemoryWord"
+    && playState === "播放中..."
+    && speechPlaybackPurpose === "memoryWords";
 }
 
 async function playQuickOptionAudio(audioKey) {
@@ -5817,10 +5845,15 @@ function canConfirmTask(task, response) {
     delete response.behavior.selectionWarning;
     if (task.id === "memory1") {
       const complete = selected.length === targets.length && targets.every((word) => selected.includes(word));
-      if (!complete && !response.behavior.memoryIncorrectSubmitConfirmed) {
+      const reviewLimitReached = Number(response.behavior.memoryPlaybackCount || 0) >= 3;
+      if (!complete && !response.behavior.memoryIncorrectSubmitConfirmed && !reviewLimitReached) {
         response.behavior.memoryReviewPromptVisible = true;
         response.behavior.selectionWarning = "这次选择和刚刚读到的词不完全一致。";
         return false;
+      }
+      if (!complete && reviewLimitReached && !response.behavior.memoryIncorrectSubmitConfirmed) {
+        response.behavior.memoryIncorrectSubmitAutoConfirmed = true;
+        response.behavior.memoryIncorrectSubmitAutoConfirmedAt = new Date().toISOString();
       }
       delete response.behavior.memoryReviewPromptVisible;
     }
@@ -6239,6 +6272,7 @@ function playMemoryWords(response) {
     audioKeys: targets.map(memoryWordAudioKey),
     gapMs: 1000,
     rate: 0.72,
+    purpose: "memoryWords",
     staticOnly: true,
     done: () => {
       response.answer.audioReady = true;
@@ -6510,9 +6544,10 @@ function pickNaturalVoice() {
 }
 
 function speakItemsSlow(items, options = {}) {
-  const { gapMs = 1000, rate = 0.72, done, onItemStart, audioKeyPrefix = "", audioKeys = [], staticOnly = false } = options;
+  const { gapMs = 1000, rate = 0.72, done, onItemStart, audioKeyPrefix = "", audioKeys = [], staticOnly = false, purpose = "" } = options;
   const playbackId = beginAudioPlayback();
   playState = "播放中...";
+  speechPlaybackPurpose = purpose || null;
   render();
   playStaticItemSequence(items, { audioKeyPrefix, audioKeys, gapMs, playbackId, onItemStart, done })
     .catch(() => false)
@@ -6520,6 +6555,7 @@ function speakItemsSlow(items, options = {}) {
       if (!started && staticOnly) {
         if (playbackId !== speechPlaybackId) return;
         playState = "开始";
+        speechPlaybackPurpose = null;
         render();
         if (done) done();
         return;
@@ -6534,6 +6570,7 @@ function speakItemsWithBrowser(items, { gapMs, rate, done, onItemStart, audioKey
     if (playbackId !== speechPlaybackId) return;
     if (index >= items.length) {
       playState = "开始";
+      speechPlaybackPurpose = null;
       render();
       if (done) done();
       return;
@@ -6826,6 +6863,7 @@ function finishStaticItemSequence(playbackId, done) {
   activeSpeechBufferSources = [];
   clearSpeechItemTimers();
   playState = "开始";
+  speechPlaybackPurpose = null;
   render();
   if (done) done();
 }

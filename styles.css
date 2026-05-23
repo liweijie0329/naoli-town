@@ -1999,7 +1999,7 @@ h4 {
 .memory-review-modal {
   position: fixed;
   inset: 0;
-  z-index: 10;
+  z-index: 70;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -2012,7 +2012,7 @@ h4 {
   justify-items: center;
   width: min(560px, 92vw);
   padding: clamp(26px, 5vw, 42px);
-  border: 3px solid #d7392f;
+  border: 3px solid var(--leaf);
   border-radius: 12px;
   background: #fff;
   box-shadow: 0 20px 54px rgba(36, 52, 71, 0.24);
