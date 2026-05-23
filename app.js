@@ -42,7 +42,7 @@ const ABSTRACTION_DISTRACTORS_BY_SUFFIX = {
   仪器: ["医疗仪器", "音乐仪器", "照明仪器", "通信仪器", "厨房仪器", "运动仪器", "教学仪器", "摄影仪器"]
 };
 const DEFAULT_CITY = "南京市";
-const DEFAULT_PLACE = "社区中心";
+const DEFAULT_PLACE = "医院";
 const CITY_DISTRACTORS = [
   "北京市", "上海市", "杭州市", "苏州市", "广州市",
   "深圳市", "成都市", "武汉市", "西安市", "青岛市",
@@ -52,7 +52,7 @@ const CITY_DISTRACTORS = [
 const DEFAULT_CITY_OPTIONS = ["杭州市", "上海市", DEFAULT_CITY, "西安市"];
 const PLACE_DISTRACTOR_POOL = ["医院", "学校", "社区中心", "公园", "商场", "超市", "图书馆", "体育中心", "博物馆", "车站"];
 const PLACE_CORRECT_CATEGORIES = [...PLACE_DISTRACTOR_POOL, "银行", "药店", "菜市场"];
-const DEFAULT_PLACE_OPTIONS = [DEFAULT_PLACE, "医院", "学校", "公园"];
+const DEFAULT_PLACE_OPTIONS = [DEFAULT_PLACE, "学校", "社区中心", "公园"];
 const PLACE_SEARCH_TERMS = ["医院", "学校", "社区中心", "大学", "公园", "图书馆", "体育中心", "博物馆"];
 const MIN_PLACE_DISTRACTOR_KM = 10;
 const DRAWING_CONFIRM_NUDGE_MS = 10000;
@@ -64,13 +64,17 @@ const MOCA_AUDIO_MAX_LEVEL_DB_HL = 95;
 const SELF_SELECTED_AUDIO_MIN_DB_HL = 20;
 const SELF_SELECTED_AUDIO_MAX_DB_HL = 80;
 const SELF_SELECTED_AUDIO_STEP_DB_HL = 5;
-const VOLUME_SAMPLE_TEXT = "请调到您听起来清楚、舒服的音量。";
+const VOLUME_SAMPLE_TEXT = "请调到您觉得清楚、舒服的音量。";
+const VOLUME_SAMPLE_AUDIO_KEY = "volume:sample";
+const NAMING_QUESTION_TEXT = "这是什么动物？";
+const NAMING_QUESTION_AUDIO_KEY = "stimulus:naming:question";
 const STATIC_TTS_MANIFEST_SRC = "./assets/audio/manifest.json";
 const STATIC_AUDIO_BUFFER_CACHE_LIMIT = 96;
 const LOCAL_DEV_API_ORIGIN = "http://127.0.0.1:5178";
 const API_ORIGIN = location.protocol === "file:" ? LOCAL_DEV_API_ORIGIN : "";
 const ASR_ENDPOINT = `${API_ORIGIN}/api/asr`;
 const ASR_TIMEOUT_MS = 90000;
+const FLUENCY_ASR_TIMEOUT_MS = 45000;
 const AI_SCORE_TIMEOUT_MS = 45000;
 const FLUENCY_LIVE_ASR_INTERVAL_MS = 5000;
 const FLUENCY_LIVE_ASR_MIN_CHUNKS = 12;
@@ -553,6 +557,8 @@ let setupPromptAttempted = false;
 let setupPromptPlayed = false;
 let setupPromptRetryPending = false;
 let hearingIntroPromptStartedAt = 0;
+let volumeSampleTimer = null;
+let lastVolumeSampleAt = 0;
 let playState = "开始";
 let voiceState = "待说";
 let speechRecognition = null;
@@ -598,6 +604,8 @@ let trailGuideFrame = null;
 let trailGuideTick = 0;
 let trailDragStart = null;
 let trailDragPoint = null;
+let trailGuidePracticeDragStart = null;
+let trailGuidePracticeDragPoint = null;
 let viewportRenderTimer = null;
 let drawingIdleTimers = [];
 let pendingAiScoreTaskIds = new Set();
@@ -1150,8 +1158,12 @@ function render() {
   root.innerHTML = renderShell(current);
   if (state.view === "test") {
     const step = getTaskStep(current);
-    if (isTaskGuideActive(current, step)) scheduleTaskInstruction(current, step);
-    else setupCurrentTask(current);
+    if (isTaskGuideActive(current, step)) {
+      setupTaskGuide(current, step);
+      scheduleTaskInstruction(current, step);
+    } else {
+      setupCurrentTask(current);
+    }
   }
   queueVisibleSpeechAudioPreload();
   focusAdminPasswordInput();
@@ -1190,8 +1202,7 @@ function renderVolumeSetup() {
       <section class="volume-setup-panel">
         <div class="volume-setup-copy">
           <span>音量选择</span>
-          <h2>请选择清楚、舒服的说明音量</h2>
-          <p>接下来的听力测试说明会按这个音量播放。认知测试音量会在听力测试结束后按结果自动调整。</p>
+          <h2>请调到您觉得清楚、舒服的音量</h2>
         </div>
         <div class="volume-slider-card">
           <strong class="volume-level-value" data-volume-value>${formatAudioLevel(level)}</strong>
@@ -1210,8 +1221,7 @@ function renderVolumeSetup() {
             <span>响一点</span>
           </div>
           <div class="volume-setup-actions">
-            <button class="secondary big-button" data-action="playVolumeSample">试听</button>
-            <button class="primary big-button pulse" data-action="continueToHearing">继续</button>
+            <button class="primary big-button pulse" data-action="continueToHearing">选好了</button>
           </div>
         </div>
       </section>
@@ -1439,6 +1449,7 @@ function renderShell(current) {
   const hearingView = state.view === "hearing";
   const progress = headerProgressState();
   const drawerAvatar = participantAvatarSrc();
+  const showHeaderPrompt = state.view === "test" && !isTaskGuideActive(current, getTaskStep(current));
   return html`
     <div class="app-shell">
       <aside class="hidden-drawer ${menuOpen ? "open" : ""}">
@@ -1471,7 +1482,7 @@ function renderShell(current) {
           <button class="icon-button" data-action="openMenu" aria-label="打开菜单">≡</button>
           <div class="header-title">
             <h2>${state.view === "test" ? escapeHtml(current.title) : viewTitle()}</h2>
-            ${state.view === "test" ? `<p class="header-prompt">${escapeHtml(current.prompt)}</p>` : ""}
+            ${showHeaderPrompt ? `<p class="header-prompt">${escapeHtml(current.prompt)}</p>` : ""}
           </div>
           <div class="header-progress">
             <span>${escapeHtml(progress.label)}</span>
@@ -2066,27 +2077,14 @@ function renderTaskGuide(task, step) {
 }
 
 function renderTrailGuidePractice(instructionReady) {
-  const progress = trailGuidePracticeSequence();
   const complete = isTrailGuidePracticeComplete();
-  const disabled = instructionReady ? "" : "disabled";
-  const hasFirst = progress.includes("1");
-  const hasSecond = progress.includes("甲");
-  const hasThird = progress.includes("2");
   return html`
     <div class="trail-guide-practice ${complete ? "complete" : ""}">
       <p>请按手指方向连线</p>
-      <div class="trail-guide-board">
-        <svg class="trail-guide-lines" viewBox="0 0 100 100" aria-hidden="true">
-          <path class="${hasSecond ? "drawn" : ""}" d="M22 52 L50 26" />
-          <path class="${hasThird ? "drawn" : ""}" d="M50 26 L78 52" />
-          <path class="guide-arrow" d="M22 52 L50 26 L78 52" />
-        </svg>
-        <button class="trail-guide-node node-1 ${hasFirst ? "picked" : ""}" data-action="touchTrailGuideNode" data-label="1" ${disabled}>1</button>
-        <button class="trail-guide-node node-jia ${hasSecond ? "picked" : ""}" data-action="touchTrailGuideNode" data-label="甲" ${disabled}>甲</button>
-        <button class="trail-guide-node node-2 ${hasThird ? "picked" : ""}" data-action="touchTrailGuideNode" data-label="2" ${disabled}>2</button>
-        <span class="trail-guide-finger" aria-hidden="true">👉</span>
+      <div class="trail-guide-board ${instructionReady ? "" : "locked"}">
+        <canvas id="trailGuideCanvas" class="trail-guide-canvas" aria-label="连线练习区域"></canvas>
       </div>
-      <strong>${complete ? "练习完成" : instructionReady ? "请依次点击 1、甲、2" : "请先听完说明"}</strong>
+      <strong>${complete ? "练习完成" : instructionReady ? "请从 1 拖到甲，再拖到乙" : "请先听完说明"}</strong>
     </div>
   `;
 }
@@ -2171,7 +2169,7 @@ function hasTaskAnswer(task, response = getResponse(task.id), step = getTaskStep
   }
   if (task.type === "memory") {
     const selected = response.answer.selectedWords || [];
-    if (task.trial === 1) return Boolean(response.answer.audioReady) && selected.length >= MEMORY_TARGET_COUNT;
+    if (task.trial === 1) return Boolean(response.answer.audioReady);
     return selected.length > 0;
   }
   if (task.type === "choice") {
@@ -2215,8 +2213,44 @@ function getTaskStepCount(task) {
 }
 
 function confirmLabel(task, step) {
-  if (state.activeTaskIndex === tasks.length - 1 && step >= getTaskStepCount(task) - 1) return "答完了，查看结果";
-  return "答完了，下一题";
+  if (step < getTaskStepCount(task) - 1) return "答完了，下一题";
+  return nextTaskIndexAfterSubmitPreview(task) < 0 ? "答完了，查看结果" : "答完了，下一题";
+}
+
+function nextTaskIndexAfterSubmitPreview(task) {
+  if (!task) return -1;
+  if (task.id !== "memory2" && !isMemory2Submitted() && isMemory2Ready()) return taskIndex("memory2");
+  if (task.id === "memory2") {
+    const resumeIndex = state.resumeAfterMemory2Index;
+    if (Number.isInteger(resumeIndex) && resumeIndex >= 0 && resumeIndex < tasks.length) return resumeIndex;
+    if (allNonMemory2TasksSubmittedAfterSubmit(task.id)) return -1;
+  }
+  const nextIndex = nextSequentialIndexAfterSubmitPreview(state.activeTaskIndex, task.id);
+  if (nextIndex >= 0) return nextIndex;
+  if (shouldRunMemory2AtEndAfterSubmit(task.id)) return taskIndex("memory2");
+  return -1;
+}
+
+function nextSequentialIndexAfterSubmitPreview(fromIndex, currentTaskId) {
+  for (let index = fromIndex + 1; index < tasks.length; index += 1) {
+    if (tasks[index].id === "memory2" && !isMemory2AvailableAfterSubmit(currentTaskId)) continue;
+    return index;
+  }
+  return -1;
+}
+
+function isMemory2AvailableAfterSubmit(currentTaskId) {
+  return isMemory2Submitted() || isMemory2Ready() || allNonMemory2TasksSubmittedAfterSubmit(currentTaskId);
+}
+
+function shouldRunMemory2AtEndAfterSubmit(currentTaskId) {
+  return Boolean(state.memoryWaitStartedAt) && !isMemory2Submitted() && allNonMemory2TasksSubmittedAfterSubmit(currentTaskId);
+}
+
+function allNonMemory2TasksSubmittedAfterSubmit(currentTaskId) {
+  return tasks.every((entry) => (
+    entry.id === "memory2" || entry.id === currentTaskId || Boolean(state.responses[entry.id]?.submitted)
+  ));
 }
 
 function renderTaskWorkspace(task, step) {
@@ -2330,7 +2364,21 @@ function renderMemoryTask(task) {
           ${options.map((word) => `<button class="option ${selected.includes(word) ? "picked" : ""}" data-action="toggleMemoryWord" data-word="${escapeHtml(word)}" ${inputDisabled}${speechAttrs(word, memoryWordAudioKey(word))}>${escapeHtml(word)}</button>`).join("")}
         </div>
         ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
+        ${response.behavior.memoryReviewPromptVisible ? renderMemoryReviewPrompt(response) : ""}
       ` : `<p class="memory-wait-copy">请先点击开始，听完 5 个词后再选择。</p>`}
+    </div>
+  `;
+}
+
+function renderMemoryReviewPrompt() {
+  return html`
+    <div class="memory-review-panel">
+      <strong>要再听一遍吗？</strong>
+      <p>这次选择和刚刚读到的词不完全一致。</p>
+      <div class="memory-review-actions">
+        <button class="secondary" data-action="reviewMemoryReplay">再听一遍</button>
+        <button class="primary" data-action="confirmMemoryIncorrectSubmit">提交</button>
+      </div>
     </div>
   `;
 }
@@ -2463,6 +2511,7 @@ function renderFluencyTask() {
   const live = getLiveTranscript(tasks.find((task) => task.id === "fluency"), response, 0);
   const animals = fluencyAnimalNamesFromResponse(response, live);
   const readyToAnswer = isTaskReadyToAnswer(tasks[state.activeTaskIndex]);
+  const statusText = fluencyUploadStatusText(response, waiting);
   return html`
     <div class="fluency-page">
       ${renderAudioWave()}
@@ -2470,7 +2519,9 @@ function renderFluencyTask() {
         <button class="timer-button ${running ? "running" : waiting || !readyToAnswer ? "" : "pulse"}" ${waiting || !readyToAnswer ? "disabled" : `data-action="${running ? "stopFluency" : "startFluency"}"`}>${waiting ? "请稍等" : readyToAnswer ? running ? "停止" : "开始" : "请听说明"}</button>
       </div>`}
       <strong class="fluency-count-status">${fluencyStatusText(response, animals)}</strong>
+      ${statusText ? `<p class="fluency-upload-status">${escapeHtml(statusText)}</p>` : ""}
       <div class="animal-count-list">${renderAnimalCountChips(animals)}</div>
+      ${completed ? renderTranscriptEditor(live, "fluency", waiting ? "disabled" : "") : ""}
       ${response.behavior.selectionWarning ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
     </div>
   `;
@@ -2478,8 +2529,15 @@ function renderFluencyTask() {
 
 function fluencyStatusText(response, animals) {
   const countText = `已识别 ${animals.length} 个`;
-  if (response.answer?.completedAt) return `${countText} · 请确认`;
+  if (response.answer?.completedAt) return `${countText} · ${speechTranscribing ? "正在计数" : "请确认"}`;
   return response.answer?.running ? `剩余 ${response.answer.remaining ?? 60} 秒 · ${countText}` : countText;
+}
+
+function fluencyUploadStatusText(response, waiting = false) {
+  const status = response.answer?.transcriptionStatus || "";
+  if (waiting || status === "uploading") return response.answer?.transcriptionMessage || "正在上传录音并计数...";
+  if (status === "error" || status === "empty") return response.answer?.transcriptionMessage || "计数未完成，可手动修改后继续";
+  return "";
 }
 
 function renderAnimalCountChips(animals) {
@@ -3263,10 +3321,208 @@ behavior_json:
   sequence, errors, undoCount, taps, strokes, voiceEvents, audioRecordings, location`;
 }
 
+function setupTaskGuide(task, step = getTaskStep(task)) {
+  if (task?.type === "trail") setupTrailGuidePracticeCanvas(step);
+}
+
+function setupTrailGuidePracticeCanvas() {
+  const canvas = document.querySelector("#trailGuideCanvas");
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.round(rect.width * dpr));
+  canvas.height = Math.max(1, Math.round(rect.height * dpr));
+  const context = canvas.getContext("2d");
+  context.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawTrailGuidePracticeCanvas(canvas);
+
+  canvas.onpointerdown = (event) => {
+    const task = tasks[state.activeTaskIndex];
+    if (task?.type !== "trail" || !isInstructionComplete(task) || isTrailGuidePracticeComplete()) return;
+    const point = canvasPoint(event, canvas);
+    const node = nearestTrailGuidePracticeNode(point, canvas);
+    if (!node) return;
+    playSfx("pick");
+    trailGuidePracticeDragStart = node;
+    trailGuidePracticeDragPoint = point;
+    canvas.setPointerCapture(event.pointerId);
+    drawTrailGuidePracticeCanvas(canvas);
+  };
+  canvas.onpointermove = (event) => {
+    if (!trailGuidePracticeDragStart) return;
+    trailGuidePracticeDragPoint = canvasPoint(event, canvas);
+    drawTrailGuidePracticeCanvas(canvas);
+  };
+  canvas.onpointerup = (event) => {
+    if (!trailGuidePracticeDragStart) return;
+    const point = canvasPoint(event, canvas);
+    const endNode = nearestTrailGuidePracticeNode(point, canvas);
+    commitTrailGuidePracticeDrag(trailGuidePracticeDragStart, endNode, canvas);
+    trailGuidePracticeDragStart = null;
+    trailGuidePracticeDragPoint = null;
+    canvas.releasePointerCapture(event.pointerId);
+    drawTrailGuidePracticeCanvas(canvas);
+    saveDraft();
+    render();
+  };
+  canvas.onpointercancel = () => {
+    trailGuidePracticeDragStart = null;
+    trailGuidePracticeDragPoint = null;
+    drawTrailGuidePracticeCanvas(canvas);
+  };
+}
+
+function trailGuidePracticeExpected() {
+  return ["1", "甲", "乙"];
+}
+
+function trailGuidePracticeEdges() {
+  const edges = getResponse("trail").behavior.trailGuidePracticeEdges;
+  return Array.isArray(edges) ? edges : [];
+}
+
+function commitTrailGuidePracticeDrag(startNode, endNode) {
+  const response = getResponse("trail");
+  response.behavior.trailGuidePracticeAttempts = Number(response.behavior.trailGuidePracticeAttempts || 0) + 1;
+  if (!endNode || startNode.label === endNode.label) {
+    response.behavior.trailGuidePracticeMissedDrops = Number(response.behavior.trailGuidePracticeMissedDrops || 0) + 1;
+    return;
+  }
+  const expected = trailGuidePracticeExpected();
+  const current = trailGuidePracticeSequence();
+  const expectedStart = current.length ? current[current.length - 1] : expected[0];
+  const expectedEnd = expected[current.length ? current.length : 1];
+  const correct = startNode.label === expectedStart && endNode.label === expectedEnd;
+  if (!correct) {
+    response.behavior.trailGuidePracticeErrors = Number(response.behavior.trailGuidePracticeErrors || 0) + 1;
+    return;
+  }
+  const next = current.length ? [...current, endNode.label] : [startNode.label, endNode.label];
+  response.behavior.trailGuidePracticeSequence = next;
+  response.behavior.trailGuidePracticeEdges = [
+    ...trailGuidePracticeEdges(),
+    { from: startNode.label, to: endNode.label, at: new Date().toISOString() }
+  ];
+  if (next.length >= expected.length) {
+    response.behavior.trailGuidePracticeCompletedAt = new Date().toISOString();
+  }
+}
+
+function drawTrailGuidePracticeCanvas(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const context = canvas.getContext("2d");
+  context.clearRect(0, 0, rect.width, rect.height);
+  context.fillStyle = "#fffdf7";
+  context.fillRect(0, 0, rect.width, rect.height);
+  const nodes = trailGuidePracticeNodes(canvas);
+  const nodeMap = new Map(nodes.map((node) => [node.label, node]));
+  const sequence = trailGuidePracticeSequence();
+  const complete = isTrailGuidePracticeComplete();
+
+  context.strokeStyle = "rgba(36,52,71,0.16)";
+  context.lineWidth = 8;
+  context.setLineDash([12, 12]);
+  context.lineCap = "round";
+  context.beginPath();
+  trailGuidePracticeExpected().forEach((label, index) => {
+    const node = nodeMap.get(label);
+    if (!node) return;
+    if (index === 0) context.moveTo(node.x, node.y);
+    else context.lineTo(node.x, node.y);
+  });
+  context.stroke();
+  context.setLineDash([]);
+
+  trailGuidePracticeEdges().forEach((edge) => {
+    const from = nodeMap.get(edge.from);
+    const to = nodeMap.get(edge.to);
+    if (!from || !to) return;
+    context.strokeStyle = "#20a66b";
+    context.lineWidth = 7;
+    context.beginPath();
+    context.moveTo(from.x, from.y);
+    context.lineTo(to.x, to.y);
+    context.stroke();
+  });
+
+  if (trailGuidePracticeDragStart && trailGuidePracticeDragPoint) {
+    context.strokeStyle = "rgba(32,166,107,0.82)";
+    context.lineWidth = 8;
+    context.setLineDash([14, 9]);
+    context.beginPath();
+    context.moveTo(trailGuidePracticeDragStart.x, trailGuidePracticeDragStart.y);
+    context.lineTo(trailGuidePracticeDragPoint.x, trailGuidePracticeDragPoint.y);
+    context.stroke();
+    context.setLineDash([]);
+  }
+
+  nodes.forEach((node) => {
+    const used = sequence.includes(node.label);
+    context.beginPath();
+    context.fillStyle = used ? "#d0f5e4" : "#ffffff";
+    context.strokeStyle = used ? "#16a865" : "#243447";
+    context.lineWidth = used ? 4 : 2.5;
+    context.arc(node.x, node.y, node.r, 0, Math.PI * 2);
+    context.fill();
+    context.stroke();
+    context.fillStyle = used ? "#0d7a48" : "#243447";
+    context.font = "800 28px Inter, 'PingFang SC', system-ui";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(node.label, node.x, node.y);
+  });
+
+  if (!complete && isInstructionComplete(tasks[state.activeTaskIndex])) {
+    const expected = trailGuidePracticeExpected();
+    const from = nodeMap.get(sequence.length ? sequence[sequence.length - 1] : expected[0]);
+    const to = nodeMap.get(expected[sequence.length ? sequence.length : 1]);
+    if (from && to) {
+      const x = from.x + (to.x - from.x) * 0.45;
+      const y = from.y + (to.y - from.y) * 0.45;
+      drawFingerCue(context, x, y, 16, Math.atan2(to.y - from.y, to.x - from.x));
+    }
+  }
+}
+
+function trailGuidePracticeNodes(canvas) {
+  const rect = canvas.getBoundingClientRect();
+  const w = rect.width;
+  const h = rect.height;
+  return [
+    { label: "1", x: w * 0.22, y: h * 0.62, r: 34 },
+    { label: "甲", x: w * 0.50, y: h * 0.30, r: 34 },
+    { label: "乙", x: w * 0.78, y: h * 0.62, r: 34 }
+  ];
+}
+
+function nearestTrailGuidePracticeNode(point, canvas) {
+  return trailGuidePracticeNodes(canvas).find((node) => Math.sqrt((point.x - node.x) ** 2 + (point.y - node.y) ** 2) <= node.r + 14);
+}
+
 function setupCurrentTask(task) {
   if (task.type === "drawing") setupFreeCanvas(task);
   if (task.type === "trail") setupTrailCanvas();
+  if (task.type === "naming") scheduleNamingQuestionPrompt(task, getTaskStep(task));
   if (task.type === "orientation") prepareLocationAnswer();
+}
+
+function scheduleNamingQuestionPrompt(task, step) {
+  const response = getResponse(task.id);
+  response.behavior.namingQuestionAudioPlayed = response.behavior.namingQuestionAudioPlayed || {};
+  if (response.behavior.namingQuestionAudioPlayed[step]) return;
+  response.behavior.namingQuestionAudioPlayed[step] = new Date().toISOString();
+  saveDraft();
+  window.setTimeout(() => {
+    if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
+    speakText(NAMING_QUESTION_TEXT, {
+      audioKey: NAMING_QUESTION_AUDIO_KEY,
+      rate: 0.82,
+      pitch: 1.18,
+      purpose: "instruction",
+      staticOnly: true,
+      preferBuffer: true
+    });
+  }, 180);
 }
 
 function setupFreeCanvas(task) {
@@ -4211,8 +4467,8 @@ root.addEventListener("click", async (event) => {
   }
   if (shouldStartTaskTimingForAction(action, current)) beginTask(current.id);
   if (action === "startSession") playSfx("start");
-  else if (["skipTask", "nextTask", "skipLogin", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
-  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu", "playVolumeSample", "continueToHearing", "replayTaskGuide", "acknowledgeTaskGuide", "touchTrailGuideNode"].includes(action)) playSfx("pick");
+  else if (["skipTask", "nextTask", "goHome", "navView", "closeMenu", "openMenu"].includes(action)) playSfx("nav");
+  else if (["chooseParticipant", "selectTask", "chooseNaming", "toggleMemoryWord", "reviewMemoryReplay", "confirmMemoryIncorrectSubmit", "chooseAbstraction", "appendDigit", "inputSerialDigit", "inputOrientationDigit", "setOrientationDateField", "chooseOrientation", "openRubric", "closeRubric", "clearDrawing", "undoDrawing", "undoTrail", "clearTrail", "confirmTrailCompletion", "cancelTrailCompletion", "selectSavedSession", "startHearingCalibration", "skipHearingCalibration", "restartHearingCalibration", "enterCognitionTest", "confirmHearingChannel", "answerHearingPractice", "answerHearingTrial", "checkHearingEnvironment", "toggleCognitionMenu", "playVolumeSample", "continueToHearing", "replayTaskGuide", "acknowledgeTaskGuide", "touchTrailGuideNode"].includes(action)) playSfx("pick");
 
   if (shouldStopAudioForAction(action, target)) stopAudioPlayback();
   if (buttonSpeech) speakButtonSelection(buttonSpeech);
@@ -4284,14 +4540,6 @@ root.addEventListener("click", async (event) => {
     }
     await startNewSession({ ...state.participant });
   }
-  if (action === "skipLogin") {
-    await startNewSession({
-      name: `访客${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
-      birthYear: "1966-01-01",
-      sex: "",
-      educationLevel: ""
-    });
-  }
   if (action === "openMenu") {
     menuOpen = true;
     render();
@@ -4351,6 +4599,14 @@ root.addEventListener("click", async (event) => {
     render();
   }
   if (action === "toggleMemoryWord") toggleMemoryWord(target.dataset.word);
+  if (action === "reviewMemoryReplay") {
+    reviewMemoryReplay();
+    return;
+  }
+  if (action === "confirmMemoryIncorrectSubmit") {
+    await confirmMemoryIncorrectSubmit();
+    return;
+  }
   if (action === "chooseAbstraction") {
     const response = getResponse("abstraction");
     response.answer[target.dataset.key] = target.dataset.value;
@@ -4362,7 +4618,7 @@ root.addEventListener("click", async (event) => {
   if (action === "replayTaskGuide") replayTaskGuide();
   if (action === "acknowledgeTaskGuide") acknowledgeTaskGuide();
   if (action === "touchTrailGuideNode") touchTrailGuideNode(target.dataset.label);
-  if (action === "toggleVoiceInput") toggleVoiceInput();
+  if (action === "toggleVoiceInput") await toggleVoiceInput();
   if (action === "appendDigit") await appendDigit(target.dataset.digit);
   if (action === "backspaceDigit") backspaceDigit();
   if (action === "inputSerialDigit") inputSerialDigit(target.dataset.digit);
@@ -4459,6 +4715,8 @@ function taskActionsRequiringInstruction() {
     "toggleVoiceInput",
     "chooseNaming",
     "toggleMemoryWord",
+    "reviewMemoryReplay",
+    "confirmMemoryIncorrectSubmit",
     "appendDigit",
     "backspaceDigit",
     "tapVigilance",
@@ -4584,14 +4842,19 @@ function focusAdminPasswordInput() {
   });
 }
 
-document.addEventListener("click", () => {
+document.addEventListener("click", (event) => {
   if (state.view !== "setup" || !setupPromptRetryPending || setupPromptPlayed) return;
+  if (shouldIgnoreSetupPromptRetryClick(event.target)) return;
   void playSetupPrompt().then((started) => {
     if (!started) return;
     setupPromptPlayed = true;
     setupPromptRetryPending = false;
   });
 });
+
+function shouldIgnoreSetupPromptRetryClick(target) {
+  return Boolean(target?.closest?.("input, select, textarea, button, [contenteditable='true']"));
+}
 
 function buttonSpeechData(target) {
   const text = target?.dataset?.speech;
@@ -4610,10 +4873,11 @@ function speakButtonSelection({ text, audioKey, action }) {
   }
   const task = tasks[state.activeTaskIndex];
   if (!task || ["playCurrentAudio", "toggleVoiceInput", "tapVigilance"].includes(action)) return;
+  if (task.type === "choice" && ["appendDigit", "backspaceDigit"].includes(action)) return;
   const response = getResponse(task.id);
   response.behavior.optionAudioPlayback = response.behavior.optionAudioPlayback || [];
   response.behavior.optionAudioPlayback.push({ text, audioKey, action, at: new Date().toISOString() });
-  speakText(text, { audioKey, rate: 0.82, pitch: 1.1, purpose: "option", preferBuffer: true });
+  speakText(text, { audioKey, rate: 0.82, pitch: 1.1, purpose: "option", staticOnly: true, preferBuffer: true });
 }
 
 root.addEventListener("pointerdown", (event) => {
@@ -4640,6 +4904,7 @@ root.addEventListener("input", (event) => {
   }
   if (target.dataset.audioVolume !== undefined) {
     updateSelfSelectedAudioLevel(target.value);
+    scheduleVolumeSamplePlayback();
   }
   if (target.dataset.voiceManual !== undefined) {
     if (manualTranscriptComposing || event.isComposing) return;
@@ -4659,6 +4924,8 @@ root.addEventListener("input", (event) => {
     response.answer.rawTranscript = toSimplifiedChinese(target.value);
     response.answer.interimTranscript = "";
     response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
+    response.answer.transcriptionStatus = response.answer.rawTranscript ? "manual" : response.answer.transcriptionStatus;
+    if (response.answer.rawTranscript) response.answer.transcriptionMessage = "";
     refreshFluencyCountUi(response);
     refreshTaskActionButtons();
     saveDraft();
@@ -4697,6 +4964,8 @@ root.addEventListener("compositionend", (event) => {
     response.answer.rawTranscript = toSimplifiedChinese(target.value);
     response.answer.interimTranscript = "";
     response.answer.animals = extractAnimalNames(response.answer.rawTranscript);
+    response.answer.transcriptionStatus = response.answer.rawTranscript ? "manual" : response.answer.transcriptionStatus;
+    if (response.answer.rawTranscript) response.answer.transcriptionMessage = "";
     refreshFluencyCountUi(response);
   }
   refreshTaskActionButtons();
@@ -4735,18 +5004,40 @@ function updateSelfSelectedAudioLevel(value, options = {}) {
   if (!options.saveOnly) queueVisibleSpeechAudioPreload();
 }
 
+function scheduleVolumeSamplePlayback() {
+  if (state.view !== "volume") return;
+  const now = Date.now();
+  const elapsed = now - lastVolumeSampleAt;
+  const minGapMs = 850;
+  window.clearTimeout(volumeSampleTimer);
+  if (elapsed >= minGapMs) {
+    lastVolumeSampleAt = now;
+    playVolumeSample();
+    return;
+  }
+  volumeSampleTimer = window.setTimeout(() => {
+    if (state.view !== "volume") return;
+    lastVolumeSampleAt = Date.now();
+    playVolumeSample();
+  }, minGapMs - elapsed);
+}
+
 function playVolumeSample() {
   updateSelfSelectedAudioLevel(state.hearingScreening?.selfSelectedAudioLevelDbHl ?? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL, { saveOnly: true });
   return speakText(VOLUME_SAMPLE_TEXT, {
+    audioKey: VOLUME_SAMPLE_AUDIO_KEY,
     rate: 0.82,
     pitch: 1.18,
     purpose: "instruction",
-    staticOnly: false,
+    staticOnly: true,
+    preferBuffer: true,
     fallbackMs: browserSpeechFallbackMs(VOLUME_SAMPLE_TEXT)
   });
 }
 
 function continueToHearing() {
+  window.clearTimeout(volumeSampleTimer);
+  volumeSampleTimer = null;
   state.hearingScreening = {
     ...normalizeHearingScreening(state.hearingScreening),
     selfSelectedAudioLevelDbHl: currentSelfSelectedAudioLevelDbHl(),
@@ -5002,10 +5293,12 @@ function canConfirmTask(task, response) {
     delete response.behavior.selectionWarning;
     if (task.id === "memory1") {
       const complete = selected.length === targets.length && targets.every((word) => selected.includes(word));
-      if (!complete) {
-        response.behavior.selectionWarning = "请把刚刚听到的 5 个词都选对，再继续。";
+      if (!complete && !response.behavior.memoryIncorrectSubmitConfirmed) {
+        response.behavior.memoryReviewPromptVisible = true;
+        response.behavior.selectionWarning = "这次选择和刚刚读到的词不完全一致。";
         return false;
       }
+      delete response.behavior.memoryReviewPromptVisible;
     }
   }
   if (task.type === "abstractionChoice") {
@@ -5204,7 +5497,7 @@ function requestImmediateInstructionPlayback(task, step = getTaskStep(task)) {
 }
 
 function taskGuideText(task, step = getTaskStep(task)) {
-  if (task.type === "naming") return "请您告诉我这个动物的名字。这是什么动物？";
+  if (task.type === "naming") return task.instruction || "请您告诉我这个动物的名字。";
   if (task.type === "serial7") return task.instruction || `请从 100 开始连续减 ${serialSubtractionNumber()}。`;
   if (task.id === "digitBackward") return "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。例如，听到一二三，您就选择三二一。";
   return task.instruction || task.prompt;
@@ -5237,7 +5530,9 @@ function markInstructionComplete(task, step = getTaskStep(task)) {
 }
 
 function audioKeyForInstruction(task, step = getTaskStep(task)) {
-  if (task?.type === "serial7") return `instruction:serialSubtraction:${serialSubtractionNumber()}:0`;
+  if (task?.type === "serial7") return "instruction:serial7:0";
+  if (task?.type === "orientation") return "instruction:orientation:guide";
+  if (task?.type === "abstractionChoice") return "instruction:abstraction:guide";
   return task ? `instruction:${task.id}:0` : null;
 }
 
@@ -5276,7 +5571,7 @@ function isTrailGuidePracticeComplete() {
 function touchTrailGuideNode(label) {
   const task = tasks[state.activeTaskIndex];
   if (task?.type !== "trail" || !isInstructionComplete(task)) return;
-  const expected = ["1", "甲", "2"];
+  const expected = trailGuidePracticeExpected();
   const response = getResponse("trail");
   if (isTrailGuidePracticeComplete()) return;
   const current = trailGuidePracticeSequence();
@@ -5317,17 +5612,19 @@ function playCurrentAudio() {
 function playMemoryWords(response) {
   const targets = memoryTargetWords();
   const wasStarted = Boolean(response.answer.wordsPlaybackStarted);
-  response.answer.audioReady = false;
+  response.answer.audioReady = wasStarted;
   response.answer.wordsPlaybackStarted = true;
   response.behavior.memoryTargetWords = [...targets];
   response.behavior.memoryCandidateWords = [...memoryCandidateWords("memory1")];
   response.behavior.memoryRecallCandidateWords = [...memoryCandidateWords("memory2")];
   response.behavior.memoryPlaybackCount = Number(response.behavior.memoryPlaybackCount || 0) + 1;
   if (wasStarted) response.behavior.replayCount = Number(response.behavior.replayCount || 0) + 1;
+  delete response.behavior.memoryReviewPromptVisible;
   return speakItemsSlow(targets, {
     audioKeys: targets.map(memoryWordAudioKey),
     gapMs: 1000,
     rate: 0.72,
+    staticOnly: true,
     done: () => {
       response.answer.audioReady = true;
       delete response.behavior.selectionWarning;
@@ -5335,6 +5632,28 @@ function playMemoryWords(response) {
       render();
     }
   });
+}
+
+function reviewMemoryReplay() {
+  const task = tasks[state.activeTaskIndex];
+  if (task?.id !== "memory1") return;
+  const response = getResponse("memory1");
+  delete response.behavior.memoryReviewPromptVisible;
+  delete response.behavior.selectionWarning;
+  saveDraft();
+  playMemoryWords(response);
+}
+
+async function confirmMemoryIncorrectSubmit() {
+  const task = tasks[state.activeTaskIndex];
+  if (task?.id !== "memory1") return;
+  const response = getResponse("memory1");
+  response.behavior.memoryIncorrectSubmitConfirmed = true;
+  response.behavior.memoryIncorrectSubmitConfirmedAt = new Date().toISOString();
+  delete response.behavior.memoryReviewPromptVisible;
+  delete response.behavior.selectionWarning;
+  saveDraft();
+  await nextTask();
 }
 
 function markCurrentInstructionHandled(task, step = getTaskStep(task)) {
@@ -5352,7 +5671,6 @@ function prioritizeStartPlayback(task, step = getTaskStep(task)) {
 
 function playSentenceForRepeat(task, step) {
   const text = task.sentences[step];
-  prepareSpeechInputBeforePlayback();
   if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
   const response = getResponse(task.id);
   response.answer.sentenceAudioReady = response.answer.sentenceAudioReady || {};
@@ -5414,7 +5732,14 @@ function resetSetupPromptPlayback() {
 }
 
 function playSetupPrompt() {
-  return speakText(SETUP_PROMPT_TEXT, { rate: 0.82, pitch: 1.18, purpose: "instruction" });
+  return speakText(SETUP_PROMPT_TEXT, {
+    audioKey: SETUP_PROMPT_AUDIO_KEY,
+    rate: 0.82,
+    pitch: 1.18,
+    purpose: "instruction",
+    staticOnly: true,
+    preferBuffer: true
+  });
 }
 
 function playHearingPrompt() {
@@ -5462,7 +5787,7 @@ async function playStaticPrompt(audioKey, purpose = "speech") {
     finished = true;
     playState = "开始";
     speechPlaybackPurpose = null;
-    if (state.view !== "setup") render();
+    if (shouldRenderForPlaybackUi()) render();
   };
   const started = await playStaticTtsAudio(audioKey, {
     playbackId,
@@ -5486,7 +5811,7 @@ async function speakText(text, options = {}) {
     clearSpeechTextFallbackTimer();
     playState = "开始";
     speechPlaybackPurpose = null;
-    if (state.view !== "setup") render();
+    if (shouldRenderForPlaybackUi()) render();
     if (done) done();
   };
 
@@ -5516,7 +5841,11 @@ function startPlaybackUi(playbackId, purpose) {
   if (playbackId !== speechPlaybackId) return;
   playState = "播放中...";
   speechPlaybackPurpose = purpose;
-  if (state.view !== "setup") render();
+  if (shouldRenderForPlaybackUi()) render();
+}
+
+function shouldRenderForPlaybackUi() {
+  return state.view !== "setup" && state.view !== "volume";
 }
 
 function speakTextWithBrowser(text, { playbackId, speechParams, onStart, finish }) {
@@ -5531,7 +5860,7 @@ function speakTextWithBrowser(text, { playbackId, speechParams, onStart, finish 
     if (playbackId !== speechPlaybackId) return;
     playState = "播放中...";
     if (onStart) onStart();
-    if (state.view !== "setup") render();
+    if (shouldRenderForPlaybackUi()) render();
   };
   utterance.onend = finish;
   utterance.onerror = finish;
@@ -5566,13 +5895,20 @@ function pickNaturalVoice() {
 }
 
 function speakItemsSlow(items, options = {}) {
-  const { gapMs = 1000, rate = 0.72, done, onItemStart, audioKeyPrefix = "", audioKeys = [] } = options;
+  const { gapMs = 1000, rate = 0.72, done, onItemStart, audioKeyPrefix = "", audioKeys = [], staticOnly = false } = options;
   const playbackId = beginAudioPlayback();
   playState = "播放中...";
   render();
   playStaticItemSequence(items, { audioKeyPrefix, audioKeys, gapMs, playbackId, onItemStart, done })
     .catch(() => false)
     .then((started) => {
+      if (!started && staticOnly) {
+        if (playbackId !== speechPlaybackId) return;
+        playState = "开始";
+        render();
+        if (done) done();
+        return;
+      }
       if (!started) speakItemsWithBrowser(items, { gapMs, rate, done, onItemStart, audioKeyPrefix, audioKeys, playbackId });
     });
 }
@@ -6035,6 +6371,7 @@ function playDigitStimulus(task) {
     audioKeys: digits.map((digit) => `digit:${digit}`),
     gapMs: 1000,
     rate: 0.66,
+    staticOnly: true,
     done: () => {
       response.answer.audioReady = true;
       saveDraft();
@@ -6116,10 +6453,10 @@ function initSpeechRecognition() {
   return recognition;
 }
 
-function toggleVoiceInput() {
+async function toggleVoiceInput() {
   if (speechTranscribing) return;
   if (recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending) stopVoiceInput();
-  else startVoiceInput();
+  else await startVoiceInput();
 }
 
 async function startVoiceInput() {
@@ -6128,10 +6465,13 @@ async function startVoiceInput() {
   voiceState = voicePromptText();
   speechRecognitionLastError = null;
   beginLiveTranscriptSession({ resetFinal: true });
+  speechRecognitionStartPending = true;
+  render();
   if (PREFER_CLOUDFLARE_ASR) {
     recordSpeechRecognitionEvent("cloudflare-asr-preferred");
     const task = tasks[state.activeTaskIndex];
     const recordingStarted = await startAudioRecording({ transcribeOnStop: true, liveAsr: task?.type !== "fluency" });
+    speechRecognitionStartPending = false;
     voiceState = recordingStarted ? voicePromptText() : "当前浏览器不能录音或识别";
     render();
     return recordingStarted;
@@ -6141,6 +6481,7 @@ async function startVoiceInput() {
   if (!micReady && !speechRecognition) {
     recordSpeechRecognitionEvent("mic-unavailable", { permission: state.permissions.microphone });
     activeSpeechTaskId = null;
+    speechRecognitionStartPending = false;
     voiceState = speechMicrophoneUnavailableText();
     render();
     return false;
@@ -6148,6 +6489,7 @@ async function startVoiceInput() {
   if (!micReady && state.permissions.microphone === "denied") {
     recordSpeechRecognitionEvent("mic-permission-denied");
     activeSpeechTaskId = null;
+    speechRecognitionStartPending = false;
     voiceState = "请允许麦克风权限";
     render();
     return false;
@@ -6159,12 +6501,14 @@ async function startVoiceInput() {
     recordSpeechRecognitionEvent("start-request", { engine: speechRecognition.constructor?.name || "SpeechRecognition" });
     const started = startSpeechRecognitionSafe();
     if (!started) await fallbackToAudioRecording("识别启动失败，已改为录音，可手动修改文字");
+    if (!started && !recordingAudio) speechRecognitionStartPending = false;
     render();
     return started || recordingAudio;
   }
 
   recordSpeechRecognitionEvent("unsupported", { message: "SpeechRecognition API is not available" });
   const recordingStarted = await startAudioRecording();
+  speechRecognitionStartPending = false;
   voiceState = recordingStarted ? "已录音，但此浏览器不支持自动转文字" : "当前浏览器不能录音或识别";
   render();
   return recordingStarted;
@@ -6703,6 +7047,10 @@ async function transcribeAudioBlob(blob, taskId, step) {
   response.behavior.speechRecognition = response.behavior.speechRecognition || [];
   response.behavior.asrStartedAt = response.behavior.asrStartedAt || {};
   response.behavior.asrStartedAt[step] = transcriptionStartedAt;
+  if (task.type === "fluency") {
+    response.answer.transcriptionStatus = "uploading";
+    response.answer.transcriptionMessage = "正在上传录音并计数...";
+  }
   response.behavior.speechRecognition.push({
     step,
     eventType: "cloudflare-asr-upload",
@@ -6713,7 +7061,9 @@ async function transcribeAudioBlob(blob, taskId, step) {
   voiceState = "请稍等";
   render();
   try {
-    const result = await requestAsrJson(task, step, blob);
+    const result = await requestAsrJson(task, step, blob, {
+      timeoutMs: task.type === "fluency" ? FLUENCY_ASR_TIMEOUT_MS : ASR_TIMEOUT_MS
+    });
     const text = cleanAsrTranscript(result?.text || result?.transcription || "");
     response.behavior.speechRecognition.push({
       step,
@@ -6725,8 +7075,16 @@ async function transcribeAudioBlob(blob, taskId, step) {
     });
     if (text) {
       applyVoiceTextForTask(task, response, step, text, { transcriptionStartedAt });
+      if (task.type === "fluency") {
+        response.answer.transcriptionStatus = "completed";
+        response.answer.transcriptionMessage = "计数完成";
+      }
     } else {
       setSpeechWarning(response, step, "未录到声音，请再说一次");
+      if (task.type === "fluency") {
+        response.answer.transcriptionStatus = "empty";
+        response.answer.transcriptionMessage = "未识别到动物名称，可手动修改后继续";
+      }
     }
     voiceState = text ? "转文字完成" : "未录到声音，请再说一次";
     render();
@@ -6737,6 +7095,10 @@ async function transcribeAudioBlob(blob, taskId, step) {
       message: error?.message || "ASR failed",
       at: new Date().toISOString()
     });
+    if (task.type === "fluency") {
+      response.answer.transcriptionStatus = "error";
+      response.answer.transcriptionMessage = "计数失败，可手动修改后继续";
+    }
     voiceState = "转文字失败，可手动输入";
     saveDraft();
     render();
@@ -6748,9 +7110,10 @@ async function transcribeAudioBlob(blob, taskId, step) {
   }
 }
 
-async function requestAsrJson(task, step, blob) {
+async function requestAsrJson(task, step, blob, options = {}) {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), ASR_TIMEOUT_MS);
+  const timeoutMs = Number(options.timeoutMs) || ASR_TIMEOUT_MS;
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${ASR_ENDPOINT}?taskId=${encodeURIComponent(task.id)}&step=${encodeURIComponent(step)}`, {
       method: "POST",
@@ -7360,6 +7723,8 @@ function toggleMemoryWord(word) {
   const response = getResponse(tasks[state.activeTaskIndex].id);
   response.answer.selectedWords = response.answer.selectedWords || [];
   delete response.behavior.selectionWarning;
+  delete response.behavior.memoryReviewPromptVisible;
+  delete response.behavior.memoryIncorrectSubmitConfirmed;
   if (response.answer.selectedWords.includes(word)) {
     response.answer.selectedWords = response.answer.selectedWords.filter((entry) => entry !== word);
   } else if (response.answer.selectedWords.length < MEMORY_TARGET_COUNT) {
@@ -7402,7 +7767,6 @@ function backspaceDigit() {
 function refreshDigitChoiceUi(task, response = getResponse(task.id)) {
   if (!task || task.type !== "choice") return;
   const sequence = response.answer.sequence || [];
-  const answerLength = activeDigitItem(task).answer.length;
   const row = document.querySelector(".digit-answer-squares");
   if (!row) return;
   Array.from(row.children).forEach((entry, index) => {
@@ -7410,9 +7774,8 @@ function refreshDigitChoiceUi(task, response = getResponse(task.id)) {
     entry.textContent = value;
     entry.classList.toggle("empty", !sequence[index]);
   });
-  const full = sequence.length >= answerLength;
   document.querySelectorAll(".digit-keypad button[data-action='appendDigit']").forEach((button) => {
-    button.disabled = full;
+    button.disabled = false;
   });
 }
 
@@ -7502,6 +7865,7 @@ function startVigilance() {
     audioKeyPrefix: "stimulus:vigilance:digit",
     gapMs: 1000,
     rate: 0.66,
+    staticOnly: true,
     onItemStart: (digit, index) => response.behavior.vigilanceDigits.push({ digit, index, at: Date.now() }),
     done: () => {
       window.clearInterval(vigilanceTimer);
@@ -7549,6 +7913,10 @@ async function startFluency() {
   response.answer.running = true;
   response.answer.timerStartedAt = Date.now();
   delete response.answer.completedAt;
+  delete response.answer.completedReason;
+  delete response.answer.transcriptionStatus;
+  delete response.answer.transcriptionMessage;
+  delete response.behavior.selectionWarning;
   render();
   const voiceStarted = await startVoiceInput();
   if (!voiceStarted) {
@@ -7563,11 +7931,8 @@ async function startFluency() {
     response.answer.remaining -= 1;
     if (response.answer.remaining <= 0) {
       response.answer.remaining = 0;
-      response.answer.running = false;
-      response.answer.completedAt = Date.now();
-      window.clearInterval(fluencyTimer);
-      stopVoiceInput();
-      saveDraft();
+      completeFluency("timeout");
+      return;
     }
     render();
   }, 1000);
@@ -7576,8 +7941,19 @@ async function startFluency() {
 
 function stopFluency() {
   const response = getResponse("fluency");
+  if (!response.answer.running && response.answer.completedAt) return;
+  completeFluency("manual");
+}
+
+function completeFluency(reason) {
+  const response = getResponse("fluency");
   response.answer.running = false;
   response.answer.completedAt = Date.now();
+  response.answer.completedReason = reason;
+  if (recordingAudio || pcmRecorder || mediaRecorder) {
+    response.answer.transcriptionStatus = "uploading";
+    response.answer.transcriptionMessage = "正在上传录音并计数...";
+  }
   window.clearInterval(fluencyTimer);
   stopVoiceInput();
   saveDraft();

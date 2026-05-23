@@ -573,22 +573,6 @@ h4 {
   line-height: 0.98;
 }
 
-.skip-login-button {
-  position: absolute;
-  right: 18px;
-  bottom: 12px;
-  z-index: 2;
-  padding: 5px 8px;
-  background: transparent;
-  color: #98a3ad;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.skip-login-button:hover {
-  color: #65758a;
-}
-
 .primary:hover,
 .secondary:hover,
 .confirm-button:hover,
@@ -4188,12 +4172,6 @@ h4 {
     font-size: clamp(28px, 8vw, 38px);
   }
 
-  .skip-login-button {
-    right: 10px;
-    bottom: 7px;
-    font-size: 12px;
-  }
-
   .page-shell {
     grid-template-rows: 56px minmax(0, 1fr);
   }
@@ -5760,11 +5738,6 @@ body,
   line-height: 1;
 }
 
-.skip-login-button {
-  color: rgba(75, 97, 108, 0.68);
-  font-size: 15px;
-}
-
 @media (orientation: landscape) and (max-width: 1280px) and (max-height: 900px) {
   .setup-panel {
     grid-template-columns: minmax(380px, 610px) minmax(0, 1fr);
@@ -6007,10 +5980,6 @@ body,
 
 .setup-left {
   max-height: calc(var(--app-height) - (var(--login-edge-gap) * 2));
-}
-
-.skip-login-button {
-  bottom: max(10px, env(safe-area-inset-bottom));
 }
 
 .clock-time-reference {
@@ -6591,11 +6560,6 @@ body,
   }
 }
 
-.skip-login-button {
-  right: var(--screen-edge-x);
-  bottom: var(--screen-edge-y);
-}
-
 .app-shell {
   display: grid;
   width: 100%;
@@ -6945,6 +6909,15 @@ body,
   font-size: 14px;
   font-weight: 850;
   line-height: 1.15;
+}
+
+.fluency-upload-status {
+  margin: -6px 0 0;
+  color: var(--muted);
+  font-size: clamp(16px, 2vw, 20px);
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .setup-title-row {

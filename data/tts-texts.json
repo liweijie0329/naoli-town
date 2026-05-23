@@ -17,7 +17,7 @@
     },
     {
       "key": "instruction:naming:0",
-      "text": "请您告诉我这个动物的名字。这是什么动物？"
+      "text": "请您告诉我这个动物的名字。"
     },
     {
       "key": "instruction:naming:1",
@@ -41,7 +41,7 @@
     },
     {
       "key": "instruction:digitBackward:0",
-      "text": "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。"
+      "text": "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。例如，听到一二三，您就选择三二一。"
     },
     {
       "key": "instruction:vigilance:0",
@@ -58,6 +58,26 @@
     {
       "key": "instruction:fluency:0",
       "text": "请您尽可能快、尽可能多地说出您所知道的动物的名称。时间是 1 分钟。"
+    },
+    {
+      "key": "instruction:serial7:0",
+      "text": "现在请您做一道计算题，从 100 中减 7，而后从得数中再减 7，一直往下减，直到我让您停下为止。"
+    },
+    {
+      "key": "instruction:abstraction:guide",
+      "text": "请您说说两个词在什么方面相类似，或者说它们有什么共性。"
+    },
+    {
+      "key": "instruction:orientation:guide",
+      "text": "告诉我今天是什么日期。然后请告诉我这是什么地方，它在哪个城市。"
+    },
+    {
+      "key": "stimulus:naming:question",
+      "text": "这是什么动物？"
+    },
+    {
+      "key": "volume:sample",
+      "text": "请调到您觉得清楚、舒服的音量。"
     },
     {
       "key": "instruction:abstraction:0",
