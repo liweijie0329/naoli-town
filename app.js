@@ -34,11 +34,11 @@ const SENTENCE_AUTO_STOP_MS = 30000;
 const SETUP_PROMPT_TEXT = "请填写病例号、姓名和教育水平。";
 const POST_TEST_SURVEY_INTRO_TEXT = "下面我将问一些问题，有关您刚才答题时的感觉。请根据您的真实感受回答，答案没有对错之分，当您准备好了请按开始";
 const SUS_LIKERT_OPTIONS = [
-  { value: 1, label: "非常不同意" },
-  { value: 2, label: "不同意" },
-  { value: 3, label: "一般" },
-  { value: 4, label: "同意" },
-  { value: 5, label: "非常同意" }
+  { value: 1, label: "非常不同意", resultLabel: "非常不同意" },
+  { value: 2, label: "不同意", resultLabel: "不同意" },
+  { value: 3, label: "一般", resultLabel: "中立" },
+  { value: 4, label: "同意", resultLabel: "同意" },
+  { value: 5, label: "非常同意", resultLabel: "非常同意" }
 ];
 const LOGO_SRC = "./assets/logo.svg";
 const MOCA_SHEET_IMAGE = "./assets/moca/moca-page.png";
@@ -216,6 +216,9 @@ const POST_TEST_SURVEY_ITEMS = [
     dimension: "烦恼程度"
   }
 ];
+const POST_TEST_SURVEY_VARIABLE_NAMES = POST_TEST_SURVEY_ITEMS.map((item) => (
+  item.instrument === "sus" ? `SUS_${item.index}` : `NASA_${item.index}`
+));
 
 const TRADITIONAL_PHRASE_REPLACEMENTS = [
   ["甚麼", "什么"],
@@ -3092,7 +3095,7 @@ function renderNasaTlxQuestion(item, answer) {
         type="range"
         min="0"
         max="100"
-        step="5"
+        step="1"
         value="${value}"
         data-survey-range
         data-question-id="${escapeHtml(item.id)}"
@@ -3145,6 +3148,11 @@ function hasPostSurveyAnswer(item, answer = {}) {
   return value !== null && value >= 0 && value <= 100;
 }
 
+function postSurveyVariableName(item) {
+  if (!item || !item.index) return "";
+  return item.instrument === "sus" ? `SUS_${item.index}` : `NASA_${item.index}`;
+}
+
 function postTestSurveyPayload() {
   const survey = getPostTestSurveyState();
   const responses = POST_TEST_SURVEY_ITEMS.map((item, index) => {
@@ -3156,6 +3164,7 @@ function postTestSurveyPayload() {
       order: index + 1,
       instrument: item.instrument,
       index: item.index,
+      variableName: postSurveyVariableName(item),
       dimension: item.dimension || null,
       prompt: item.prompt,
       value: hasValue ? value : null,
@@ -3170,6 +3179,7 @@ function postTestSurveyPayload() {
     step: survey.step,
     totalQuestions: POST_TEST_SURVEY_ITEMS.length,
     responses,
+    variables: postTestSurveyVariables(responses),
     scores: postTestSurveyScores(responses)
   };
 }
@@ -3177,8 +3187,58 @@ function postTestSurveyPayload() {
 function postSurveyAnswerLabel(item, value) {
   const numericValue = surveyNumericValue(value);
   if (numericValue === null) return "";
-  if (item.instrument === "sus") return SUS_LIKERT_OPTIONS.find((option) => option.value === numericValue)?.label || "";
-  return String(numericValue);
+  if (item.instrument === "sus") return susResultLabel(numericValue);
+  const nasaValue = normalizeNasaSurveyValue(numericValue);
+  return nasaValue === null ? "" : String(nasaValue);
+}
+
+function susResultLabel(value) {
+  const numericValue = surveyNumericValue(value);
+  if (numericValue === null) return "";
+  const option = SUS_LIKERT_OPTIONS.find((entry) => entry.value === numericValue);
+  return option?.resultLabel || option?.label || "";
+}
+
+function normalizeNasaSurveyValue(value) {
+  const numericValue = surveyNumericValue(value);
+  if (numericValue === null) return null;
+  return Math.max(0, Math.min(100, Math.round(numericValue)));
+}
+
+function emptyPostTestSurveyVariables() {
+  return Object.fromEntries(POST_TEST_SURVEY_VARIABLE_NAMES.map((name) => [name, ""]));
+}
+
+function postTestSurveyVariables(responses = []) {
+  const variables = emptyPostTestSurveyVariables();
+  responses.forEach((entry) => {
+    const name = entry.variableName || (entry.instrument === "sus" ? `SUS_${entry.index}` : `NASA_${entry.index}`);
+    if (!name || !(name in variables)) return;
+    if (entry.instrument === "sus") {
+      variables[name] = susResultLabel(entry.value);
+      return;
+    }
+    const nasaValue = normalizeNasaSurveyValue(entry.value);
+    variables[name] = nasaValue === null ? "" : nasaValue;
+  });
+  return variables;
+}
+
+function postTestSurveyVariablesFromPayload(postSurvey = {}) {
+  const variables = emptyPostTestSurveyVariables();
+  if (postSurvey.variables && typeof postSurvey.variables === "object") {
+    POST_TEST_SURVEY_VARIABLE_NAMES.forEach((name) => {
+      variables[name] = postSurvey.variables[name] ?? "";
+    });
+    return variables;
+  }
+  if (Array.isArray(postSurvey.responses)) return postTestSurveyVariables(postSurvey.responses);
+  return variables;
+}
+
+function postTestSurveyCsvFields(postSurvey = {}) {
+  const variables = postTestSurveyVariablesFromPayload(postSurvey);
+  return Object.fromEntries(POST_TEST_SURVEY_VARIABLE_NAMES.map((name) => [name, variables[name] ?? ""]));
 }
 
 function postTestSurveyScores(responses) {
@@ -3190,7 +3250,7 @@ function postTestSurveyScores(responses) {
   }, 0);
   const susComplete = susResponses.length === 10 && susResponses.every((entry) => surveyNumericValue(entry.value) !== null);
   const nasaResponses = responses.filter((entry) => entry.instrument === "nasa-tlx");
-  const nasaValues = nasaResponses.map((entry) => surveyNumericValue(entry.value)).filter((value) => value !== null);
+  const nasaValues = nasaResponses.map((entry) => normalizeNasaSurveyValue(entry.value)).filter((value) => value !== null);
   const nasaRaw = nasaValues.length ? nasaValues.reduce((sum, value) => sum + value, 0) / nasaValues.length : null;
   return {
     susScore: susComplete ? susRaw * 2.5 : null,
@@ -5600,15 +5660,14 @@ function chooseSusAnswer(questionId, value) {
   const item = POST_TEST_SURVEY_ITEMS.find((entry) => entry.id === questionId && entry.instrument === "sus");
   if (!item) return;
   const numericValue = Math.max(1, Math.min(5, Number(value)));
-  const option = SUS_LIKERT_OPTIONS.find((entry) => entry.value === numericValue);
-  recordPostSurveyAnswer(item, numericValue, option?.label || "");
+  recordPostSurveyAnswer(item, numericValue, susResultLabel(numericValue));
   render();
 }
 
 function inputNasaTlxAnswer(questionId, value) {
   const item = POST_TEST_SURVEY_ITEMS.find((entry) => entry.id === questionId && entry.instrument === "nasa-tlx");
   if (!item) return;
-  const numericValue = Math.max(0, Math.min(100, Math.round(Number(value) / 5) * 5));
+  const numericValue = normalizeNasaSurveyValue(value) ?? 0;
   recordPostSurveyAnswer(item, numericValue, String(numericValue));
   refreshNasaSliderUi(numericValue);
 }
@@ -9883,6 +9942,7 @@ function csvRowsForSession(session) {
     sus_score: postSurveyScores.susScore ?? "",
     sus_raw_score: postSurveyScores.susRaw ?? "",
     nasa_tlx_raw_score: postSurveyScores.nasaTlxRawScore ?? "",
+    ...postTestSurveyCsvFields(postSurvey),
     post_test_survey_json: postSurvey.status ? stringifyForCsv(postSurvey) : "",
     task_id: item.taskId || "",
     task_title: item.title || "",
