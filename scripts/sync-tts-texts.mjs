@@ -92,7 +92,7 @@ function syncSerialSubtractionPrompts() {
   for (let subtractBy = 1; subtractBy <= 9; subtractBy += 1) {
     for (let step = 0; step < 5; step += 1) {
       upsertEntry(`instruction:serialSubtraction:${subtractBy}:${step}`, {
-        text: step === 0 ? `100 减 ${subtractBy} 等于多少？` : `再减 ${subtractBy}，等于多少？`
+        text: step === 0 ? `100 减 ${subtractBy}，等于多少？` : `再减${subtractBy}，等于多少？`
       });
     }
   }

@@ -60,10 +60,6 @@
       "text": "请您尽可能快、尽可能多地说出您所知道的动物的名称。时间是 1 分钟。"
     },
     {
-      "key": "instruction:serial7:0",
-      "text": "现在请您做一道计算题，从 100 中减 7，而后从得数中再减 7，一直往下减，直到我让您停下为止。"
-    },
-    {
       "key": "instruction:abstraction:guide",
       "text": "请您说说两个词在什么方面相类似，或者说它们有什么共性。"
     },
@@ -948,183 +944,183 @@
     },
     {
       "key": "instruction:serialSubtraction:1:0",
-      "text": "100 减 1 等于多少？"
+      "text": "100 减 1，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:1:1",
-      "text": "再减 1，等于多少？"
+      "text": "再减1，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:1:2",
-      "text": "再减 1，等于多少？"
+      "text": "再减1，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:1:3",
-      "text": "再减 1，等于多少？"
+      "text": "再减1，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:1:4",
-      "text": "再减 1，等于多少？"
+      "text": "再减1，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:2:0",
-      "text": "100 减 2 等于多少？"
+      "text": "100 减 2，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:2:1",
-      "text": "再减 2，等于多少？"
+      "text": "再减2，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:2:2",
-      "text": "再减 2，等于多少？"
+      "text": "再减2，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:2:3",
-      "text": "再减 2，等于多少？"
+      "text": "再减2，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:2:4",
-      "text": "再减 2，等于多少？"
+      "text": "再减2，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:3:0",
-      "text": "100 减 3 等于多少？"
+      "text": "100 减 3，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:3:1",
-      "text": "再减 3，等于多少？"
+      "text": "再减3，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:3:2",
-      "text": "再减 3，等于多少？"
+      "text": "再减3，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:3:3",
-      "text": "再减 3，等于多少？"
+      "text": "再减3，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:3:4",
-      "text": "再减 3，等于多少？"
+      "text": "再减3，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:4:0",
-      "text": "100 减 4 等于多少？"
+      "text": "100 减 4，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:4:1",
-      "text": "再减 4，等于多少？"
+      "text": "再减4，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:4:2",
-      "text": "再减 4，等于多少？"
+      "text": "再减4，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:4:3",
-      "text": "再减 4，等于多少？"
+      "text": "再减4，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:4:4",
-      "text": "再减 4，等于多少？"
+      "text": "再减4，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:5:0",
-      "text": "100 减 5 等于多少？"
+      "text": "100 减 5，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:5:1",
-      "text": "再减 5，等于多少？"
+      "text": "再减5，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:5:2",
-      "text": "再减 5，等于多少？"
+      "text": "再减5，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:5:3",
-      "text": "再减 5，等于多少？"
+      "text": "再减5，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:5:4",
-      "text": "再减 5，等于多少？"
+      "text": "再减5，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:6:0",
-      "text": "100 减 6 等于多少？"
+      "text": "100 减 6，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:6:1",
-      "text": "再减 6，等于多少？"
+      "text": "再减6，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:6:2",
-      "text": "再减 6，等于多少？"
+      "text": "再减6，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:6:3",
-      "text": "再减 6，等于多少？"
+      "text": "再减6，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:6:4",
-      "text": "再减 6，等于多少？"
+      "text": "再减6，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:7:0",
-      "text": "100 减 7 等于多少？"
+      "text": "100 减 7，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:7:1",
-      "text": "再减 7，等于多少？"
+      "text": "再减7，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:7:2",
-      "text": "再减 7，等于多少？"
+      "text": "再减7，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:7:3",
-      "text": "再减 7，等于多少？"
+      "text": "再减7，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:7:4",
-      "text": "再减 7，等于多少？"
+      "text": "再减7，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:8:0",
-      "text": "100 减 8 等于多少？"
+      "text": "100 减 8，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:8:1",
-      "text": "再减 8，等于多少？"
+      "text": "再减8，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:8:2",
-      "text": "再减 8，等于多少？"
+      "text": "再减8，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:8:3",
-      "text": "再减 8，等于多少？"
+      "text": "再减8，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:8:4",
-      "text": "再减 8，等于多少？"
+      "text": "再减8，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:9:0",
-      "text": "100 减 9 等于多少？"
+      "text": "100 减 9，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:9:1",
-      "text": "再减 9，等于多少？"
+      "text": "再减9，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:9:2",
-      "text": "再减 9，等于多少？"
+      "text": "再减9，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:9:3",
-      "text": "再减 9，等于多少？"
+      "text": "再减9，等于多少？"
     },
     {
       "key": "instruction:serialSubtraction:9:4",
-      "text": "再减 9，等于多少？"
+      "text": "再减9，等于多少？"
     },
     {
       "key": "text:d8vzub",
@@ -1557,82 +1553,82 @@
     },
     {
       "key": "survey:sus:1",
-      "text": "我愿意经常使用这个答题系统。",
+      "text": "我愿意经常使用刚才的答题系统。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:sus:2",
-      "text": "我觉得这个答题系统过于复杂。",
+      "text": "我觉得刚才的答题系统过于复杂。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:sus:3",
-      "text": "我觉得这个答题系统容易使用。",
+      "text": "我觉得刚才的答题系统容易使用。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:sus:4",
-      "text": "我觉得需要工作人员帮助，才能顺利使用这个答题系统。",
+      "text": "我觉得需要工作人员帮助，才能顺利使用刚才的答题系统。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:sus:5",
-      "text": "我觉得这个答题系统的各项功能配合得很好。",
+      "text": "我觉得刚才的答题系统的各项功能配合得很好。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:sus:6",
-      "text": "我觉得这个答题系统前后不太一致。",
+      "text": "我觉得刚才的答题系统前后不太一致。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:sus:7",
-      "text": "我觉得大多数人可以很快学会使用这个答题系统。",
+      "text": "我觉得大多数人可以很快学会使用刚才的答题系统。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:sus:8",
-      "text": "我觉得这个答题系统使用起来比较麻烦。",
+      "text": "我觉得刚才的答题系统使用起来比较麻烦。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:sus:9",
-      "text": "我使用这个答题系统时很有信心。",
+      "text": "我使用刚才的答题系统时很有信心。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:sus:10",
-      "text": "我觉得在使用这个答题系统前，需要先学习很多东西。",
+      "text": "我觉得在使用刚才的答题系统前，需要先学习很多东西。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:nasa-tlx:1",
-      "text": "刚才答题时，需要您记忆、思考、计算或判断的程度有多高？",
+      "text": "您刚才做测试付出了多少脑力？0是最少，100是最多，请选择一个数字。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:nasa-tlx:2",
-      "text": "刚才答题时，需要您动手、点击、拖动或说话的程度有多高？",
+      "text": "您刚才做测试付出了多少体力？0是最少，100是最多，请选择一个数字。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:nasa-tlx:3",
-      "text": "刚才答题时，您感觉时间紧迫、需要赶快完成的程度有多高？",
+      "text": "您觉得刚才的测试有多花时间？0是最少，100是最多，请选择一个数字。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:nasa-tlx:4",
-      "text": "刚才答题时，您觉得自己完成得不理想的程度有多高？",
+      "text": "您觉得刚才的测试有多费力？0是最少，100是最多，请选择一个数字。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:nasa-tlx:5",
-      "text": "为了完成刚才的答题，您需要付出的努力有多大？",
+      "text": "您觉得刚才的测试您完成得有多好？0是最好，100是最差，请选择一个数字。",
       "speedRatio": 0.9
     },
     {
       "key": "survey:nasa-tlx:6",
-      "text": "刚才答题时，您感到紧张、烦躁、沮丧或不安的程度有多高？",
+      "text": "您刚才做测试有多沮丧或烦恼？0是最少，100是最多，请选择一个数字。",
       "speedRatio": 0.9
     }
   ]
