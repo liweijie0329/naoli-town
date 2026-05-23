@@ -1157,13 +1157,8 @@ function render() {
   const current = tasks[state.activeTaskIndex] || tasks[0];
   root.innerHTML = renderShell(current);
   if (state.view === "test") {
-    const step = getTaskStep(current);
-    if (isTaskGuideActive(current, step)) {
-      setupTaskGuide(current, step);
-      scheduleTaskInstruction(current, step);
-    } else {
-      setupCurrentTask(current);
-    }
+    setupCurrentTask(current);
+    scheduleTaskInstruction(current);
   }
   queueVisibleSpeechAudioPreload();
   focusAdminPasswordInput();
@@ -1449,7 +1444,6 @@ function renderShell(current) {
   const hearingView = state.view === "hearing";
   const progress = headerProgressState();
   const drawerAvatar = participantAvatarSrc();
-  const showHeaderPrompt = state.view === "test" && !isTaskGuideActive(current, getTaskStep(current));
   return html`
     <div class="app-shell">
       <aside class="hidden-drawer ${menuOpen ? "open" : ""}">
@@ -1482,7 +1476,7 @@ function renderShell(current) {
           <button class="icon-button" data-action="openMenu" aria-label="打开菜单">≡</button>
           <div class="header-title">
             <h2>${state.view === "test" ? escapeHtml(current.title) : viewTitle()}</h2>
-            ${showHeaderPrompt ? `<p class="header-prompt">${escapeHtml(current.prompt)}</p>` : ""}
+            ${state.view === "test" ? `<p class="header-prompt">${escapeHtml(current.prompt)}</p>` : ""}
           </div>
           <div class="header-progress">
             <span>${escapeHtml(progress.label)}</span>
@@ -2041,7 +2035,6 @@ function taskSubmittingLabel(task) {
 
 function renderTask(task) {
   const step = getTaskStep(task);
-  if (isTaskGuideActive(task, step)) return renderTaskGuide(task, step);
   const waitAttr = speechTranscribing || isTaskSubmitting(task) ? "disabled" : "";
   return html`
     <section class="single-page task-page">
@@ -2153,7 +2146,8 @@ function shouldNudgeConfirm(task) {
 }
 
 function isTaskReadyToAnswer(task, step = getTaskStep(task)) {
-  return isTaskGuideAcknowledged(task, step);
+  if (task?.type === "drawing" && ["cube", "clock"].includes(task.id)) return true;
+  return isInstructionComplete(task, step);
 }
 
 function hasTaskAnswer(task, response = getResponse(task.id), step = getTaskStep(task)) {
