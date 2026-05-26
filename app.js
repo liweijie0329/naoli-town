@@ -3322,7 +3322,7 @@ function renderAdmin() {
       <div class="admin-toolbar">
         <button class="primary" data-action="loadSessions">刷新</button>
         <button class="secondary" data-action="saveSession">保存当前测评</button>
-        <button class="secondary" data-action="exportCsv">导出 CSV</button>
+        <button class="secondary" data-action="exportCsv">导出结果</button>
       </div>
       <div class="admin-layout">
         <div class="admin-table">
@@ -9898,13 +9898,22 @@ async function exportSessionsCsv() {
   const fullSessions = await Promise.all(sessions.map((session) => (
     requestJson(`/api/sessions/${encodeURIComponent(session.id)}`, undefined, () => readLocalSessions().find((entry) => entry.id === session.id) || session)
   )));
-  const rows = fullSessions.flatMap(csvRowsForSession);
-  const csv = rowsToCsv(rows);
-  const filename = `cognition-hearing-game-${formatDateForFilename(new Date())}.csv`;
-  downloadTextFile(filename, csv, "text/csv;charset=utf-8");
+  const exportPackage = buildResultsExportPackage(fullSessions);
+  const filename = `cognition-hearing-game-results-${formatDateForFilename(new Date())}.zip`;
+  downloadBlobFile(filename, exportPackage);
 }
 
-function csvRowsForSession(session) {
+function buildResultsExportPackage(sessions) {
+  const mediaFiles = [];
+  const rows = sessions.map((session, index) => csvRowForSession(session, index, mediaFiles));
+  const csv = rowsToCsv(rows);
+  return createZipBlob([
+    { path: "results.csv", data: utf8Bytes(`\ufeff${csv}`) },
+    ...mediaFiles
+  ]);
+}
+
+function csvRowForSession(session, sessionIndex, mediaFiles) {
   const participant = session.participant || {};
   const hearing = session.hearingScreening || null;
   const hearingSummary = hearing?.summary || {};
@@ -9914,9 +9923,9 @@ function csvRowsForSession(session) {
   const hearingEvents = Array.isArray(hearing?.events) ? hearing.events : (hearing ? hearingEventsForExport(hearing) : []);
   const itemResponses = Array.isArray(session.itemResponses) && session.itemResponses.length
     ? session.itemResponses
-    : [{ taskId: "", title: "", domain: "", modality: "", maxScore: "", score: "", answer: {}, behavior: {}, ai: null }];
-
-  return itemResponses.map((item) => ({
+    : [];
+  const mediaFolder = exportSessionFolderName(session, sessionIndex);
+  const row = {
     session_id: session.id || "",
     case_number: participant.caseNumber || "",
     participant_name: participant.name || "",
@@ -9957,23 +9966,158 @@ function csvRowsForSession(session) {
     nasa_tlx_raw_score: postSurveyScores.nasaTlxRawScore ?? "",
     ...postTestSurveyCsvFields(postSurvey),
     post_test_survey_json: postSurvey.status ? stringifyForCsv(postSurvey) : "",
-    task_id: item.taskId || "",
-    task_title: item.title || "",
-    domain: item.domain || "",
-    modality: item.modality || "",
-    max_score: item.maxScore ?? "",
-    score: item.score ?? "",
-    item_started_at: item.startedAt || "",
-    item_ended_at: item.endedAt || "",
-    item_duration_ms: item.durationMs ?? "",
-    standard_answer: item.standardAnswer || item.answer?.answerSummary?.standardAnswer || "",
-    user_answer: item.userAnswer || item.answer?.answerSummary?.userAnswer || "",
-    correctness_json: stringifyForCsv(item.correctness || item.answer?.answerSummary?.parts || null),
-    answer_json: stringifyForCsv(item.answer || {}),
-    behavior_json: stringifyForCsv(item.behavior || {}),
-    ai_json: stringifyForCsv(item.ai || null),
-    drawing_image: item.drawingImage || ""
-  }));
+    media_folder: mediaFolder,
+    drawing_files: "",
+    audio_files: ""
+  };
+  const allDrawingFiles = [];
+  const allAudioFiles = [];
+  const itemSummaries = [];
+  itemResponses.forEach((item, index) => {
+    const exportedMedia = exportItemMediaFiles(item, index, mediaFolder);
+    mediaFiles.push(...exportedMedia.files);
+    allDrawingFiles.push(...exportedMedia.drawingFiles);
+    allAudioFiles.push(...exportedMedia.audioFiles);
+    const prefix = exportItemColumnPrefix(item, index);
+    const answerForCsv = answerForCsvExport(item.answer || {}, exportedMedia.audioFilesByStep);
+    const itemSummary = {
+      taskId: item.taskId || "",
+      title: item.title || "",
+      score: item.score ?? "",
+      maxScore: item.maxScore ?? "",
+      drawingFiles: exportedMedia.drawingFiles,
+      audioFiles: exportedMedia.audioFiles
+    };
+    itemSummaries.push(itemSummary);
+    row[`${prefix}_task_id`] = item.taskId || "";
+    row[`${prefix}_task_title`] = item.title || "";
+    row[`${prefix}_domain`] = item.domain || "";
+    row[`${prefix}_modality`] = item.modality || "";
+    row[`${prefix}_max_score`] = item.maxScore ?? "";
+    row[`${prefix}_score`] = item.score ?? "";
+    row[`${prefix}_started_at`] = item.startedAt || "";
+    row[`${prefix}_ended_at`] = item.endedAt || "";
+    row[`${prefix}_duration_ms`] = item.durationMs ?? "";
+    row[`${prefix}_standard_answer`] = item.standardAnswer || item.answer?.answerSummary?.standardAnswer || "";
+    row[`${prefix}_user_answer`] = item.userAnswer || item.answer?.answerSummary?.userAnswer || "";
+    row[`${prefix}_correctness_json`] = stringifyForCsv(item.correctness || item.answer?.answerSummary?.parts || null);
+    row[`${prefix}_answer_json`] = stringifyForCsv(answerForCsv);
+    row[`${prefix}_behavior_json`] = stringifyForCsv(item.behavior || {});
+    row[`${prefix}_ai_json`] = stringifyForCsv(item.ai || null);
+    row[`${prefix}_drawing_file`] = exportedMedia.drawingFiles.join(";");
+    row[`${prefix}_audio_files`] = exportedMedia.audioFiles.join(";");
+  });
+  row.drawing_files = allDrawingFiles.join(";");
+  row.audio_files = allAudioFiles.join(";");
+  row.item_responses_json = stringifyForCsv(itemSummaries);
+  return row;
+}
+
+function exportItemMediaFiles(item = {}, index = 0, mediaFolder = "users/unknown") {
+  const files = [];
+  const drawingFiles = [];
+  const audioFiles = [];
+  const audioFilesByStep = {};
+  const itemName = `${String(index + 1).padStart(2, "0")}_${safeExportPathPart(item.taskId || item.title || "task")}`;
+  const drawing = dataUrlToExportFile(item.drawingImage);
+  if (drawing) {
+    const path = `${mediaFolder}/drawings/${itemName}.${drawing.extension}`;
+    files.push({ path, data: drawing.bytes });
+    drawingFiles.push(path);
+  }
+  const recordings = item.answer?.audioRecordings;
+  if (recordings && typeof recordings === "object") {
+    Object.entries(recordings).forEach(([step, value]) => {
+      const audio = dataUrlToExportFile(value);
+      if (!audio) return;
+      const stepName = safeExportPathPart(`step_${Number(step) + 1 || step}`);
+      const path = `${mediaFolder}/audio/${itemName}_${stepName}.${audio.extension}`;
+      files.push({ path, data: audio.bytes });
+      audioFiles.push(path);
+      audioFilesByStep[step] = path;
+    });
+  }
+  return { files, drawingFiles, audioFiles, audioFilesByStep };
+}
+
+function answerForCsvExport(answer = {}, audioFilesByStep = {}) {
+  const copy = JSON.parse(JSON.stringify(answer || {}));
+  if (copy.audioRecordings && typeof copy.audioRecordings === "object") {
+    copy.audioRecordings = Object.fromEntries(Object.entries(copy.audioRecordings).map(([step, value]) => {
+      if (audioFilesByStep[step]) return [step, audioFilesByStep[step]];
+      if (typeof value === "string" && value.startsWith("data:audio/")) return [step, "[audio exported separately]"];
+      return [step, value];
+    }));
+  }
+  return copy;
+}
+
+function exportSessionFolderName(session = {}, index = 0) {
+  const participant = session.participant || {};
+  const prefix = String(index + 1).padStart(3, "0");
+  const parts = [
+    prefix,
+    participant.caseNumber || "",
+    participant.name || "",
+    String(session.id || "").slice(0, 8)
+  ].map((part) => safeExportPathPart(part)).filter(Boolean);
+  return `users/${parts.join("_") || prefix}`;
+}
+
+function exportItemColumnPrefix(item = {}, index = 0) {
+  const taskKey = safeCsvColumnPart(item.taskId || item.title || `item_${index + 1}`);
+  return `task_${String(index + 1).padStart(2, "0")}_${taskKey}`;
+}
+
+function safeCsvColumnPart(value) {
+  const text = String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return text || "item";
+}
+
+function safeExportPathPart(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_")
+    .replace(/\s+/g, "_")
+    .slice(0, 80);
+}
+
+function dataUrlToExportFile(value) {
+  if (typeof value !== "string" || !value.startsWith("data:")) return null;
+  const match = value.match(/^data:([^;,]+)?((?:;[^,]*)*),(.*)$/);
+  if (!match) return null;
+  const mimeType = match[1] || "application/octet-stream";
+  const parameters = match[2] || "";
+  const payload = match[3] || "";
+  try {
+    const bytes = parameters.includes(";base64")
+      ? base64ToBytes(payload)
+      : utf8Bytes(decodeURIComponent(payload));
+    return { mimeType, extension: extensionForMimeType(mimeType), bytes };
+  } catch {
+    return null;
+  }
+}
+
+function base64ToBytes(base64) {
+  const binary = atob(base64.replace(/\s/g, ""));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function extensionForMimeType(mimeType) {
+  const normalized = String(mimeType || "").toLowerCase().split(";")[0];
+  if (normalized === "image/png") return "png";
+  if (normalized === "image/jpeg" || normalized === "image/jpg") return "jpg";
+  if (normalized === "image/webp") return "webp";
+  if (normalized === "audio/webm") return "webm";
+  if (normalized === "audio/mp4" || normalized === "audio/aac") return "m4a";
+  if (normalized === "audio/mpeg" || normalized === "audio/mp3") return "mp3";
+  if (normalized === "audio/wav" || normalized === "audio/wave") return "wav";
+  return normalized.split("/").pop()?.replace(/[^a-z0-9]/g, "") || "bin";
 }
 
 function stringifyForCsv(value) {
@@ -9981,7 +10125,7 @@ function stringifyForCsv(value) {
 }
 
 function rowsToCsv(rows) {
-  const headers = Object.keys(rows[0] || {});
+  const headers = [...new Set(rows.flatMap((row) => Object.keys(row || {})))];
   return [
     headers.join(","),
     ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header])).join(","))
@@ -9998,8 +10142,98 @@ function formatDateForFilename(date) {
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}`;
 }
 
+function utf8Bytes(text) {
+  return new TextEncoder().encode(String(text ?? ""));
+}
+
+function createZipBlob(files) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+  files.forEach((file) => {
+    const nameBytes = utf8Bytes(file.path);
+    const data = file.data instanceof Uint8Array ? file.data : new Uint8Array(file.data || []);
+    const crc = crc32(data);
+    const { time, date } = zipDosDateTime(new Date());
+    const localHeader = new Uint8Array(30 + nameBytes.length);
+    const localView = new DataView(localHeader.buffer);
+    localView.setUint32(0, 0x04034b50, true);
+    localView.setUint16(4, 20, true);
+    localView.setUint16(6, 0x0800, true);
+    localView.setUint16(8, 0, true);
+    localView.setUint16(10, time, true);
+    localView.setUint16(12, date, true);
+    localView.setUint32(14, crc, true);
+    localView.setUint32(18, data.length, true);
+    localView.setUint32(22, data.length, true);
+    localView.setUint16(26, nameBytes.length, true);
+    localHeader.set(nameBytes, 30);
+    localParts.push(localHeader, data);
+
+    const centralHeader = new Uint8Array(46 + nameBytes.length);
+    const centralView = new DataView(centralHeader.buffer);
+    centralView.setUint32(0, 0x02014b50, true);
+    centralView.setUint16(4, 20, true);
+    centralView.setUint16(6, 20, true);
+    centralView.setUint16(8, 0x0800, true);
+    centralView.setUint16(10, 0, true);
+    centralView.setUint16(12, time, true);
+    centralView.setUint16(14, date, true);
+    centralView.setUint32(16, crc, true);
+    centralView.setUint32(20, data.length, true);
+    centralView.setUint32(24, data.length, true);
+    centralView.setUint16(28, nameBytes.length, true);
+    centralView.setUint32(42, offset, true);
+    centralHeader.set(nameBytes, 46);
+    centralParts.push(centralHeader);
+    offset += localHeader.length + data.length;
+  });
+
+  const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
+  const endRecord = new Uint8Array(22);
+  const endView = new DataView(endRecord.buffer);
+  endView.setUint32(0, 0x06054b50, true);
+  endView.setUint16(8, files.length, true);
+  endView.setUint16(10, files.length, true);
+  endView.setUint32(12, centralSize, true);
+  endView.setUint32(16, offset, true);
+  return new Blob([...localParts, ...centralParts, endRecord], { type: "application/zip" });
+}
+
+function zipDosDateTime(date) {
+  return {
+    time: (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2),
+    date: ((date.getFullYear() - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate()
+  };
+}
+
+function crc32(bytes) {
+  const table = crc32.table || (crc32.table = makeCrc32Table());
+  let crc = 0xffffffff;
+  for (let index = 0; index < bytes.length; index += 1) {
+    crc = (crc >>> 8) ^ table[(crc ^ bytes[index]) & 0xff];
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function makeCrc32Table() {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n += 1) {
+    let c = n;
+    for (let k = 0; k < 8; k += 1) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    }
+    table[n] = c >>> 0;
+  }
+  return table;
+}
+
 function downloadTextFile(filename, content, mimeType) {
   const blob = new Blob(["\ufeff", content], { type: mimeType });
+  downloadBlobFile(filename, blob);
+}
+
+function downloadBlobFile(filename, blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
