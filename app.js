@@ -9909,6 +9909,7 @@ function buildResultsExportPackage(sessions) {
   const csv = rowsToCsv(rows);
   return createZipBlob([
     { path: "results.csv", data: utf8Bytes(`\ufeff${csv}`) },
+    { path: "raw_sessions.json", data: utf8Bytes(JSON.stringify(sessions, null, 2)) },
     ...mediaFiles
   ]);
 }
@@ -9920,7 +9921,6 @@ function csvRowForSession(session, sessionIndex, mediaFiles) {
   const postSurvey = session.postTestSurvey || {};
   const postSurveyScores = postSurvey.scores || {};
   const hearingResponseCounts = hearing?.responseCounts || hearingSummary.responseCounts || (hearing ? summarizeHearingResponses(hearing) : {});
-  const hearingEvents = Array.isArray(hearing?.events) ? hearing.events : (hearing ? hearingEventsForExport(hearing) : []);
   const itemResponses = Array.isArray(session.itemResponses) && session.itemResponses.length
     ? session.itemResponses
     : [];
@@ -9941,7 +9941,7 @@ function csvRowForSession(session, sessionIndex, mediaFiles) {
     education_bonus: session.educationBonus ?? "",
     total_score: session.totalScore ?? "",
     risk_band: session.riskBand || "",
-    domain_scores_json: stringifyForCsv(session.domainScores || {}),
+    ...domainScoreCsvFields(session.domainScores || {}),
     hearing_status: hearing ? formatHearingStatus(hearingSummary.status || hearing.status) : "",
     hearing_right_pta4: hearingSummary.ears?.right?.pta4 ?? "",
     hearing_left_pta4: hearingSummary.ears?.left?.pta4 ?? "",
@@ -9955,9 +9955,6 @@ function csvRowForSession(session, sessionIndex, mediaFiles) {
     hearing_response_count: hearingResponseCounts.total ?? "",
     hearing_heard_count: hearingResponseCounts.heard ?? "",
     hearing_missed_count: hearingResponseCounts.missed ?? "",
-    hearing_environment_checks_json: hearing ? stringifyForCsv(hearing.environmentChecks || []) : "",
-    hearing_events_json: hearing ? stringifyForCsv(hearingEvents) : "",
-    hearing_screening_json: hearing ? stringifyForCsv(hearing) : "",
     post_test_survey_status: postSurvey.status || "",
     post_test_survey_started_at: postSurvey.startedAt || "",
     post_test_survey_completed_at: postSurvey.completedAt || "",
@@ -9965,30 +9962,19 @@ function csvRowForSession(session, sessionIndex, mediaFiles) {
     sus_raw_score: postSurveyScores.susRaw ?? "",
     nasa_tlx_raw_score: postSurveyScores.nasaTlxRawScore ?? "",
     ...postTestSurveyCsvFields(postSurvey),
-    post_test_survey_json: postSurvey.status ? stringifyForCsv(postSurvey) : "",
     media_folder: mediaFolder,
     drawing_files: "",
     audio_files: ""
   };
   const allDrawingFiles = [];
   const allAudioFiles = [];
-  const itemSummaries = [];
   itemResponses.forEach((item, index) => {
     const exportedMedia = exportItemMediaFiles(item, index, mediaFolder);
     mediaFiles.push(...exportedMedia.files);
     allDrawingFiles.push(...exportedMedia.drawingFiles);
     allAudioFiles.push(...exportedMedia.audioFiles);
     const prefix = exportItemColumnPrefix(item, index);
-    const answerForCsv = answerForCsvExport(item.answer || {}, exportedMedia.audioFilesByStep);
-    const itemSummary = {
-      taskId: item.taskId || "",
-      title: item.title || "",
-      score: item.score ?? "",
-      maxScore: item.maxScore ?? "",
-      drawingFiles: exportedMedia.drawingFiles,
-      audioFiles: exportedMedia.audioFiles
-    };
-    itemSummaries.push(itemSummary);
+    const task = tasks.find((entry) => entry.id === item.taskId) || null;
     row[`${prefix}_task_id`] = item.taskId || "";
     row[`${prefix}_task_title`] = item.title || "";
     row[`${prefix}_domain`] = item.domain || "";
@@ -10000,17 +9986,249 @@ function csvRowForSession(session, sessionIndex, mediaFiles) {
     row[`${prefix}_duration_ms`] = item.durationMs ?? "";
     row[`${prefix}_standard_answer`] = item.standardAnswer || item.answer?.answerSummary?.standardAnswer || "";
     row[`${prefix}_user_answer`] = item.userAnswer || item.answer?.answerSummary?.userAnswer || "";
-    row[`${prefix}_correctness_json`] = stringifyForCsv(item.correctness || item.answer?.answerSummary?.parts || null);
-    row[`${prefix}_answer_json`] = stringifyForCsv(answerForCsv);
-    row[`${prefix}_behavior_json`] = stringifyForCsv(item.behavior || {});
-    row[`${prefix}_ai_json`] = stringifyForCsv(item.ai || null);
+    row[`${prefix}_score_basis`] = taskScoreBasisForExport(item, task);
     row[`${prefix}_drawing_file`] = exportedMedia.drawingFiles.join(";");
     row[`${prefix}_audio_files`] = exportedMedia.audioFiles.join(";");
+    const subItems = exportSubItemsForItem(item, task, exportedMedia);
+    subItems.forEach((subItem, subIndex) => {
+      const subPrefix = `${prefix}_sub_${String(subIndex + 1).padStart(2, "0")}`;
+      row[`${subPrefix}_label`] = subItem.label || "";
+      row[`${subPrefix}_standard_answer`] = subItem.standardAnswer || "";
+      row[`${subPrefix}_user_answer`] = subItem.userAnswer || "";
+      row[`${subPrefix}_correct`] = formatBooleanForCsv(subItem.correct);
+      row[`${subPrefix}_score`] = subItem.score ?? "";
+      row[`${subPrefix}_max_score`] = subItem.maxScore ?? "";
+      row[`${subPrefix}_started_at`] = subItem.startedAt || "";
+      row[`${subPrefix}_ended_at`] = subItem.endedAt || "";
+      row[`${subPrefix}_duration_ms`] = subItem.durationMs ?? "";
+      row[`${subPrefix}_score_basis`] = subItem.scoreBasis || "";
+      row[`${subPrefix}_drawing_file`] = subItem.drawingFile || "";
+      row[`${subPrefix}_audio_files`] = Array.isArray(subItem.audioFiles) ? subItem.audioFiles.join(";") : "";
+    });
   });
   row.drawing_files = allDrawingFiles.join(";");
   row.audio_files = allAudioFiles.join(";");
-  row.item_responses_json = stringifyForCsv(itemSummaries);
+  row.item_count = itemResponses.length;
   return row;
+}
+
+function domainScoreCsvFields(domainScores = {}) {
+  const domains = [
+    ["visuospatial_executive", "视空间与执行功能"],
+    ["naming", "命名"],
+    ["memory", "记忆"],
+    ["delayed_recall", "延迟回忆"],
+    ["attention", "注意"],
+    ["language", "语言"],
+    ["abstraction", "抽象"],
+    ["orientation", "定向"]
+  ];
+  const fields = {};
+  domains.forEach(([key, label]) => {
+    const value = domainScores?.[label] || {};
+    fields[`domain_${key}_score`] = value.score ?? "";
+    fields[`domain_${key}_max_score`] = value.max ?? "";
+  });
+  return fields;
+}
+
+function exportSubItemsForItem(item = {}, task = null, exportedMedia = {}) {
+  if (item.taskId === "clock") return clockSubItemsForExport(item, task, exportedMedia);
+  const parts = answerPartsForExport(item).filter((part) => part.label !== "评分说明");
+  if (!parts.length) return [];
+  return parts.map((part, index) => {
+    const timing = subItemTimingForExport(item, index);
+    const maxScore = subItemMaxScoreForExport(item, task, parts);
+    return {
+      label: part.label,
+      standardAnswer: part.standard,
+      userAnswer: part.user,
+      correct: part.correct,
+      score: subItemScoreForExport(item, task, part, parts, maxScore),
+      maxScore,
+      ...timing,
+      scoreBasis: scoreBasisForPartExport(item, task, part, index),
+      drawingFile: drawingFileForSubItem(item, exportedMedia),
+      audioFiles: audioFilesForSubItem(item, index, exportedMedia)
+    };
+  });
+}
+
+function answerPartsForExport(item = {}) {
+  const savedParts = Array.isArray(item.correctness?.parts)
+    ? item.correctness.parts
+    : Array.isArray(item.answer?.answerSummary?.parts)
+      ? item.answer.answerSummary.parts
+      : Array.isArray(item.correctness)
+        ? item.correctness
+        : null;
+  const parts = savedParts && savedParts.length ? savedParts : readableItemAnswerParts(item);
+  return (Array.isArray(parts) ? parts : []).map(normalizeAnswerPart);
+}
+
+function clockSubItemsForExport(item = {}, task = null, exportedMedia = {}) {
+  const rubric = DRAWING_AI_RUBRICS.clock || [];
+  const criteria = Array.isArray(item.ai?.criteria) ? item.ai.criteria : [];
+  const timing = subItemTimingForExport(item, 0);
+  return rubric.map((rubricItem, index) => {
+    const criterion = findDrawingCriterion(criteria, rubricItem, index);
+    const passed = criterionPassedForExport(criterion);
+    return {
+      label: rubricItem.label,
+      standardAnswer: rubricItem.detail,
+      userAnswer: item.drawingImage || exportedMedia.drawingFiles?.length ? "见画图文件" : "未提交画图",
+      correct: passed,
+      score: passed === null ? "" : (passed ? 1 : 0),
+      maxScore: 1,
+      ...timing,
+      scoreBasis: criterionEvidenceForExport(criterion) || taskScoreBasisForExport(item, task),
+      drawingFile: drawingFileForSubItem(item, exportedMedia),
+      audioFiles: []
+    };
+  });
+}
+
+function findDrawingCriterion(criteria = [], rubricItem = {}, index = 0) {
+  return criteria.find((entry) => entry?.key === rubricItem.key)
+    || criteria.find((entry) => entry?.label === rubricItem.label)
+    || criteria[index]
+    || null;
+}
+
+function criterionPassedForExport(criterion) {
+  if (!criterion || typeof criterion !== "object") return null;
+  if (typeof criterion.passed === "boolean") return criterion.passed;
+  if (typeof criterion.correct === "boolean") return criterion.correct;
+  if (typeof criterion.met === "boolean") return criterion.met;
+  const text = String(criterion.detail ?? criterion.value ?? "").trim().toLowerCase();
+  if (["true", "1", "yes", "y", "是", "通过", "正确"].includes(text)) return true;
+  if (["false", "0", "no", "n", "否", "未通过", "错误"].includes(text)) return false;
+  return null;
+}
+
+function criterionEvidenceForExport(criterion) {
+  if (!criterion || typeof criterion !== "object") return "";
+  const detail = String(criterion.detail || "").trim();
+  return criterion.evidence || criterion.comment || criterion.reason || (
+    detail && !["true", "false", "1", "0"].includes(detail.toLowerCase()) ? detail : ""
+  );
+}
+
+function subItemMaxScoreForExport(item = {}, task = null, parts = []) {
+  const maxScore = Number(item.maxScore ?? task?.maxScore ?? 0);
+  if (!Number.isFinite(maxScore) || maxScore <= 0) return "";
+  if (parts.length <= 1) return maxScore;
+  return 1;
+}
+
+function subItemScoreForExport(item = {}, task = null, part = {}, parts = [], maxScore = "") {
+  if (maxScore === "") return "";
+  if (typeof part.correct !== "boolean") return "";
+  if (parts.length <= 1 && Number(maxScore) > 1) return item.score ?? (part.correct ? maxScore : 0);
+  return part.correct ? 1 : 0;
+}
+
+function taskScoreBasisForExport(item = {}, task = null) {
+  const summaryReason = item.answer?.answerSummary?.scoreReason || "";
+  if (summaryReason) return summaryReason;
+  if (item.ai?.comment) return item.ai.comment;
+  if (item.taskId === "serial7") {
+    const correctSteps = item.behavior?.serialSubtractionCorrectSteps;
+    const score = item.behavior?.serialSubtractionScore ?? item.score;
+    return Number.isFinite(Number(correctSteps))
+      ? `每一步按上一个减数继续减 7 独立评判；正确 ${correctSteps} 步，折算 ${score}/${item.maxScore ?? task?.maxScore ?? 3} 分。`
+      : "每一步按上一个减数继续减 7 独立评判。";
+  }
+  if (item.taskId === "sentence") return "每句话必须原原本本复述；省略、替换、增加或语序变化均不给该句分。";
+  if (item.taskId === "fluency") {
+    const animals = Array.isArray(item.answer?.animals) ? item.answer.animals : [];
+    const rawTranscript = truncateCsvText(item.answer?.rawTranscript || "");
+    return `识别动物 ${animals.length} 个；不少于 11 个给 1 分。${rawTranscript ? `原始转写：${rawTranscript}` : ""}`;
+  }
+  if (item.taskId === "vigilance") {
+    const errors = item.behavior?.vigilance?.errors;
+    return Number.isFinite(Number(errors)) ? `错误 ${errors} 次；完全正确或只有一次错误给 1 分。` : "完全正确或只有一次错误给 1 分。";
+  }
+  if (task?.type === "drawing") return "图片 AI 按 MoCA 画图标准评分。";
+  if (task?.type === "choice") return "用户点击序列与标准序列完全一致给 1 分。";
+  if (task?.type === "memory") return task.maxScore > 0 ? "每选中一个目标词给 1 分。" : "学习试次不计入总分，仅记录选择情况。";
+  if (["naming", "abstractionChoice", "orientation"].includes(task?.type)) return "用户答案与标准答案一致给 1 分。";
+  return "";
+}
+
+function scoreBasisForPartExport(item = {}, task = null, part = {}, index = 0) {
+  if (item.taskId === "serial7") {
+    const step = item.behavior?.serialSubtractionSteps?.[index];
+    if (step) return `从 ${step.previous} 减 ${step.subtractBy ?? 7}；标准答案 ${step.expected}，用户答案 ${step.answer ?? "未答"}。`;
+  }
+  if (item.taskId === "sentence") {
+    const detail = item.behavior?.sentenceScoring?.details?.[index];
+    if (detail?.rule) return detail.rule;
+  }
+  if (item.taskId === "memory1" || item.taskId === "memory2") {
+    const targets = item.behavior?.memoryTargetWords || [];
+    const selected = item.answer?.selectedWords || [];
+    return `目标词：${targets.join("、")}；用户选择：${selected.join("、") || "未选择"}。`;
+  }
+  return taskScoreBasisForExport(item, task);
+}
+
+function subItemTimingForExport(item = {}, index = 0) {
+  if (item.taskId === "serial7") {
+    const step = item.behavior?.serialSubtractionSteps?.[index];
+    if (step) return {
+      startedAt: step.startedAt || "",
+      endedAt: step.endedAt || "",
+      durationMs: step.durationMs ?? durationMsBetween(step.startedAt, step.endedAt)
+    };
+  }
+  if (item.taskId === "sentence") {
+    const playback = (item.behavior?.sentencePlayback || []).find((entry) => Number(entry.step) === index);
+    const recording = (item.behavior?.audioRecordings || []).find((entry) => Number(entry.step) === index);
+    const startedAt = playback?.at || item.startedAt || "";
+    const endedAt = recording?.endedAt || item.endedAt || "";
+    return { startedAt, endedAt, durationMs: durationMsBetween(startedAt, endedAt) || item.durationMs || "" };
+  }
+  if (item.taskId === "fluency") {
+    const startedAt = isoFromMaybeTimestamp(item.answer?.timerStartedAt) || item.startedAt || "";
+    const endedAt = isoFromMaybeTimestamp(item.answer?.completedAt) || item.endedAt || "";
+    return { startedAt, endedAt, durationMs: durationMsBetween(startedAt, endedAt) || item.durationMs || "" };
+  }
+  return { startedAt: item.startedAt || "", endedAt: item.endedAt || "", durationMs: item.durationMs ?? "" };
+}
+
+function audioFilesForSubItem(item = {}, index = 0, exportedMedia = {}) {
+  const byStep = exportedMedia.audioFilesByStep || {};
+  if (byStep[index]) return [byStep[index]];
+  return [];
+}
+
+function drawingFileForSubItem(item = {}, exportedMedia = {}) {
+  return ["trail", "cube", "clock"].includes(item.taskId) ? (exportedMedia.drawingFiles?.[0] || "") : "";
+}
+
+function formatBooleanForCsv(value) {
+  if (value === true) return "正确";
+  if (value === false) return "错误";
+  return "";
+}
+
+function durationMsBetween(startedAt, endedAt) {
+  const start = Date.parse(startedAt || "");
+  const end = Date.parse(endedAt || "");
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return "";
+  return end - start;
+}
+
+function isoFromMaybeTimestamp(value) {
+  if (typeof value === "string" && value) return value;
+  if (!Number.isFinite(Number(value))) return "";
+  return new Date(Number(value)).toISOString();
+}
+
+function truncateCsvText(value, maxLength = 500) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
 
 function exportItemMediaFiles(item = {}, index = 0, mediaFolder = "users/unknown") {
@@ -10038,18 +10256,6 @@ function exportItemMediaFiles(item = {}, index = 0, mediaFolder = "users/unknown
     });
   }
   return { files, drawingFiles, audioFiles, audioFilesByStep };
-}
-
-function answerForCsvExport(answer = {}, audioFilesByStep = {}) {
-  const copy = JSON.parse(JSON.stringify(answer || {}));
-  if (copy.audioRecordings && typeof copy.audioRecordings === "object") {
-    copy.audioRecordings = Object.fromEntries(Object.entries(copy.audioRecordings).map(([step, value]) => {
-      if (audioFilesByStep[step]) return [step, audioFilesByStep[step]];
-      if (typeof value === "string" && value.startsWith("data:audio/")) return [step, "[audio exported separately]"];
-      return [step, value];
-    }));
-  }
-  return copy;
 }
 
 function exportSessionFolderName(session = {}, index = 0) {
@@ -10118,10 +10324,6 @@ function extensionForMimeType(mimeType) {
   if (normalized === "audio/mpeg" || normalized === "audio/mp3") return "mp3";
   if (normalized === "audio/wav" || normalized === "audio/wave") return "wav";
   return normalized.split("/").pop()?.replace(/[^a-z0-9]/g, "") || "bin";
-}
-
-function stringifyForCsv(value) {
-  return JSON.stringify(value ?? null);
 }
 
 function rowsToCsv(rows) {
