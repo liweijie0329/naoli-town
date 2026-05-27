@@ -9955,6 +9955,7 @@ function csvRowForSession(session, sessionIndex, mediaFiles) {
     hearing_response_count: hearingResponseCounts.total ?? "",
     hearing_heard_count: hearingResponseCounts.heard ?? "",
     hearing_missed_count: hearingResponseCounts.missed ?? "",
+    ...hearingDetailCsvFields(hearing),
     post_test_survey_status: postSurvey.status || "",
     post_test_survey_started_at: postSurvey.startedAt || "",
     post_test_survey_completed_at: postSurvey.completedAt || "",
@@ -10030,6 +10031,46 @@ function domainScoreCsvFields(domainScores = {}) {
     fields[`domain_${key}_max_score`] = value.max ?? "";
   });
   return fields;
+}
+
+function hearingDetailCsvFields(screening = null) {
+  const fields = {};
+  const normalized = screening ? normalizeHearingScreening(screening) : null;
+  const responses = Array.isArray(normalized?.responses) ? normalized.responses : [];
+  const thresholds = normalized?.thresholds || {};
+  HEARING_SIDES.forEach((side) => {
+    HEARING_TEST_FREQUENCIES.forEach((frequencyHz) => {
+      const prefix = `hearing_${side.key}_${frequencyHz}hz`;
+      const frequencyResponses = responses.filter((entry) => (
+        entry.ear === side.key && Number(entry.frequencyHz) === Number(frequencyHz)
+      ));
+      const finalResponse = [...frequencyResponses].reverse().find((entry) => entry.finalForFrequency)
+        || frequencyResponses[frequencyResponses.length - 1]
+        || null;
+      const threshold = thresholds?.[side.key]?.[frequencyHz] || {};
+      fields[`${prefix}_final_answer`] = hearingAnswerLabelForCsv(finalResponse?.heard);
+      fields[`${prefix}_final_level_db_hl`] = finalResponse?.levelDbHl ?? "";
+      fields[`${prefix}_threshold_db_hl`] = thresholdValueForCsv(threshold);
+      fields[`${prefix}_no_response_at_max`] = threshold.noResponseAtMax === true ? "是" : threshold.noResponseAtMax === false ? "否" : "";
+      HEARING_LEVELS_DB_HL.forEach((levelDbHl) => {
+        const attempts = frequencyResponses.filter((entry) => Number(entry.levelDbHl) === Number(levelDbHl));
+        fields[`${prefix}_${levelDbHl}db_answer`] = attempts.map((entry) => hearingAnswerLabelForCsv(entry.heard)).filter(Boolean).join(";");
+      });
+    });
+  });
+  return fields;
+}
+
+function hearingAnswerLabelForCsv(heard) {
+  if (heard === true) return "听见";
+  if (heard === false) return "没听见";
+  return "";
+}
+
+function thresholdValueForCsv(threshold = {}) {
+  if (Number.isFinite(Number(threshold.thresholdDbHl))) return Number(threshold.thresholdDbHl);
+  if (threshold.noResponseAtMax) return `>${HEARING_LEVELS_DB_HL[HEARING_LEVELS_DB_HL.length - 1]}`;
+  return "";
 }
 
 function exportSubItemsForItem(item = {}, task = null, exportedMedia = {}) {
