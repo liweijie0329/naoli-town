@@ -45,6 +45,135 @@ const MOCA_SHEET_IMAGE = "./assets/moca/moca-page.png";
 const MOCA_SCALE_PDF = "./assets/moca/moca-scale.pdf";
 const GRANDMA_AVATAR_SRC = "./assets/avatar-grandma.svg";
 const GRANDPA_AVATAR_SRC = "./assets/avatar-grandpa.svg";
+
+// ── 2.5D Character Guide ──
+const CHAR_BASE = "./assets/character/avatar-base.png";
+const CHAR_EYES_OPEN = "./assets/character/eyes-open.png";
+const CHAR_EYES_CLOSE = "./assets/character/eyes-close.png";
+const CHAR_MOUTH_SMILE = "./assets/character/smile-close.png";
+const CHAR_MOUTH_OPEN = "./assets/character/mouse-open.png";
+const GOOD_2_SRC = "./assets/character/good-2.png";
+
+const ONBOARDING_STEPS = [
+  "欢迎来到脑力闯关，我是脑博士！",
+  "接下来我们将会进行一系列的脑力闯关挑战，请您尽最大努力来完成挑战！",
+  "当然不用害怕，我会在每关前给您进行引导和帮助，所以请放心。",
+  "接下来请填入您的个人信息，之后开始挑战吧！"
+];
+
+const HEARING_GUIDE_STEPS = [
+  "现在需要测试周围环境，请您戴上耳机，保持安静。",
+  "接下来需要对您的听力进行测试，方便后续的挑战。请逐次点击播放键并回应。"
+];
+
+class CharacterGuide {
+  constructor() {
+    this.isSpeaking = false;
+    this.blinkTimer = null;
+    this.speakTimer = null;
+    this.syncTimer = null;
+    this._speakForTimer = null;
+    this.destroyed = false;
+    this._scheduleBlink();
+    this._startSync();
+  }
+
+  _startSync() {
+    // Poll playState to sync lips with audio playback
+    this.syncTimer = setInterval(() => {
+      if (this.destroyed) return;
+      const audioPlaying = (typeof playState !== "undefined" && playState === "播放中...");
+      if (audioPlaying && !this.isSpeaking) this.startSpeaking();
+      else if (!audioPlaying && this.isSpeaking) this.stopSpeaking();
+    }, 200);
+  }
+
+  startSpeaking() {
+    if (this.destroyed || this.isSpeaking) return;
+    this.isSpeaking = true;
+    this._speakTick();
+  }
+
+  stopSpeaking() {
+    this.isSpeaking = false;
+    if (this.speakTimer) { clearTimeout(this.speakTimer); this.speakTimer = null; }
+    this._setMouth(false);
+  }
+
+  speakFor(ms) {
+    if (this.destroyed) return;
+    playState = "播放中...";
+    this.startSpeaking();
+    if (this._speakForTimer) clearTimeout(this._speakForTimer);
+    this._speakForTimer = setTimeout(() => {
+      this.stopSpeaking();
+      playState = "开始";
+      this._speakForTimer = null;
+    }, ms);
+  }
+
+  _speakTick() {
+    if (!this.isSpeaking || this.destroyed) return;
+    this._setMouth(true);
+    const openDuration = 120 + Math.random() * 140;
+    this.speakTimer = setTimeout(() => {
+      if (!this.isSpeaking || this.destroyed) return;
+      this._setMouth(false);
+      const closeDuration = 60 + Math.random() * 90;
+      this.speakTimer = setTimeout(() => this._speakTick(), closeDuration);
+    }, openDuration);
+  }
+
+  _scheduleBlink() {
+    if (this.destroyed) return;
+    const interval = 2500 + Math.random() * 4500;
+    this.blinkTimer = setTimeout(() => {
+      if (this.destroyed) return;
+      this._setEyes(false);
+      setTimeout(() => {
+        if (this.destroyed) return;
+        this._setEyes(true);
+        this._scheduleBlink();
+      }, 120);
+    }, interval);
+  }
+
+  _setEyes(open) {
+    const el = document.getElementById("charEyesImg");
+    if (el) el.src = open ? CHAR_EYES_OPEN : CHAR_EYES_CLOSE;
+  }
+
+  _setMouth(open) {
+    const el = document.getElementById("charMouthImg");
+    if (el) el.src = open ? CHAR_MOUTH_OPEN : CHAR_MOUTH_SMILE;
+  }
+
+  destroy() {
+    this.destroyed = true;
+    this.stopSpeaking();
+    if (this.blinkTimer) { clearTimeout(this.blinkTimer); this.blinkTimer = null; }
+    if (this.syncTimer) { clearInterval(this.syncTimer); this.syncTimer = null; }
+  }
+}
+
+let activeCharacter = null;
+
+function renderCharacterHTML() {
+  return `
+    <div class="character-container">
+      <img class="character-base" src="${CHAR_BASE}" alt="" />
+      <div class="character-eyes"><img id="charEyesImg" src="${CHAR_EYES_OPEN}" alt="" /></div>
+      <div class="character-mouth"><img id="charMouthImg" src="${CHAR_MOUTH_SMILE}" alt="" /></div>
+    </div>
+  `;
+}
+
+function getOrCreateCharacter() {
+  if (activeCharacter && !activeCharacter.destroyed) activeCharacter.destroy();
+  activeCharacter = new CharacterGuide();
+  return activeCharacter;
+}
+
 const NATURAL_VOICE_HINTS = ["xiaoxiao", "xiaoyi", "xiaobei", "ting-ting", "tingting", "mei-jia", "meijia", "google 普通话", "google 國語", "mandarin", "普通话", "美佳", "sin-ji"];
 const SETUP_PROMPT_AUDIO_KEY = "setup:intro";
 const ABSTRACTION_DISTRACTORS_BY_SUFFIX = {
@@ -409,7 +538,7 @@ const tasks = [
     type: "trail",
     modality: "拖拽连线",
     prompt: "请从一个圆圈拖线连到另一个圆圈，按数字和汉字交替上升的规则完成。",
-    instruction: "请按数字和汉字交替上升的规则，把所有圆圈用一条线连起来。每次从当前圆圈拖到下一个圆圈。",
+    instruction: `我们有时会用"123……"或者汉语的"甲乙丙……"来表示顺序。\n请您按照从数字到汉字并逐渐升高的顺序画一条连线。\n从 1 连向甲，再连向 2，并一直连下去，到戊结束。`,
     scoring: "最终连线序列只要包含 1-甲-2-乙-3-丙-4-丁-5-戊 的正确顺序，即给 1 分；重复点击同一节点不扣分，撤销后按最后留下的序列判分。"
   },
   {
@@ -696,6 +825,8 @@ let trailDragStart = null;
 let trailDragPoint = null;
 let trailGuidePracticeDragStart = null;
 let trailGuidePracticeDragPoint = null;
+let trailGuidePracticeFrame = null;
+let trailGuidePracticeTick = 0;
 let viewportRenderTimer = null;
 let drawingIdleTimers = [];
 let pendingAiScoreTaskIds = new Set();
@@ -755,7 +886,8 @@ function isEditableElementFocused() {
 
 function createInitialState() {
   return {
-    view: "setup",
+    view: "onboarding",
+    onboardingStep: 0,
     activeTaskIndex: 0,
     sessionId: crypto.randomUUID(),
     startedAt: null,
@@ -1262,8 +1394,21 @@ function render() {
   stopDrawingIdleTimers();
   activeCanvas = null;
   activeCanvasTaskId = null;
+  // Clean up character if leaving test view or guide is no longer active
+  if (activeCharacter && (state.view !== "test" || !isTaskGuideActive(tasks[state.activeTaskIndex]))) {
+    activeCharacter.destroy();
+    activeCharacter = null;
+  }
+  if (state.view === "onboarding") {
+    root.innerHTML = renderOnboarding();
+    const char = getOrCreateCharacter();
+    setTimeout(() => { if (char && !char.destroyed) char.speakFor(2000); }, 100);
+    return;
+  }
   if (state.view === "setup") {
     root.innerHTML = renderSetup();
+    const char = getOrCreateCharacter();
+    setTimeout(() => { if (char && !char.destroyed) char.speakFor(3500); }, 300);
     queueVisibleSpeechAudioPreload();
     return;
   }
@@ -1276,6 +1421,13 @@ function render() {
   ensureRenderableTask();
   const current = tasks[state.activeTaskIndex] || tasks[0];
   root.innerHTML = renderShell(current);
+  setupTaskGuide(current);
+  if (state.view === "hearing") {
+    const char = activeCharacter;
+    if (char && !char.destroyed) {
+      setTimeout(() => { char.speakFor(2500); }, 300);
+    }
+  }
   if (state.view === "test") {
     setupCurrentTask(current);
     scheduleTaskInstruction(current);
@@ -1285,9 +1437,47 @@ function render() {
   focusAdminPasswordInput();
 }
 
+function renderOnboarding() {
+  const step = state.onboardingStep || 0;
+  const text = ONBOARDING_STEPS[step] || ONBOARDING_STEPS[0];
+  const isLast = step >= ONBOARDING_STEPS.length - 1;
+  return html`
+    <div class="onboarding-screen" data-action="advanceOnboarding">
+      <div class="onboarding-content">
+        <div class="onboarding-character">
+          ${renderCharacterHTML()}
+        </div>
+        <div class="onboarding-bubble">
+          <p>${escapeHtml(text)}</p>
+        </div>
+      </div>
+      <div class="onboarding-hint">
+        <span>点击继续</span>
+        <span class="onboarding-dots">${ONBOARDING_STEPS.map((_, i) => `<i class="${i === step ? "active" : i < step ? "done" : ""}"></i>`).join("")}</span>
+      </div>
+    </div>
+  `;
+}
+
+function advanceOnboarding() {
+  const step = state.onboardingStep || 0;
+  if (step >= ONBOARDING_STEPS.length - 1) {
+    state.view = "setup";
+    if (activeCharacter) { activeCharacter.destroy(); activeCharacter = null; }
+  } else {
+    state.onboardingStep = step + 1;
+  }
+  render();
+}
+
 function renderSetup() {
   return html`
     <div class="setup-screen">
+      <div class="setup-ambient-extra"></div>
+      <span class="setup-geo setup-geo--ring setup-geo-1" aria-hidden="true"></span>
+      <span class="setup-geo setup-geo--pill setup-geo-2" aria-hidden="true"></span>
+      <span class="setup-geo setup-geo--sphere setup-geo-3" aria-hidden="true"></span>
+      <span class="setup-geo setup-geo--ring setup-geo-4" aria-hidden="true"></span>
       <section class="setup-panel">
         <div class="setup-left">
           <div class="brand-row setup-title-row">
@@ -1305,6 +1495,12 @@ function renderSetup() {
           </button>
         </div>
         <button class="setup-skip-login" data-action="skipLogin">跳过登录</button>
+        <div class="setup-welcome">
+          <div class="setup-welcome-inner">
+            <div class="setup-welcome-bubble">请依次填入您的<br>个人信息</div>
+            ${renderCharacterHTML()}
+          </div>
+        </div>
       </section>
     </div>
   `;
@@ -1751,6 +1947,7 @@ function hearingQuestionProgress(screening = state.hearingScreening) {
 function renderHearingCalibration() {
   state.hearingScreening = normalizeHearingScreening(state.hearingScreening);
   const screening = state.hearingScreening;
+  const guide2 = state.hearingGuide2Pending ? renderHearingGuide2Popup() : "";
   return html`
     <section class="single-page hearing-page">
       ${screening.phase === "intro" ? renderHearingIntro(screening) : ""}
@@ -1758,7 +1955,25 @@ function renderHearingCalibration() {
       ${screening.phase === "practice" ? renderHearingPractice(screening) : ""}
       ${screening.phase === "test" ? renderHearingTest(screening) : ""}
       ${screening.phase === "summary" ? renderHearingSummary(screening) : ""}
+      ${guide2}
     </section>
+  `;
+}
+
+function renderHearingGuide2Popup() {
+  const guide2Text = "接下来需要对您的听力进行测试，方便后续的挑战。请逐次点击播放键并回应。";
+  return html`
+    <div class="hearing-guide-overlay" data-action="dismissHearingGuide2">
+      <div class="hearing-guide-popup">
+        <div class="hearing-guide-popup-char">
+          ${renderCharacterHTML()}
+        </div>
+        <div class="hearing-guide-popup-bubble">
+          <p>${escapeHtml(guide2Text)}</p>
+        </div>
+        <button class="primary big-button pulse">知道了</button>
+      </div>
+    </div>
   `;
 }
 
@@ -1769,27 +1984,35 @@ function renderHearingIntro(screening) {
     ? "检测中..."
     : checked ? "重新检测" : "环境检测";
   const checkClass = checked ? "secondary hearing-check-button hearing-recheck-button" : "primary big-button hearing-check-button";
+  getOrCreateCharacter();
+  const guideText = "现在需要测试周围环境，请您戴上耳机，保持安静。";
   return html`
-    <div class="hearing-card hearing-intro-card">
-      <div class="hearing-intro-layout">
-        <div class="hearing-hero-icon"><span class="headphone-icon"></span></div>
-        <div class="hearing-intro-main">
-          <div class="hearing-copy">
-            <h3><span>请戴上耳机</span><span>保持安静</span></h3>
+    <div class="hearing-intro-wrapper">
+      <div class="hearing-guide-character">
+        ${renderCharacterHTML()}
+        <div class="hearing-guide-bubble">${escapeHtml(guideText)}</div>
+      </div>
+      <div class="hearing-card hearing-intro-card">
+        <div class="hearing-intro-layout">
+          <div class="hearing-hero-icon"><span class="headphone-icon"></span></div>
+          <div class="hearing-intro-main">
+            <div class="hearing-copy">
+              <h3><span>请戴上耳机</span><span>保持安静</span></h3>
+            </div>
+            <div class="hearing-check-row">
+              <button class="${checkClass}" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
+                ${checkLabel}
+              </button>
+              ${screening.environment.status === "not_checked" ? "" : `
+                <span class="hearing-env-status ${screening.environment.status}">
+                  ${hearingEnvironmentText(screening.environment)}
+                </span>
+              `}
+            </div>
+            ${canStart ? `<div class="hearing-actions">
+              <button class="primary big-button hearing-start-button pulse" data-action="startHearingCalibration">开始</button>
+            </div>` : ""}
           </div>
-          <div class="hearing-check-row">
-            <button class="${checkClass}" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
-              ${checkLabel}
-            </button>
-            ${screening.environment.status === "not_checked" ? "" : `
-              <span class="hearing-env-status ${screening.environment.status}">
-                ${hearingEnvironmentText(screening.environment)}
-              </span>
-            `}
-          </div>
-          ${canStart ? `<div class="hearing-actions">
-            <button class="primary big-button hearing-start-button pulse" data-action="startHearingCalibration">开始</button>
-          </div>` : ""}
         </div>
       </div>
     </div>
@@ -1891,29 +2114,31 @@ function renderHearingSummary(screening) {
   const summary = screening.summary || summarizeHearingScreening(screening);
   const ears = summary.ears || {};
   const audioLevel = summary.mocaAudioLevelDbHl ?? screening.mocaAudioLevelDbHl ?? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL;
+  getOrCreateCharacter();
   return html`
-    <div class="hearing-card hearing-summary-card">
-      <div class="hearing-complete-animation" aria-hidden="true">
-        <span class="hearing-complete-ring"></span>
-        <span class="hearing-complete-check">✓</span>
+    <div class="hearing-summary-wrapper">
+      <div class="hearing-guide-character">
+        ${renderCharacterHTML()}
+        <div class="hearing-guide-bubble">听力测试已完成！<br>请继续认知测试</div>
       </div>
-      <p class="hearing-summary-note">听力测试已完成，请继续认知测试</p>
-      <div class="hearing-summary-grid">
-        ${HEARING_SIDES.map((side) => `
+      <div class="hearing-card hearing-summary-card">
+        <div class="hearing-summary-grid">
+          ${HEARING_SIDES.map((side) => `
+            <div class="hearing-summary-item">
+              <span>${escapeHtml(side.label)}平均</span>
+              <strong>${formatThreshold(ears[side.key]?.pta4)}</strong>
+            </div>
+          `).join("")}
           <div class="hearing-summary-item">
-            <span>${escapeHtml(side.label)}平均</span>
-            <strong>${formatThreshold(ears[side.key]?.pta4)}</strong>
+            <span>认知测试音量</span>
+            <strong>${formatAudioLevel(audioLevel)}</strong>
           </div>
-        `).join("")}
-        <div class="hearing-summary-item">
-          <span>认知测试音量</span>
-          <strong>${formatAudioLevel(audioLevel)}</strong>
         </div>
+        <div class="hearing-summary-actions">
+          <button class="primary big-button hearing-continue-button pulse" data-action="enterCognitionTest">继续</button>
+        </div>
+        <button class="hearing-retest-link" data-action="restartHearingCalibration">重测</button>
       </div>
-      <div class="hearing-summary-actions">
-        <button class="primary big-button hearing-continue-button pulse" data-action="enterCognitionTest">继续</button>
-      </div>
-      <button class="hearing-retest-link" data-action="restartHearingCalibration">重测</button>
     </div>
   `;
 }
@@ -2174,6 +2399,7 @@ function taskSubmittingLabel(task) {
 
 function renderTask(task) {
   const step = getTaskStep(task);
+  if (isTaskGuideActive(task, step)) return renderTaskGuide(task, step);
   return html`
     <section class="single-page task-page">
       <div class="task-workspace">${renderTaskWorkspace(task, step)}</div>
@@ -2185,36 +2411,44 @@ function renderTask(task) {
 function renderTaskGuide(task, step) {
   const ready = isInstructionComplete(task, step);
   const trailReady = task.type !== "trail" || isTrailGuidePracticeComplete();
-  const canProceed = ready && trailReady;
   const playLabel = playState === "播放中..." ? "播放中..." : "再听一遍";
+  const isTrail = task.type === "trail";
+  // Initialize character — sync timer auto-matches mouth to audio
+  getOrCreateCharacter();
   return html`
     <section class="single-page task-guide-page">
-      <div class="task-guide-card">
-        <div class="task-guide-copy">
-          <span>第 ${state.activeTaskIndex + 1} 题</span>
-          <h2>${escapeHtml(task.title)}</h2>
-          <p>${escapeHtml(taskGuideText(task, step))}</p>
+      <div class="character-dialog-screen">
+        <div class="character-side">
+          ${renderCharacterHTML()}
         </div>
-        ${task.type === "trail" ? renderTrailGuidePractice(ready) : ""}
-        ${renderAudioWave()}
-        <div class="task-guide-actions">
-          <button class="secondary big-button" data-action="replayTaskGuide" ${ready ? "" : "disabled"}>${playLabel}</button>
-          <button class="primary big-button ${canProceed ? "pulse" : ""}" data-action="acknowledgeTaskGuide" ${canProceed ? "" : "disabled"}>我明白了</button>
+        <div class="character-dialog-bubble">
+          <div class="task-guide-copy">
+            <span style="color:#22a96b;font-weight:900;">第 ${state.activeTaskIndex + 1} 题</span>
+            <h2>${escapeHtml(task.title)}</h2>
+            ${isTrail
+              ? taskGuideText(task, step).split("\n").map((line) => `<p>${escapeHtml(line)}</p>`).join("")
+              : `<p>${escapeHtml(taskGuideText(task, step))}</p>`
+            }
+          </div>
+          ${isTrail ? renderTrailGuidePractice() : ""}
+          <div class="task-guide-actions ${isTrail ? "task-guide-actions--center" : ""}">
+            <button class="secondary big-button" data-action="replayTaskGuide">${playLabel}</button>
+            <button class="primary character-dialog-btn pulse" data-action="acknowledgeTaskGuide">准备好了</button>
+          </div>
         </div>
       </div>
     </section>
   `;
 }
 
-function renderTrailGuidePractice(instructionReady) {
+function renderTrailGuidePractice() {
   const complete = isTrailGuidePracticeComplete();
   return html`
     <div class="trail-guide-practice ${complete ? "complete" : ""}">
-      <p>请按手指方向连线</p>
-      <div class="trail-guide-board ${instructionReady ? "" : "locked"}">
+      <strong>${complete ? "练习完成！" : "试试看：从 1 拖到甲，再拖到 2"}</strong>
+      <div class="trail-guide-board">
         <canvas id="trailGuideCanvas" class="trail-guide-canvas" aria-label="连线练习区域"></canvas>
       </div>
-      <strong>${complete ? "练习完成" : instructionReady ? "请从 1 拖到甲，再拖到乙" : "请先听完说明"}</strong>
     </div>
   `;
 }
@@ -3025,9 +3259,13 @@ function renderResults() {
         </div>
         <strong>${totals.totalScore}<em>/30</em></strong>
         <p>认知测试已完成</p>
+        <div class="completion-cheer">
+          <img class="completion-character" src="${GOOD_2_SRC}" alt="" />
+          <div class="completion-bubble">全部完成！为了帮助我们<br>改进体验，请您再花2分钟<br>填一份使用感受问卷～</div>
+        </div>
       </div>
       <div class="control-row results-actions final-results-actions">
-        <button class="primary big-button continue-survey-button pulse" data-action="continueToPostSurvey">继续</button>
+        <button class="primary big-button continue-survey-button survey-cta-button pulse" data-action="continueToPostSurvey">填写问卷</button>
       </div>
       ${saving ? `<p class="save-status">正在后台自动保存和评分...</p>` : ""}
       ${saved ? `<p class="save-status">数据已保存到后台${state.sessionSavedAt ? `：${escapeHtml(new Date(state.sessionSavedAt).toLocaleString())}` : ""}</p>` : ""}
@@ -3322,7 +3560,7 @@ function renderAdmin() {
       <div class="admin-toolbar">
         <button class="primary" data-action="loadSessions">刷新</button>
         <button class="secondary" data-action="saveSession">保存当前测评</button>
-        <button class="secondary" data-action="exportCsv">导出结果</button>
+        <button class="secondary" data-action="exportCsv">导出 CSV</button>
       </div>
       <div class="admin-layout">
         <div class="admin-table">
@@ -3786,10 +4024,11 @@ function setupTrailGuidePracticeCanvas() {
   const context = canvas.getContext("2d");
   context.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawTrailGuidePracticeCanvas(canvas);
+  startTrailGuidePracticeAnimation(canvas);
 
   canvas.onpointerdown = (event) => {
     const task = tasks[state.activeTaskIndex];
-    if (task?.type !== "trail" || !isInstructionComplete(task) || isTrailGuidePracticeComplete()) return;
+    if (task?.type !== "trail" || isTrailGuidePracticeComplete()) return;
     const point = canvasPoint(event, canvas);
     const node = nearestTrailGuidePracticeNode(point, canvas);
     if (!node) return;
@@ -3824,7 +4063,7 @@ function setupTrailGuidePracticeCanvas() {
 }
 
 function trailGuidePracticeExpected() {
-  return ["1", "甲", "乙"];
+  return ["1", "甲", "2"];
 }
 
 function trailGuidePracticeEdges() {
@@ -3870,19 +4109,6 @@ function drawTrailGuidePracticeCanvas(canvas) {
   const sequence = trailGuidePracticeSequence();
   const complete = isTrailGuidePracticeComplete();
 
-  context.strokeStyle = "rgba(36,52,71,0.16)";
-  context.lineWidth = 8;
-  context.setLineDash([12, 12]);
-  context.lineCap = "round";
-  context.beginPath();
-  trailGuidePracticeExpected().forEach((label, index) => {
-    const node = nodeMap.get(label);
-    if (!node) return;
-    if (index === 0) context.moveTo(node.x, node.y);
-    else context.lineTo(node.x, node.y);
-  });
-  context.stroke();
-  context.setLineDash([]);
 
   trailGuidePracticeEdges().forEach((edge) => {
     const from = nodeMap.get(edge.from);
@@ -3923,16 +4149,65 @@ function drawTrailGuidePracticeCanvas(canvas) {
     context.fillText(node.label, node.x, node.y);
   });
 
-  if (!complete && isInstructionComplete(tasks[state.activeTaskIndex])) {
+  // Dashed guide line
+  context.strokeStyle = "rgba(36,52,71,0.16)";
+  context.lineWidth = 8;
+  context.setLineDash([12, 12]);
+  context.lineCap = "round";
+  context.beginPath();
+  trailGuidePracticeExpected().forEach((label, index) => {
+    const node = nodeMap.get(label);
+    if (!node) return;
+    if (index === 0) context.moveTo(node.x, node.y);
+    else context.lineTo(node.x, node.y);
+  });
+  context.stroke();
+  context.setLineDash([]);
+
+  // Animated arrow cue
+  if (!complete) {
     const expected = trailGuidePracticeExpected();
-    const from = nodeMap.get(sequence.length ? sequence[sequence.length - 1] : expected[0]);
-    const to = nodeMap.get(expected[sequence.length ? sequence.length : 1]);
+    const fromIdx = Math.min(sequence.length, expected.length - 2);
+    const from = nodeMap.get(expected[fromIdx]);
+    const to = nodeMap.get(expected[fromIdx + 1]);
     if (from && to) {
-      const x = from.x + (to.x - from.x) * 0.45;
-      const y = from.y + (to.y - from.y) * 0.45;
-      drawFingerCue(context, x, y, 16, Math.atan2(to.y - from.y, to.x - from.x));
+      const progress = 0.15 + Math.sin(trailGuidePracticeTick / 36) * 0.32;
+      const ax = from.x + (to.x - from.x) * progress;
+      const ay = from.y + (to.y - from.y) * progress;
+      drawGuideArrow(context, ax, ay, Math.atan2(to.y - from.y, to.x - from.x), trailGuidePracticeTick);
     }
   }
+}
+
+function startTrailGuidePracticeAnimation(canvas) {
+  if (trailGuidePracticeFrame) cancelAnimationFrame(trailGuidePracticeFrame);
+  const tick = () => {
+    trailGuidePracticeTick += 1;
+    if (isTrailGuidePracticeComplete()) {
+      trailGuidePracticeFrame = null;
+      return;
+    }
+    drawTrailGuidePracticeCanvas(canvas);
+    trailGuidePracticeFrame = requestAnimationFrame(tick);
+  };
+  trailGuidePracticeFrame = requestAnimationFrame(tick);
+}
+
+function drawGuideArrow(ctx, x, y, angle, tick) {
+  const pulse = 1 + Math.sin(tick / 22) * 0.07;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.scale(pulse, pulse);
+  ctx.fillStyle = "#22a96b";
+  ctx.beginPath();
+  ctx.moveTo(18, 0);
+  ctx.lineTo(-10, -12);
+  ctx.lineTo(-4, 0);
+  ctx.lineTo(-10, 12);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }
 
 function trailGuidePracticeNodes(canvas) {
@@ -3940,9 +4215,9 @@ function trailGuidePracticeNodes(canvas) {
   const w = rect.width;
   const h = rect.height;
   return [
-    { label: "1", x: w * 0.22, y: h * 0.62, r: 34 },
-    { label: "甲", x: w * 0.50, y: h * 0.30, r: 34 },
-    { label: "乙", x: w * 0.78, y: h * 0.62, r: 34 }
+    { label: "1", x: w * 0.20, y: h * 0.65, r: 32 },
+    { label: "甲", x: w * 0.50, y: h * 0.32, r: 32 },
+    { label: "2", x: w * 0.80, y: h * 0.65, r: 32 }
   ];
 }
 
@@ -4422,6 +4697,11 @@ function cubeReferenceSvg() {
 }
 
 function startHearingCalibration() {
+  if (!state.hearingGuide2Shown) {
+    state.hearingGuide2Pending = true;
+    render();
+    return;
+  }
   const previous = normalizeHearingScreening(state.hearingScreening);
   state.hearingScreening = createHearingScreeningState({
     environment: previous.environment,
@@ -4432,6 +4712,9 @@ function startHearingCalibration() {
     status: "in_progress",
     startedAt: new Date().toISOString()
   });
+  state.hearingGuide2Pending = false;
+  state.hearingGuide2Shown = true;
+  if (activeCharacter) { activeCharacter.destroy(); activeCharacter = null; }
   saveDraft();
   render();
   queueHearingPrompt();
@@ -4464,6 +4747,8 @@ function restartHearingCalibration() {
     selfSelectedAudioLevelDbHl: previous.selfSelectedAudioLevelDbHl,
     selfSelectedAudioConfirmedAt: previous.selfSelectedAudioConfirmedAt
   });
+  state.hearingGuide2Shown = false;
+  state.hearingGuide2Pending = false;
   saveDraft();
   render();
   queueHearingPrompt();
@@ -4890,6 +5175,16 @@ root.addEventListener("click", async (event) => {
   }
   if (requiresDrawerAdminPassword(action, target)) {
     openAdminPasswordDialog(target);
+    return;
+  }
+  if (action === "dismissHearingGuide2") {
+    state.hearingGuide2Pending = false;
+    state.hearingGuide2Shown = true;
+    startHearingCalibration();
+    return;
+  }
+  if (action === "advanceOnboarding") {
+    advanceOnboarding();
     return;
   }
   if (isBlockedBehindMemoryReviewModal(action, current)) {
@@ -6169,8 +6464,8 @@ function taskGuideText(task, step = getTaskStep(task)) {
     return instruction.includes(NAMING_QUESTION_TEXT) ? instruction : `${instruction}${NAMING_QUESTION_TEXT}`;
   }
   if (task.type === "abstractionChoice") return abstractionInstructionText(task, step);
-  if (task.type === "orientation") return orientationInstructionText(step);
-  if (task.type === "serial7") return serialSubtractionInstructionText(step);
+  if (task.type === "orientation") return "接下来您需要回答现在的时间和地点。准备好了就开始吧。";
+  if (task.type === "serial7") return `接下来您需要从 100 连续减 7，一共算 5 次。准备好了就开始吧。`;
   if (task.id === "digitBackward") return "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。例如，听到一二三，您就选择三二一。";
   return task.instruction || task.prompt;
 }
@@ -6187,8 +6482,13 @@ function orientationInstructionText(step = getTaskStep(tasks[state.activeTaskInd
 }
 
 function taskInstructionKey(task, step = getTaskStep(task)) {
-  if (task?.type === "naming") return `${task.id}:guide:${step}`;
-  if (task?.type === "abstractionChoice" || task?.type === "orientation" || task?.type === "serial7") return `${task.id}:guide:${step}`;
+  if (task?.type === "naming") return `${task.id}:${step}`;
+  if (task?.type === "abstractionChoice" || task?.type === "orientation" || task?.type === "serial7") return `${task.id}:${step}`;
+  return task ? task.id : "";
+}
+
+function taskGuideKey(task) {
+  // Guide once per task, not per sub-step
   return task ? `${task.id}:guide` : "";
 }
 
@@ -6199,7 +6499,7 @@ function isInstructionComplete(task, step = getTaskStep(task)) {
 
 function isTaskGuideAcknowledged(task, step = getTaskStep(task)) {
   if (!task) return true;
-  return Boolean(state.acknowledgedInstructionKeys?.[taskInstructionKey(task, step)]);
+  return Boolean(state.acknowledgedInstructionKeys?.[taskGuideKey(task)]);
 }
 
 function isTaskGuideActive(task, step = getTaskStep(task)) {
@@ -6254,12 +6554,18 @@ function replayTaskGuide() {
 function acknowledgeTaskGuide() {
   const task = tasks[state.activeTaskIndex];
   const step = getTaskStep(task);
-  if (!task || !isInstructionComplete(task, step)) return;
-  if (task.type === "trail" && !isTrailGuidePracticeComplete()) return;
+  if (!task) return;
+  if (activeCharacter) { activeCharacter.stopSpeaking(); activeCharacter.destroy(); activeCharacter = null; }
+  if (trailGuidePracticeFrame) { cancelAnimationFrame(trailGuidePracticeFrame); trailGuidePracticeFrame = null; }
   state.acknowledgedInstructionKeys = state.acknowledgedInstructionKeys || {};
-  state.acknowledgedInstructionKeys[taskInstructionKey(task, step)] = true;
+  state.acknowledgedInstructionKeys[taskGuideKey(task)] = true;
   const response = getResponse(task.id);
   response.behavior.guideAcknowledgedAt = response.behavior.guideAcknowledgedAt || new Date().toISOString();
+  // Mark instruction complete even if audio hasn't finished
+  if (!isInstructionComplete(task, step)) {
+    state.completedInstructionKeys = state.completedInstructionKeys || {};
+    state.completedInstructionKeys[taskInstructionKey(task, step)] = true;
+  }
   beginTask(task.id);
   saveDraft();
   render();
@@ -9898,34 +10204,25 @@ async function exportSessionsCsv() {
   const fullSessions = await Promise.all(sessions.map((session) => (
     requestJson(`/api/sessions/${encodeURIComponent(session.id)}`, undefined, () => readLocalSessions().find((entry) => entry.id === session.id) || session)
   )));
-  const exportPackage = buildResultsExportPackage(fullSessions);
-  const filename = `cognition-hearing-game-results-${formatDateForFilename(new Date())}.zip`;
-  downloadBlobFile(filename, exportPackage);
-}
-
-function buildResultsExportPackage(sessions) {
-  const mediaFiles = [];
-  const rows = sessions.map((session, index) => csvRowForSession(session, index, mediaFiles));
+  const rows = fullSessions.flatMap(csvRowsForSession);
   const csv = rowsToCsv(rows);
-  return createZipBlob([
-    { path: "results.csv", data: utf8Bytes(`\ufeff${csv}`) },
-    { path: "raw_sessions.json", data: utf8Bytes(JSON.stringify(sessions, null, 2)) },
-    ...mediaFiles
-  ]);
+  const filename = `cognition-hearing-game-${formatDateForFilename(new Date())}.csv`;
+  downloadTextFile(filename, csv, "text/csv;charset=utf-8");
 }
 
-function csvRowForSession(session, sessionIndex, mediaFiles) {
+function csvRowsForSession(session) {
   const participant = session.participant || {};
   const hearing = session.hearingScreening || null;
   const hearingSummary = hearing?.summary || {};
   const postSurvey = session.postTestSurvey || {};
   const postSurveyScores = postSurvey.scores || {};
   const hearingResponseCounts = hearing?.responseCounts || hearingSummary.responseCounts || (hearing ? summarizeHearingResponses(hearing) : {});
+  const hearingEvents = Array.isArray(hearing?.events) ? hearing.events : (hearing ? hearingEventsForExport(hearing) : []);
   const itemResponses = Array.isArray(session.itemResponses) && session.itemResponses.length
     ? session.itemResponses
-    : [];
-  const mediaFolder = exportSessionFolderName(session, sessionIndex);
-  const row = {
+    : [{ taskId: "", title: "", domain: "", modality: "", maxScore: "", score: "", answer: {}, behavior: {}, ai: null }];
+
+  return itemResponses.map((item) => ({
     session_id: session.id || "",
     case_number: participant.caseNumber || "",
     participant_name: participant.name || "",
@@ -9941,7 +10238,7 @@ function csvRowForSession(session, sessionIndex, mediaFiles) {
     education_bonus: session.educationBonus ?? "",
     total_score: session.totalScore ?? "",
     risk_band: session.riskBand || "",
-    ...domainScoreCsvFields(session.domainScores || {}),
+    domain_scores_json: stringifyForCsv(session.domainScores || {}),
     hearing_status: hearing ? formatHearingStatus(hearingSummary.status || hearing.status) : "",
     hearing_right_pta4: hearingSummary.ears?.right?.pta4 ?? "",
     hearing_left_pta4: hearingSummary.ears?.left?.pta4 ?? "",
@@ -9955,7 +10252,9 @@ function csvRowForSession(session, sessionIndex, mediaFiles) {
     hearing_response_count: hearingResponseCounts.total ?? "",
     hearing_heard_count: hearingResponseCounts.heard ?? "",
     hearing_missed_count: hearingResponseCounts.missed ?? "",
-    ...hearingDetailCsvFields(hearing),
+    hearing_environment_checks_json: hearing ? stringifyForCsv(hearing.environmentChecks || []) : "",
+    hearing_events_json: hearing ? stringifyForCsv(hearingEvents) : "",
+    hearing_screening_json: hearing ? stringifyForCsv(hearing) : "",
     post_test_survey_status: postSurvey.status || "",
     post_test_survey_started_at: postSurvey.startedAt || "",
     post_test_survey_completed_at: postSurvey.completedAt || "",
@@ -9963,412 +10262,32 @@ function csvRowForSession(session, sessionIndex, mediaFiles) {
     sus_raw_score: postSurveyScores.susRaw ?? "",
     nasa_tlx_raw_score: postSurveyScores.nasaTlxRawScore ?? "",
     ...postTestSurveyCsvFields(postSurvey),
-    media_folder: mediaFolder,
-    drawing_files: "",
-    audio_files: ""
-  };
-  const allDrawingFiles = [];
-  const allAudioFiles = [];
-  itemResponses.forEach((item, index) => {
-    const exportedMedia = exportItemMediaFiles(item, index, mediaFolder);
-    mediaFiles.push(...exportedMedia.files);
-    allDrawingFiles.push(...exportedMedia.drawingFiles);
-    allAudioFiles.push(...exportedMedia.audioFiles);
-    const prefix = exportItemColumnPrefix(item, index);
-    const task = tasks.find((entry) => entry.id === item.taskId) || null;
-    row[`${prefix}_task_id`] = item.taskId || "";
-    row[`${prefix}_task_title`] = item.title || "";
-    row[`${prefix}_domain`] = item.domain || "";
-    row[`${prefix}_modality`] = item.modality || "";
-    row[`${prefix}_max_score`] = item.maxScore ?? "";
-    row[`${prefix}_score`] = item.score ?? "";
-    row[`${prefix}_started_at`] = item.startedAt || "";
-    row[`${prefix}_ended_at`] = item.endedAt || "";
-    row[`${prefix}_duration_ms`] = item.durationMs ?? "";
-    row[`${prefix}_standard_answer`] = item.standardAnswer || item.answer?.answerSummary?.standardAnswer || "";
-    row[`${prefix}_user_answer`] = item.userAnswer || item.answer?.answerSummary?.userAnswer || "";
-    row[`${prefix}_score_basis`] = taskScoreBasisForExport(item, task);
-    row[`${prefix}_drawing_file`] = exportedMedia.drawingFiles.join(";");
-    row[`${prefix}_audio_files`] = exportedMedia.audioFiles.join(";");
-    const subItems = exportSubItemsForItem(item, task, exportedMedia);
-    subItems.forEach((subItem, subIndex) => {
-      const subPrefix = `${prefix}_sub_${String(subIndex + 1).padStart(2, "0")}`;
-      row[`${subPrefix}_label`] = subItem.label || "";
-      row[`${subPrefix}_standard_answer`] = subItem.standardAnswer || "";
-      row[`${subPrefix}_user_answer`] = subItem.userAnswer || "";
-      row[`${subPrefix}_correct`] = formatBooleanForCsv(subItem.correct);
-      row[`${subPrefix}_score`] = subItem.score ?? "";
-      row[`${subPrefix}_max_score`] = subItem.maxScore ?? "";
-      row[`${subPrefix}_started_at`] = subItem.startedAt || "";
-      row[`${subPrefix}_ended_at`] = subItem.endedAt || "";
-      row[`${subPrefix}_duration_ms`] = subItem.durationMs ?? "";
-      row[`${subPrefix}_score_basis`] = subItem.scoreBasis || "";
-      row[`${subPrefix}_drawing_file`] = subItem.drawingFile || "";
-      row[`${subPrefix}_audio_files`] = Array.isArray(subItem.audioFiles) ? subItem.audioFiles.join(";") : "";
-    });
-  });
-  row.drawing_files = allDrawingFiles.join(";");
-  row.audio_files = allAudioFiles.join(";");
-  row.item_count = itemResponses.length;
-  return row;
+    post_test_survey_json: postSurvey.status ? stringifyForCsv(postSurvey) : "",
+    task_id: item.taskId || "",
+    task_title: item.title || "",
+    domain: item.domain || "",
+    modality: item.modality || "",
+    max_score: item.maxScore ?? "",
+    score: item.score ?? "",
+    item_started_at: item.startedAt || "",
+    item_ended_at: item.endedAt || "",
+    item_duration_ms: item.durationMs ?? "",
+    standard_answer: item.standardAnswer || item.answer?.answerSummary?.standardAnswer || "",
+    user_answer: item.userAnswer || item.answer?.answerSummary?.userAnswer || "",
+    correctness_json: stringifyForCsv(item.correctness || item.answer?.answerSummary?.parts || null),
+    answer_json: stringifyForCsv(item.answer || {}),
+    behavior_json: stringifyForCsv(item.behavior || {}),
+    ai_json: stringifyForCsv(item.ai || null),
+    drawing_image: item.drawingImage || ""
+  }));
 }
 
-function domainScoreCsvFields(domainScores = {}) {
-  const domains = [
-    ["visuospatial_executive", "视空间与执行功能"],
-    ["naming", "命名"],
-    ["memory", "记忆"],
-    ["delayed_recall", "延迟回忆"],
-    ["attention", "注意"],
-    ["language", "语言"],
-    ["abstraction", "抽象"],
-    ["orientation", "定向"]
-  ];
-  const fields = {};
-  domains.forEach(([key, label]) => {
-    const value = domainScores?.[label] || {};
-    fields[`domain_${key}_score`] = value.score ?? "";
-    fields[`domain_${key}_max_score`] = value.max ?? "";
-  });
-  return fields;
-}
-
-function hearingDetailCsvFields(screening = null) {
-  const fields = {};
-  const normalized = screening ? normalizeHearingScreening(screening) : null;
-  const responses = Array.isArray(normalized?.responses) ? normalized.responses : [];
-  const thresholds = normalized?.thresholds || {};
-  HEARING_SIDES.forEach((side) => {
-    HEARING_TEST_FREQUENCIES.forEach((frequencyHz) => {
-      const prefix = `hearing_${side.key}_${frequencyHz}hz`;
-      const frequencyResponses = responses.filter((entry) => (
-        entry.ear === side.key && Number(entry.frequencyHz) === Number(frequencyHz)
-      ));
-      const finalResponse = [...frequencyResponses].reverse().find((entry) => entry.finalForFrequency)
-        || frequencyResponses[frequencyResponses.length - 1]
-        || null;
-      const threshold = thresholds?.[side.key]?.[frequencyHz] || {};
-      fields[`${prefix}_final_answer`] = hearingAnswerLabelForCsv(finalResponse?.heard);
-      fields[`${prefix}_final_level_db_hl`] = finalResponse?.levelDbHl ?? "";
-      fields[`${prefix}_threshold_db_hl`] = thresholdValueForCsv(threshold);
-      fields[`${prefix}_no_response_at_max`] = threshold.noResponseAtMax === true ? "是" : threshold.noResponseAtMax === false ? "否" : "";
-      HEARING_LEVELS_DB_HL.forEach((levelDbHl) => {
-        const attempts = frequencyResponses.filter((entry) => Number(entry.levelDbHl) === Number(levelDbHl));
-        fields[`${prefix}_${levelDbHl}db_answer`] = attempts.map((entry) => hearingAnswerLabelForCsv(entry.heard)).filter(Boolean).join(";");
-      });
-    });
-  });
-  return fields;
-}
-
-function hearingAnswerLabelForCsv(heard) {
-  if (heard === true) return "听见";
-  if (heard === false) return "没听见";
-  return "";
-}
-
-function thresholdValueForCsv(threshold = {}) {
-  if (Number.isFinite(Number(threshold.thresholdDbHl))) return Number(threshold.thresholdDbHl);
-  if (threshold.noResponseAtMax) return `>${HEARING_LEVELS_DB_HL[HEARING_LEVELS_DB_HL.length - 1]}`;
-  return "";
-}
-
-function exportSubItemsForItem(item = {}, task = null, exportedMedia = {}) {
-  if (item.taskId === "clock") return clockSubItemsForExport(item, task, exportedMedia);
-  const parts = answerPartsForExport(item).filter((part) => part.label !== "评分说明");
-  if (!parts.length) return [];
-  return parts.map((part, index) => {
-    const timing = subItemTimingForExport(item, index);
-    const maxScore = subItemMaxScoreForExport(item, task, parts);
-    return {
-      label: part.label,
-      standardAnswer: part.standard,
-      userAnswer: part.user,
-      correct: part.correct,
-      score: subItemScoreForExport(item, task, part, parts, maxScore),
-      maxScore,
-      ...timing,
-      scoreBasis: scoreBasisForPartExport(item, task, part, index),
-      drawingFile: drawingFileForSubItem(item, exportedMedia),
-      audioFiles: audioFilesForSubItem(item, index, exportedMedia)
-    };
-  });
-}
-
-function answerPartsForExport(item = {}) {
-  const savedParts = Array.isArray(item.correctness?.parts)
-    ? item.correctness.parts
-    : Array.isArray(item.answer?.answerSummary?.parts)
-      ? item.answer.answerSummary.parts
-      : Array.isArray(item.correctness)
-        ? item.correctness
-        : null;
-  const parts = savedParts && savedParts.length ? savedParts : readableItemAnswerParts(item);
-  return (Array.isArray(parts) ? parts : []).map(normalizeAnswerPart);
-}
-
-function clockSubItemsForExport(item = {}, task = null, exportedMedia = {}) {
-  const rubric = DRAWING_AI_RUBRICS.clock || [];
-  const criteria = Array.isArray(item.ai?.criteria) ? item.ai.criteria : [];
-  const timing = subItemTimingForExport(item, 0);
-  return rubric.map((rubricItem, index) => {
-    const criterion = findDrawingCriterion(criteria, rubricItem, index);
-    const passed = criterionPassedForExport(criterion);
-    return {
-      label: rubricItem.label,
-      standardAnswer: rubricItem.detail,
-      userAnswer: item.drawingImage || exportedMedia.drawingFiles?.length ? "见画图文件" : "未提交画图",
-      correct: passed,
-      score: passed === null ? "" : (passed ? 1 : 0),
-      maxScore: 1,
-      ...timing,
-      scoreBasis: criterionEvidenceForExport(criterion) || taskScoreBasisForExport(item, task),
-      drawingFile: drawingFileForSubItem(item, exportedMedia),
-      audioFiles: []
-    };
-  });
-}
-
-function findDrawingCriterion(criteria = [], rubricItem = {}, index = 0) {
-  return criteria.find((entry) => entry?.key === rubricItem.key)
-    || criteria.find((entry) => entry?.label === rubricItem.label)
-    || criteria[index]
-    || null;
-}
-
-function criterionPassedForExport(criterion) {
-  if (!criterion || typeof criterion !== "object") return null;
-  if (typeof criterion.passed === "boolean") return criterion.passed;
-  if (typeof criterion.correct === "boolean") return criterion.correct;
-  if (typeof criterion.met === "boolean") return criterion.met;
-  const text = String(criterion.detail ?? criterion.value ?? "").trim().toLowerCase();
-  if (["true", "1", "yes", "y", "是", "通过", "正确"].includes(text)) return true;
-  if (["false", "0", "no", "n", "否", "未通过", "错误"].includes(text)) return false;
-  return null;
-}
-
-function criterionEvidenceForExport(criterion) {
-  if (!criterion || typeof criterion !== "object") return "";
-  const detail = String(criterion.detail || "").trim();
-  return criterion.evidence || criterion.comment || criterion.reason || (
-    detail && !["true", "false", "1", "0"].includes(detail.toLowerCase()) ? detail : ""
-  );
-}
-
-function subItemMaxScoreForExport(item = {}, task = null, parts = []) {
-  const maxScore = Number(item.maxScore ?? task?.maxScore ?? 0);
-  if (!Number.isFinite(maxScore) || maxScore <= 0) return "";
-  if (parts.length <= 1) return maxScore;
-  return 1;
-}
-
-function subItemScoreForExport(item = {}, task = null, part = {}, parts = [], maxScore = "") {
-  if (maxScore === "") return "";
-  if (typeof part.correct !== "boolean") return "";
-  if (parts.length <= 1 && Number(maxScore) > 1) return item.score ?? (part.correct ? maxScore : 0);
-  return part.correct ? 1 : 0;
-}
-
-function taskScoreBasisForExport(item = {}, task = null) {
-  const summaryReason = item.answer?.answerSummary?.scoreReason || "";
-  if (summaryReason) return summaryReason;
-  if (item.ai?.comment) return item.ai.comment;
-  if (item.taskId === "serial7") {
-    const correctSteps = item.behavior?.serialSubtractionCorrectSteps;
-    const score = item.behavior?.serialSubtractionScore ?? item.score;
-    return Number.isFinite(Number(correctSteps))
-      ? `每一步按上一个减数继续减 7 独立评判；正确 ${correctSteps} 步，折算 ${score}/${item.maxScore ?? task?.maxScore ?? 3} 分。`
-      : "每一步按上一个减数继续减 7 独立评判。";
-  }
-  if (item.taskId === "sentence") return "每句话必须原原本本复述；省略、替换、增加或语序变化均不给该句分。";
-  if (item.taskId === "fluency") {
-    const animals = Array.isArray(item.answer?.animals) ? item.answer.animals : [];
-    const rawTranscript = truncateCsvText(item.answer?.rawTranscript || "");
-    return `识别动物 ${animals.length} 个；不少于 11 个给 1 分。${rawTranscript ? `原始转写：${rawTranscript}` : ""}`;
-  }
-  if (item.taskId === "vigilance") {
-    const errors = item.behavior?.vigilance?.errors;
-    return Number.isFinite(Number(errors)) ? `错误 ${errors} 次；完全正确或只有一次错误给 1 分。` : "完全正确或只有一次错误给 1 分。";
-  }
-  if (task?.type === "drawing") return "图片 AI 按 MoCA 画图标准评分。";
-  if (task?.type === "choice") return "用户点击序列与标准序列完全一致给 1 分。";
-  if (task?.type === "memory") return task.maxScore > 0 ? "每选中一个目标词给 1 分。" : "学习试次不计入总分，仅记录选择情况。";
-  if (["naming", "abstractionChoice", "orientation"].includes(task?.type)) return "用户答案与标准答案一致给 1 分。";
-  return "";
-}
-
-function scoreBasisForPartExport(item = {}, task = null, part = {}, index = 0) {
-  if (item.taskId === "serial7") {
-    const step = item.behavior?.serialSubtractionSteps?.[index];
-    if (step) return `从 ${step.previous} 减 ${step.subtractBy ?? 7}；标准答案 ${step.expected}，用户答案 ${step.answer ?? "未答"}。`;
-  }
-  if (item.taskId === "sentence") {
-    const detail = item.behavior?.sentenceScoring?.details?.[index];
-    if (detail?.rule) return detail.rule;
-  }
-  if (item.taskId === "memory1" || item.taskId === "memory2") {
-    const targets = item.behavior?.memoryTargetWords || [];
-    const selected = item.answer?.selectedWords || [];
-    return `目标词：${targets.join("、")}；用户选择：${selected.join("、") || "未选择"}。`;
-  }
-  return taskScoreBasisForExport(item, task);
-}
-
-function subItemTimingForExport(item = {}, index = 0) {
-  if (item.taskId === "serial7") {
-    const step = item.behavior?.serialSubtractionSteps?.[index];
-    if (step) return {
-      startedAt: step.startedAt || "",
-      endedAt: step.endedAt || "",
-      durationMs: step.durationMs ?? durationMsBetween(step.startedAt, step.endedAt)
-    };
-  }
-  if (item.taskId === "sentence") {
-    const playback = (item.behavior?.sentencePlayback || []).find((entry) => Number(entry.step) === index);
-    const recording = (item.behavior?.audioRecordings || []).find((entry) => Number(entry.step) === index);
-    const startedAt = playback?.at || item.startedAt || "";
-    const endedAt = recording?.endedAt || item.endedAt || "";
-    return { startedAt, endedAt, durationMs: durationMsBetween(startedAt, endedAt) || item.durationMs || "" };
-  }
-  if (item.taskId === "fluency") {
-    const startedAt = isoFromMaybeTimestamp(item.answer?.timerStartedAt) || item.startedAt || "";
-    const endedAt = isoFromMaybeTimestamp(item.answer?.completedAt) || item.endedAt || "";
-    return { startedAt, endedAt, durationMs: durationMsBetween(startedAt, endedAt) || item.durationMs || "" };
-  }
-  return { startedAt: item.startedAt || "", endedAt: item.endedAt || "", durationMs: item.durationMs ?? "" };
-}
-
-function audioFilesForSubItem(item = {}, index = 0, exportedMedia = {}) {
-  const byStep = exportedMedia.audioFilesByStep || {};
-  if (byStep[index]) return [byStep[index]];
-  return [];
-}
-
-function drawingFileForSubItem(item = {}, exportedMedia = {}) {
-  return ["trail", "cube", "clock"].includes(item.taskId) ? (exportedMedia.drawingFiles?.[0] || "") : "";
-}
-
-function formatBooleanForCsv(value) {
-  if (value === true) return "正确";
-  if (value === false) return "错误";
-  return "";
-}
-
-function durationMsBetween(startedAt, endedAt) {
-  const start = Date.parse(startedAt || "");
-  const end = Date.parse(endedAt || "");
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return "";
-  return end - start;
-}
-
-function isoFromMaybeTimestamp(value) {
-  if (typeof value === "string" && value) return value;
-  if (!Number.isFinite(Number(value))) return "";
-  return new Date(Number(value)).toISOString();
-}
-
-function truncateCsvText(value, maxLength = 500) {
-  const text = String(value || "").replace(/\s+/g, " ").trim();
-  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
-}
-
-function exportItemMediaFiles(item = {}, index = 0, mediaFolder = "users/unknown") {
-  const files = [];
-  const drawingFiles = [];
-  const audioFiles = [];
-  const audioFilesByStep = {};
-  const itemName = `${String(index + 1).padStart(2, "0")}_${safeExportPathPart(item.taskId || item.title || "task")}`;
-  const drawing = dataUrlToExportFile(item.drawingImage);
-  if (drawing) {
-    const path = `${mediaFolder}/drawings/${itemName}.${drawing.extension}`;
-    files.push({ path, data: drawing.bytes });
-    drawingFiles.push(path);
-  }
-  const recordings = item.answer?.audioRecordings;
-  if (recordings && typeof recordings === "object") {
-    Object.entries(recordings).forEach(([step, value]) => {
-      const audio = dataUrlToExportFile(value);
-      if (!audio) return;
-      const stepName = safeExportPathPart(`step_${Number(step) + 1 || step}`);
-      const path = `${mediaFolder}/audio/${itemName}_${stepName}.${audio.extension}`;
-      files.push({ path, data: audio.bytes });
-      audioFiles.push(path);
-      audioFilesByStep[step] = path;
-    });
-  }
-  return { files, drawingFiles, audioFiles, audioFilesByStep };
-}
-
-function exportSessionFolderName(session = {}, index = 0) {
-  const participant = session.participant || {};
-  const prefix = String(index + 1).padStart(3, "0");
-  const parts = [
-    prefix,
-    participant.caseNumber || "",
-    participant.name || "",
-    String(session.id || "").slice(0, 8)
-  ].map((part) => safeExportPathPart(part)).filter(Boolean);
-  return `users/${parts.join("_") || prefix}`;
-}
-
-function exportItemColumnPrefix(item = {}, index = 0) {
-  const taskKey = safeCsvColumnPart(item.taskId || item.title || `item_${index + 1}`);
-  return `task_${String(index + 1).padStart(2, "0")}_${taskKey}`;
-}
-
-function safeCsvColumnPart(value) {
-  const text = String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-  return text || "item";
-}
-
-function safeExportPathPart(value) {
-  return String(value || "")
-    .trim()
-    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_")
-    .replace(/\s+/g, "_")
-    .slice(0, 80);
-}
-
-function dataUrlToExportFile(value) {
-  if (typeof value !== "string" || !value.startsWith("data:")) return null;
-  const match = value.match(/^data:([^;,]+)?((?:;[^,]*)*),(.*)$/);
-  if (!match) return null;
-  const mimeType = match[1] || "application/octet-stream";
-  const parameters = match[2] || "";
-  const payload = match[3] || "";
-  try {
-    const bytes = parameters.includes(";base64")
-      ? base64ToBytes(payload)
-      : utf8Bytes(decodeURIComponent(payload));
-    return { mimeType, extension: extensionForMimeType(mimeType), bytes };
-  } catch {
-    return null;
-  }
-}
-
-function base64ToBytes(base64) {
-  const binary = atob(base64.replace(/\s/g, ""));
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-}
-
-function extensionForMimeType(mimeType) {
-  const normalized = String(mimeType || "").toLowerCase().split(";")[0];
-  if (normalized === "image/png") return "png";
-  if (normalized === "image/jpeg" || normalized === "image/jpg") return "jpg";
-  if (normalized === "image/webp") return "webp";
-  if (normalized === "audio/webm") return "webm";
-  if (normalized === "audio/mp4" || normalized === "audio/aac") return "m4a";
-  if (normalized === "audio/mpeg" || normalized === "audio/mp3") return "mp3";
-  if (normalized === "audio/wav" || normalized === "audio/wave") return "wav";
-  return normalized.split("/").pop()?.replace(/[^a-z0-9]/g, "") || "bin";
+function stringifyForCsv(value) {
+  return JSON.stringify(value ?? null);
 }
 
 function rowsToCsv(rows) {
-  const headers = [...new Set(rows.flatMap((row) => Object.keys(row || {})))];
+  const headers = Object.keys(rows[0] || {});
   return [
     headers.join(","),
     ...rows.map((row) => headers.map((header) => escapeCsvCell(row[header])).join(","))
@@ -10385,98 +10304,8 @@ function formatDateForFilename(date) {
   return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}`;
 }
 
-function utf8Bytes(text) {
-  return new TextEncoder().encode(String(text ?? ""));
-}
-
-function createZipBlob(files) {
-  const localParts = [];
-  const centralParts = [];
-  let offset = 0;
-  files.forEach((file) => {
-    const nameBytes = utf8Bytes(file.path);
-    const data = file.data instanceof Uint8Array ? file.data : new Uint8Array(file.data || []);
-    const crc = crc32(data);
-    const { time, date } = zipDosDateTime(new Date());
-    const localHeader = new Uint8Array(30 + nameBytes.length);
-    const localView = new DataView(localHeader.buffer);
-    localView.setUint32(0, 0x04034b50, true);
-    localView.setUint16(4, 20, true);
-    localView.setUint16(6, 0x0800, true);
-    localView.setUint16(8, 0, true);
-    localView.setUint16(10, time, true);
-    localView.setUint16(12, date, true);
-    localView.setUint32(14, crc, true);
-    localView.setUint32(18, data.length, true);
-    localView.setUint32(22, data.length, true);
-    localView.setUint16(26, nameBytes.length, true);
-    localHeader.set(nameBytes, 30);
-    localParts.push(localHeader, data);
-
-    const centralHeader = new Uint8Array(46 + nameBytes.length);
-    const centralView = new DataView(centralHeader.buffer);
-    centralView.setUint32(0, 0x02014b50, true);
-    centralView.setUint16(4, 20, true);
-    centralView.setUint16(6, 20, true);
-    centralView.setUint16(8, 0x0800, true);
-    centralView.setUint16(10, 0, true);
-    centralView.setUint16(12, time, true);
-    centralView.setUint16(14, date, true);
-    centralView.setUint32(16, crc, true);
-    centralView.setUint32(20, data.length, true);
-    centralView.setUint32(24, data.length, true);
-    centralView.setUint16(28, nameBytes.length, true);
-    centralView.setUint32(42, offset, true);
-    centralHeader.set(nameBytes, 46);
-    centralParts.push(centralHeader);
-    offset += localHeader.length + data.length;
-  });
-
-  const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
-  const endRecord = new Uint8Array(22);
-  const endView = new DataView(endRecord.buffer);
-  endView.setUint32(0, 0x06054b50, true);
-  endView.setUint16(8, files.length, true);
-  endView.setUint16(10, files.length, true);
-  endView.setUint32(12, centralSize, true);
-  endView.setUint32(16, offset, true);
-  return new Blob([...localParts, ...centralParts, endRecord], { type: "application/zip" });
-}
-
-function zipDosDateTime(date) {
-  return {
-    time: (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2),
-    date: ((date.getFullYear() - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate()
-  };
-}
-
-function crc32(bytes) {
-  const table = crc32.table || (crc32.table = makeCrc32Table());
-  let crc = 0xffffffff;
-  for (let index = 0; index < bytes.length; index += 1) {
-    crc = (crc >>> 8) ^ table[(crc ^ bytes[index]) & 0xff];
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
-
-function makeCrc32Table() {
-  const table = new Uint32Array(256);
-  for (let n = 0; n < 256; n += 1) {
-    let c = n;
-    for (let k = 0; k < 8; k += 1) {
-      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    }
-    table[n] = c >>> 0;
-  }
-  return table;
-}
-
 function downloadTextFile(filename, content, mimeType) {
   const blob = new Blob(["\ufeff", content], { type: mimeType });
-  downloadBlobFile(filename, blob);
-}
-
-function downloadBlobFile(filename, blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
