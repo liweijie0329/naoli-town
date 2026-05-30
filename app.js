@@ -45,6 +45,13 @@ const MOCA_SHEET_IMAGE = "./assets/moca/moca-page.png";
 const MOCA_SCALE_PDF = "./assets/moca/moca-scale.pdf";
 const GRANDMA_AVATAR_SRC = "./assets/avatar-grandma.svg";
 const GRANDPA_AVATAR_SRC = "./assets/avatar-grandpa.svg";
+const GUIDE_CHARACTER_SRC = "./assets/character/good-2.png";
+const ONBOARDING_STEPS = [
+  "欢迎来到脑力闯关，我是脑博士！",
+  "接下来我们将会进行一系列的脑力闯关挑战，请您尽最大努力来完成挑战！",
+  "不用担心，我会在每关前给您进行引导和帮助，所以请放心。",
+  "接下来请填写您的个人信息，之后开始挑战吧！"
+];
 const NATURAL_VOICE_HINTS = ["xiaoxiao", "xiaoyi", "xiaobei", "ting-ting", "tingting", "mei-jia", "meijia", "google 普通话", "google 國語", "mandarin", "普通话", "美佳", "sin-ji"];
 const SETUP_PROMPT_AUDIO_KEY = "setup:intro";
 const ABSTRACTION_DISTRACTORS_BY_SUFFIX = {
@@ -696,6 +703,8 @@ let trailDragStart = null;
 let trailDragPoint = null;
 let trailGuidePracticeDragStart = null;
 let trailGuidePracticeDragPoint = null;
+let trailGuidePracticeFrame = null;
+let trailGuidePracticeTick = 0;
 let viewportRenderTimer = null;
 let drawingIdleTimers = [];
 let pendingAiScoreTaskIds = new Set();
@@ -755,7 +764,8 @@ function isEditableElementFocused() {
 
 function createInitialState() {
   return {
-    view: "setup",
+    view: "onboarding",
+    onboardingStep: 0,
     activeTaskIndex: 0,
     sessionId: crypto.randomUUID(),
     startedAt: null,
@@ -782,6 +792,8 @@ function createInitialState() {
     setupAttempted: false,
     setupVoiceRecording: false,
     setupVoiceTranscribing: false,
+    hearingGuide2Pending: false,
+    hearingGuide2Shown: false,
     adminSessions: [],
     selectedSession: null,
     selectedSessionLoading: false
@@ -1036,6 +1048,9 @@ function migrateState() {
   state.acknowledgedInstructionKeys = state.acknowledgedInstructionKeys || {};
   state.permissions = state.permissions || { microphone: "unknown", location: "unknown" };
   state.voiceProfile = VOICE_PROFILES[state.voiceProfile] ? state.voiceProfile : "cartoon";
+  state.onboardingStep = Math.max(0, Math.min(ONBOARDING_STEPS.length - 1, Number(state.onboardingStep || 0)));
+  state.hearingGuide2Pending = Boolean(state.hearingGuide2Pending);
+  state.hearingGuide2Shown = Boolean(state.hearingGuide2Shown);
   state.setupAttempted = Boolean(state.setupAttempted);
   state.setupVoiceRecording = Boolean(state.setupVoiceRecording);
   state.setupVoiceTranscribing = Boolean(state.setupVoiceTranscribing);
@@ -1262,6 +1277,11 @@ function render() {
   stopDrawingIdleTimers();
   activeCanvas = null;
   activeCanvasTaskId = null;
+  if (state.view === "onboarding") {
+    root.innerHTML = renderOnboarding();
+    queueVisibleSpeechAudioPreload();
+    return;
+  }
   if (state.view === "setup") {
     root.innerHTML = renderSetup();
     queueVisibleSpeechAudioPreload();
@@ -1285,6 +1305,41 @@ function render() {
   focusAdminPasswordInput();
 }
 
+function renderGuideCharacterHTML(className = "") {
+  return `<img class="guide-character ${className}" src="${GUIDE_CHARACTER_SRC}" alt="" />`;
+}
+
+function renderOnboarding() {
+  const step = Math.max(0, Math.min(ONBOARDING_STEPS.length - 1, Number(state.onboardingStep || 0)));
+  return html`
+    <div class="onboarding-screen" data-action="advanceOnboarding">
+      <div class="onboarding-content">
+        <div class="onboarding-character">
+          ${renderGuideCharacterHTML()}
+        </div>
+        <div class="onboarding-bubble">
+          <p>${escapeHtml(ONBOARDING_STEPS[step])}</p>
+        </div>
+      </div>
+      <div class="onboarding-hint">
+        <span>点击继续</span>
+        <span class="onboarding-dots">${ONBOARDING_STEPS.map((_, index) => `<i class="${index === step ? "active" : index < step ? "done" : ""}"></i>`).join("")}</span>
+      </div>
+    </div>
+  `;
+}
+
+function advanceOnboarding() {
+  const step = Math.max(0, Math.min(ONBOARDING_STEPS.length - 1, Number(state.onboardingStep || 0)));
+  if (step >= ONBOARDING_STEPS.length - 1) {
+    state.view = "setup";
+  } else {
+    state.onboardingStep = step + 1;
+  }
+  saveDraft();
+  render();
+}
+
 function renderSetup() {
   return html`
     <div class="setup-screen">
@@ -1305,6 +1360,12 @@ function renderSetup() {
           </button>
         </div>
         <button class="setup-skip-login" data-action="skipLogin">跳过登录</button>
+        <div class="setup-welcome">
+          <div class="setup-welcome-inner">
+            <div class="setup-welcome-bubble">请依次填入您的<br>个人信息</div>
+            ${renderGuideCharacterHTML()}
+          </div>
+        </div>
       </section>
     </div>
   `;
@@ -1751,6 +1812,7 @@ function hearingQuestionProgress(screening = state.hearingScreening) {
 function renderHearingCalibration() {
   state.hearingScreening = normalizeHearingScreening(state.hearingScreening);
   const screening = state.hearingScreening;
+  const guide2 = state.hearingGuide2Pending ? renderHearingGuide2Popup() : "";
   return html`
     <section class="single-page hearing-page">
       ${screening.phase === "intro" ? renderHearingIntro(screening) : ""}
@@ -1758,7 +1820,25 @@ function renderHearingCalibration() {
       ${screening.phase === "practice" ? renderHearingPractice(screening) : ""}
       ${screening.phase === "test" ? renderHearingTest(screening) : ""}
       ${screening.phase === "summary" ? renderHearingSummary(screening) : ""}
+      ${guide2}
     </section>
+  `;
+}
+
+function renderHearingGuide2Popup() {
+  const guide2Text = "接下来需要对您的听力进行测试，方便后续的挑战。请逐次点击播放键并回应。";
+  return html`
+    <div class="hearing-guide-overlay" data-action="dismissHearingGuide2">
+      <div class="hearing-guide-popup">
+        <div class="hearing-guide-popup-char">
+          ${renderGuideCharacterHTML()}
+        </div>
+        <div class="hearing-guide-popup-bubble">
+          <p>${escapeHtml(guide2Text)}</p>
+        </div>
+        <button class="primary big-button pulse">知道了</button>
+      </div>
+    </div>
   `;
 }
 
@@ -1770,26 +1850,32 @@ function renderHearingIntro(screening) {
     : checked ? "重新检测" : "环境检测";
   const checkClass = checked ? "secondary hearing-check-button hearing-recheck-button" : "primary big-button hearing-check-button";
   return html`
-    <div class="hearing-card hearing-intro-card">
-      <div class="hearing-intro-layout">
-        <div class="hearing-hero-icon"><span class="headphone-icon"></span></div>
-        <div class="hearing-intro-main">
-          <div class="hearing-copy">
-            <h3><span>请戴上耳机</span><span>保持安静</span></h3>
+    <div class="hearing-intro-wrapper">
+      <div class="hearing-guide-character">
+        ${renderGuideCharacterHTML()}
+        <div class="hearing-guide-bubble">现在需要测试周围环境，请您戴上耳机，保持安静。</div>
+      </div>
+      <div class="hearing-card hearing-intro-card">
+        <div class="hearing-intro-layout">
+          <div class="hearing-hero-icon"><span class="headphone-icon"></span></div>
+          <div class="hearing-intro-main">
+            <div class="hearing-copy">
+              <h3><span>请戴上耳机</span><span>保持安静</span></h3>
+            </div>
+            <div class="hearing-check-row">
+              <button class="${checkClass}" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
+                ${checkLabel}
+              </button>
+              ${screening.environment.status === "not_checked" ? "" : `
+                <span class="hearing-env-status ${screening.environment.status}">
+                  ${hearingEnvironmentText(screening.environment)}
+                </span>
+              `}
+            </div>
+            ${canStart ? `<div class="hearing-actions">
+              <button class="primary big-button hearing-start-button pulse" data-action="startHearingCalibration">开始</button>
+            </div>` : ""}
           </div>
-          <div class="hearing-check-row">
-            <button class="${checkClass}" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
-              ${checkLabel}
-            </button>
-            ${screening.environment.status === "not_checked" ? "" : `
-              <span class="hearing-env-status ${screening.environment.status}">
-                ${hearingEnvironmentText(screening.environment)}
-              </span>
-            `}
-          </div>
-          ${canStart ? `<div class="hearing-actions">
-            <button class="primary big-button hearing-start-button pulse" data-action="startHearingCalibration">开始</button>
-          </div>` : ""}
         </div>
       </div>
     </div>
@@ -1892,28 +1978,34 @@ function renderHearingSummary(screening) {
   const ears = summary.ears || {};
   const audioLevel = summary.mocaAudioLevelDbHl ?? screening.mocaAudioLevelDbHl ?? MOCA_AUDIO_DEFAULT_LEVEL_DB_HL;
   return html`
-    <div class="hearing-card hearing-summary-card">
-      <div class="hearing-complete-animation" aria-hidden="true">
-        <span class="hearing-complete-ring"></span>
-        <span class="hearing-complete-check">✓</span>
+    <div class="hearing-summary-wrapper">
+      <div class="hearing-guide-character">
+        ${renderGuideCharacterHTML()}
+        <div class="hearing-guide-bubble">听力测试已完成！<br>请继续认知测试</div>
       </div>
-      <p class="hearing-summary-note">听力测试已完成，请继续认知测试</p>
-      <div class="hearing-summary-grid">
-        ${HEARING_SIDES.map((side) => `
-          <div class="hearing-summary-item">
-            <span>${escapeHtml(side.label)}平均</span>
-            <strong>${formatThreshold(ears[side.key]?.pta4)}</strong>
-          </div>
-        `).join("")}
-        <div class="hearing-summary-item">
-          <span>认知测试音量</span>
-          <strong>${formatAudioLevel(audioLevel)}</strong>
+      <div class="hearing-card hearing-summary-card">
+        <div class="hearing-complete-animation" aria-hidden="true">
+          <span class="hearing-complete-ring"></span>
+          <span class="hearing-complete-check">✓</span>
         </div>
+        <p class="hearing-summary-note">听力测试已完成，请继续认知测试</p>
+        <div class="hearing-summary-grid">
+          ${HEARING_SIDES.map((side) => `
+            <div class="hearing-summary-item">
+              <span>${escapeHtml(side.label)}平均</span>
+              <strong>${formatThreshold(ears[side.key]?.pta4)}</strong>
+            </div>
+          `).join("")}
+          <div class="hearing-summary-item">
+            <span>认知测试音量</span>
+            <strong>${formatAudioLevel(audioLevel)}</strong>
+          </div>
+        </div>
+        <div class="hearing-summary-actions">
+          <button class="primary big-button hearing-continue-button pulse" data-action="enterCognitionTest">继续</button>
+        </div>
+        <button class="hearing-retest-link" data-action="restartHearingCalibration">重测</button>
       </div>
-      <div class="hearing-summary-actions">
-        <button class="primary big-button hearing-continue-button pulse" data-action="enterCognitionTest">继续</button>
-      </div>
-      <button class="hearing-retest-link" data-action="restartHearingCalibration">重测</button>
     </div>
   `;
 }
@@ -2189,17 +2281,22 @@ function renderTaskGuide(task, step) {
   const playLabel = playState === "播放中..." ? "播放中..." : "再听一遍";
   return html`
     <section class="single-page task-guide-page">
-      <div class="task-guide-card">
-        <div class="task-guide-copy">
-          <span>第 ${state.activeTaskIndex + 1} 题</span>
-          <h2>${escapeHtml(task.title)}</h2>
-          <p>${escapeHtml(taskGuideText(task, step))}</p>
+      <div class="character-dialog-screen">
+        <div class="character-side">
+          ${renderGuideCharacterHTML()}
         </div>
-        ${task.type === "trail" ? renderTrailGuidePractice(ready) : ""}
-        ${renderAudioWave()}
-        <div class="task-guide-actions">
-          <button class="secondary big-button" data-action="replayTaskGuide" ${ready ? "" : "disabled"}>${playLabel}</button>
-          <button class="primary big-button ${canProceed ? "pulse" : ""}" data-action="acknowledgeTaskGuide" ${canProceed ? "" : "disabled"}>我明白了</button>
+        <div class="character-dialog-bubble">
+          <div class="task-guide-copy">
+            <span>第 ${state.activeTaskIndex + 1} 题</span>
+            <h2>${escapeHtml(task.title)}</h2>
+            <p>${escapeHtml(taskGuideText(task, step))}</p>
+          </div>
+          ${task.type === "trail" ? renderTrailGuidePractice(ready) : ""}
+          ${renderAudioWave()}
+          <div class="task-guide-actions ${task.type === "trail" ? "task-guide-actions--center" : ""}">
+            <button class="secondary big-button" data-action="replayTaskGuide" ${ready ? "" : "disabled"}>${playLabel}</button>
+            <button class="primary big-button character-dialog-btn ${canProceed ? "pulse" : ""}" data-action="acknowledgeTaskGuide" ${canProceed ? "" : "disabled"}>准备好了</button>
+          </div>
         </div>
       </div>
     </section>
@@ -2214,7 +2311,7 @@ function renderTrailGuidePractice(instructionReady) {
       <div class="trail-guide-board ${instructionReady ? "" : "locked"}">
         <canvas id="trailGuideCanvas" class="trail-guide-canvas" aria-label="连线练习区域"></canvas>
       </div>
-      <strong>${complete ? "练习完成" : instructionReady ? "请从 1 拖到甲，再拖到乙" : "请先听完说明"}</strong>
+      <strong>${complete ? "练习完成" : instructionReady ? "请从 1 拖到甲，再拖到 2" : "请先听完说明"}</strong>
     </div>
   `;
 }
@@ -3026,8 +3123,12 @@ function renderResults() {
         <strong>${totals.totalScore}<em>/30</em></strong>
         <p>认知测试已完成</p>
       </div>
+      <div class="completion-cheer">
+        ${renderGuideCharacterHTML("completion-character")}
+        <div class="completion-bubble">完成得很好！<br>接下来请继续填写感受问卷</div>
+      </div>
       <div class="control-row results-actions final-results-actions">
-        <button class="primary big-button continue-survey-button pulse" data-action="continueToPostSurvey">继续</button>
+        <button class="primary big-button continue-survey-button survey-cta-button pulse" data-action="continueToPostSurvey">填写问卷</button>
       </div>
       ${saving ? `<p class="save-status">正在后台自动保存和评分...</p>` : ""}
       ${saved ? `<p class="save-status">数据已保存到后台${state.sessionSavedAt ? `：${escapeHtml(new Date(state.sessionSavedAt).toLocaleString())}` : ""}</p>` : ""}
@@ -3786,6 +3887,7 @@ function setupTrailGuidePracticeCanvas() {
   const context = canvas.getContext("2d");
   context.setTransform(dpr, 0, 0, dpr, 0, 0);
   drawTrailGuidePracticeCanvas(canvas);
+  startTrailGuidePracticeAnimation(canvas);
 
   canvas.onpointerdown = (event) => {
     const task = tasks[state.activeTaskIndex];
@@ -3824,7 +3926,7 @@ function setupTrailGuidePracticeCanvas() {
 }
 
 function trailGuidePracticeExpected() {
-  return ["1", "甲", "乙"];
+  return ["1", "甲", "2"];
 }
 
 function trailGuidePracticeEdges() {
@@ -3928,11 +4030,26 @@ function drawTrailGuidePracticeCanvas(canvas) {
     const from = nodeMap.get(sequence.length ? sequence[sequence.length - 1] : expected[0]);
     const to = nodeMap.get(expected[sequence.length ? sequence.length : 1]);
     if (from && to) {
-      const x = from.x + (to.x - from.x) * 0.45;
-      const y = from.y + (to.y - from.y) * 0.45;
-      drawFingerCue(context, x, y, 16, Math.atan2(to.y - from.y, to.x - from.x));
+      const progress = 0.15 + ((trailGuidePracticeTick % 90) / 90) * 0.7;
+      const x = from.x + (to.x - from.x) * progress;
+      const y = from.y + (to.y - from.y) * progress;
+      drawFingerCue(context, x, y, trailGuidePracticeTick, Math.atan2(to.y - from.y, to.x - from.x));
     }
   }
+}
+
+function startTrailGuidePracticeAnimation(canvas) {
+  if (trailGuidePracticeFrame) cancelAnimationFrame(trailGuidePracticeFrame);
+  const tick = () => {
+    if (state.view !== "test" || tasks[state.activeTaskIndex]?.type !== "trail" || isTrailGuidePracticeComplete()) {
+      trailGuidePracticeFrame = null;
+      return;
+    }
+    trailGuidePracticeTick += 1;
+    drawTrailGuidePracticeCanvas(canvas);
+    trailGuidePracticeFrame = requestAnimationFrame(tick);
+  };
+  trailGuidePracticeFrame = requestAnimationFrame(tick);
 }
 
 function trailGuidePracticeNodes(canvas) {
@@ -3942,7 +4059,7 @@ function trailGuidePracticeNodes(canvas) {
   return [
     { label: "1", x: w * 0.22, y: h * 0.62, r: 34 },
     { label: "甲", x: w * 0.50, y: h * 0.30, r: 34 },
-    { label: "乙", x: w * 0.78, y: h * 0.62, r: 34 }
+    { label: "2", x: w * 0.78, y: h * 0.62, r: 34 }
   ];
 }
 
@@ -4223,6 +4340,8 @@ function startTrailGuide() {
 function stopTrailGuide() {
   if (trailGuideFrame) cancelAnimationFrame(trailGuideFrame);
   trailGuideFrame = null;
+  if (trailGuidePracticeFrame) cancelAnimationFrame(trailGuidePracticeFrame);
+  trailGuidePracticeFrame = null;
 }
 
 function drawTrailCanvas(canvas, tick = 0) {
@@ -4422,6 +4541,12 @@ function cubeReferenceSvg() {
 }
 
 function startHearingCalibration() {
+  if (!state.hearingGuide2Shown) {
+    state.hearingGuide2Pending = true;
+    saveDraft();
+    render();
+    return;
+  }
   const previous = normalizeHearingScreening(state.hearingScreening);
   state.hearingScreening = createHearingScreeningState({
     environment: previous.environment,
@@ -4432,6 +4557,8 @@ function startHearingCalibration() {
     status: "in_progress",
     startedAt: new Date().toISOString()
   });
+  state.hearingGuide2Pending = false;
+  state.hearingGuide2Shown = true;
   saveDraft();
   render();
   queueHearingPrompt();
@@ -4464,6 +4591,8 @@ function restartHearingCalibration() {
     selfSelectedAudioLevelDbHl: previous.selfSelectedAudioLevelDbHl,
     selfSelectedAudioConfirmedAt: previous.selfSelectedAudioConfirmedAt
   });
+  state.hearingGuide2Pending = false;
+  state.hearingGuide2Shown = false;
   saveDraft();
   render();
   queueHearingPrompt();
@@ -4890,6 +5019,16 @@ root.addEventListener("click", async (event) => {
   }
   if (requiresDrawerAdminPassword(action, target)) {
     openAdminPasswordDialog(target);
+    return;
+  }
+  if (action === "advanceOnboarding") {
+    advanceOnboarding();
+    return;
+  }
+  if (action === "dismissHearingGuide2") {
+    state.hearingGuide2Pending = false;
+    state.hearingGuide2Shown = true;
+    startHearingCalibration();
     return;
   }
   if (isBlockedBehindMemoryReviewModal(action, current)) {

@@ -8014,3 +8014,383 @@ body,
     font-size: clamp(24px, 6vw, 34px);
   }
 }
+
+.guide-character {
+  display: block;
+  width: min(230px, 28vw);
+  max-height: min(360px, 50vh);
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 12px 22px rgba(36, 52, 71, 0.14));
+}
+
+.onboarding-screen {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 34px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 247, 0.96), rgba(238, 251, 244, 0.94)),
+    url("./assets/village/login-hero-v3.webp") center / cover no-repeat;
+  cursor: pointer;
+}
+
+.onboarding-content {
+  display: flex;
+  width: min(980px, 100%);
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 34px;
+}
+
+.onboarding-character {
+  flex: 0 0 auto;
+}
+
+.onboarding-bubble {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 640px;
+  padding: 30px 36px;
+  border: 2px solid rgba(189, 210, 204, 0.82);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 0 rgba(197, 213, 201, 0.9), 0 18px 34px rgba(36, 52, 71, 0.12);
+}
+
+.onboarding-bubble::before {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 50%;
+  width: 0;
+  height: 0;
+  border-top: 12px solid transparent;
+  border-bottom: 12px solid transparent;
+  border-right: 16px solid rgba(189, 210, 204, 0.82);
+  transform: translateY(-50%);
+}
+
+.onboarding-bubble p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 850;
+  line-height: 1.65;
+}
+
+.onboarding-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px;
+  color: rgba(36, 52, 71, 0.68);
+  font-size: 18px;
+  font-weight: 800;
+  animation: hintPulse 2.2s ease-in-out infinite;
+}
+
+@keyframes hintPulse {
+  0%, 100% { opacity: 0.48; }
+  50% { opacity: 0.86; }
+}
+
+.onboarding-dots {
+  display: flex;
+  gap: 10px;
+}
+
+.onboarding-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #cfd9d4;
+}
+
+.onboarding-dots i.active {
+  background: var(--leaf);
+  transform: scale(1.28);
+}
+
+.onboarding-dots i.done {
+  background: #93c7ab;
+}
+
+.setup-welcome {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.setup-welcome-inner {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+
+.setup-welcome .guide-character {
+  width: min(250px, 26vw);
+  max-height: 360px;
+}
+
+.setup-welcome-bubble {
+  position: relative;
+  padding: 16px 22px;
+  border: 2px solid rgba(189, 210, 204, 0.82);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink);
+  font-size: 23px;
+  font-weight: 850;
+  line-height: 1.45;
+  text-align: center;
+  box-shadow: 0 6px 0 rgba(197, 213, 201, 0.9);
+}
+
+.setup-welcome-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 12px solid rgba(189, 210, 204, 0.82);
+  transform: translateX(-50%);
+}
+
+.hearing-intro-wrapper,
+.hearing-summary-wrapper {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.hearing-guide-character {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 18px;
+}
+
+.hearing-guide-character .guide-character {
+  width: min(168px, 22vw);
+  max-height: 230px;
+}
+
+.hearing-guide-bubble {
+  position: relative;
+  max-width: 520px;
+  padding: 16px 22px;
+  border: 2px solid rgba(189, 210, 204, 0.82);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.55;
+  box-shadow: 0 6px 0 rgba(197, 213, 201, 0.9), 0 12px 26px rgba(36, 52, 71, 0.10);
+}
+
+.hearing-guide-bubble::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  bottom: 30px;
+  width: 0;
+  height: 0;
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+  border-right: 14px solid rgba(189, 210, 204, 0.82);
+}
+
+.hearing-guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(22, 32, 42, 0.28);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.hearing-guide-popup {
+  display: grid;
+  width: min(560px, 94vw);
+  justify-items: center;
+  gap: 18px;
+  padding: 28px;
+  border: 2px solid rgba(189, 210, 204, 0.82);
+  border-radius: 8px;
+  background: #fffdf7;
+  box-shadow: 0 14px 44px rgba(36, 52, 71, 0.20);
+}
+
+.hearing-guide-popup-char .guide-character {
+  width: min(170px, 30vw);
+  max-height: 240px;
+}
+
+.hearing-guide-popup-bubble {
+  padding: 16px 20px;
+  border: 2px solid rgba(189, 210, 204, 0.82);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.hearing-guide-popup-bubble p {
+  margin: 0;
+}
+
+.character-dialog-screen {
+  display: flex;
+  width: min(1160px, 100%);
+  height: min(100%, 720px);
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 0 auto;
+  padding: clamp(12px, 2dvh, 24px);
+}
+
+.character-side {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: min(190px, 20vw);
+}
+
+.character-side .guide-character {
+  width: min(190px, 20vw);
+  max-height: 310px;
+}
+
+.character-dialog-bubble {
+  position: relative;
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-items: center;
+  gap: 16px;
+  padding: clamp(18px, 3dvh, 32px);
+  border: 2px solid rgba(189, 210, 204, 0.82);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fffdf7, #eefbf4);
+  box-shadow: 0 8px 0 rgba(197, 213, 201, 0.9), 0 18px 34px rgba(36, 52, 71, 0.12);
+}
+
+.character-dialog-bubble::before {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 90px;
+  width: 0;
+  height: 0;
+  border-top: 12px solid transparent;
+  border-bottom: 12px solid transparent;
+  border-right: 16px solid rgba(189, 210, 204, 0.82);
+}
+
+.character-dialog-btn {
+  min-width: 190px;
+}
+
+.task-guide-actions--center {
+  justify-content: center;
+}
+
+.completion-cheer {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  width: min(720px, 100%);
+  margin: 10px auto 0;
+}
+
+.completion-cheer .guide-character {
+  width: min(120px, 22vw);
+  max-height: 170px;
+}
+
+.completion-bubble {
+  position: relative;
+  padding: 14px 20px;
+  border: 2px solid rgba(189, 210, 204, 0.82);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 850;
+  line-height: 1.45;
+  box-shadow: 0 6px 0 rgba(197, 213, 201, 0.9);
+}
+
+.survey-cta-button {
+  border-color: #f0b429;
+  background: linear-gradient(180deg, #ffd85a, #f5b820);
+  color: #473400;
+  box-shadow: 0 7px 0 #c99010, 0 12px 28px rgba(245, 184, 32, 0.28);
+}
+
+@media (max-width: 760px) {
+  .onboarding-content,
+  .character-dialog-screen,
+  .hearing-guide-character,
+  .completion-cheer {
+    flex-direction: column;
+  }
+
+  .onboarding-bubble::before,
+  .character-dialog-bubble::before,
+  .hearing-guide-bubble::before {
+    display: none;
+  }
+
+  .guide-character,
+  .setup-welcome .guide-character,
+  .character-side .guide-character {
+    width: min(180px, 46vw);
+    max-height: 230px;
+  }
+
+  .onboarding-bubble p,
+  .hearing-guide-bubble,
+  .hearing-guide-popup-bubble,
+  .completion-bubble {
+    font-size: 22px;
+  }
+
+  .setup-welcome {
+    display: none;
+  }
+}
