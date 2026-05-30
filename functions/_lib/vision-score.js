@@ -1,6 +1,19 @@
 const DEFAULT_OPENAI_VISION_MODEL = "gpt-4.1-mini";
 const DEFAULT_OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
 const DEFAULT_WORKERS_AI_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
+const DRAWING_RUBRICS = {
+  cube: [
+    { key: "threeDimensional", label: "三维结构", standard: "图形为三维结构" },
+    { key: "allLinesPresent", label: "线条完整", standard: "所有的线都存在" },
+    { key: "noExtraLines", label: "无多余线", standard: "无多余的线" },
+    { key: "parallelAndSimilar", label: "平行等长", standard: "相对的边基本平行，长度基本一致（长方体或棱柱体也算正确）" }
+  ],
+  clock: [
+    { key: "contour", label: "轮廓", standard: "表面必须是个圆，允许有轻微的缺陷（如，圆没有闭合）" },
+    { key: "numbers", label: "数字", standard: "所有的数字必须完整且无多余的数字；数字顺序必须正确且在所属的象限内；可以是罗马数字；数字可以放在圆圈之外" },
+    { key: "hands", label: "指针", standard: "必须有两个指针且一起指向正确的时间；时针必须明显短于分针；指针的中心交点必须在表内且接近于钟表的中心" }
+  ]
+};
 
 function clampScore(value, maxScore) {
   const score = Number.isFinite(Number(value)) ? Math.round(Number(value)) : 0;
@@ -108,14 +121,13 @@ function openAiRequestBody(payload, model) {
             text: [
               "你是 MoCA 中文量表画图题评分助手。",
               "只根据用户提交的图片和评分标准评分，不使用人工勾选。",
-              "评分必须考虑手绘因素：线条抖动、重描、轻微断开、歪斜、大小不一、间距不均、椭圆或近似圆表盘都不应直接扣分。",
+              "严格按照 MoCA 中文量表评分，不要放宽标准；不得凭题目要求推测图片中不存在的线、数字或指针。",
               "必须返回严格 JSON，不要 Markdown，不要解释 JSON 以外的文字。",
               "scoreSuggestion 必须是 0 到 maxScore 的整数；confidence 是 0 到 1；requiresHumanReview 固定返回 false。",
-              "criteria 必须列出每个分项的 passed true/false；comment 只写未得分项目，满分时 comment 为空字符串。",
-              "comment 示例：未得分：指针（未看到两根明确指针）。不要在 comment 里解释已得分项目。",
-              "立方体：能辨认为三维盒状/立方体、主要边线基本存在、无明显无关多余线、相对边大致平行且长度接近，即可 1 分。",
-              "钟表：轮廓、数字、指针三项各 1 分；圆/椭圆/近似圆可给轮廓分，1-12 基本写全且总体顺时针可给数字分。",
-              "钟表指针项必须看得到两根明确的指针/线段，并大致表示 11 点 10 分才给 1 分；没有指针、只有一根指针、只有数字/表盘时，指针项固定 0 分，不能凭题目要求或猜测补分。"
+              "criteria 必须列出每个分项的 passed true/false；evidence 写图片证据；comment 只写未得分项目，满分时 comment 为空字符串。",
+              "comment 示例：未得分：指针（必须有两个指针且一起指向正确的时间）。不要在 comment 里解释已得分项目。",
+              "立方体总分只有 0 或 1 分：完全符合图形为三维结构、所有的线都存在、无多余的线、相对的边基本平行且长度基本一致（长方体或棱柱体也算正确）时给 1 分；任一标准违反即 0 分。",
+              "钟表：轮廓、数字、指针三项各 1 分。轮廓：表面必须是个圆，允许有轻微的缺陷（如，圆没有闭合）。数字：所有的数字必须完整且无多余的数字；数字顺序必须正确且在所属的象限内；可以是罗马数字；数字可以放在圆圈之外。指针：必须有两个指针且一起指向正确的时间；时针必须明显短于分针；指针的中心交点必须在表内且接近于钟表的中心。各项目中只要违反任何一条，该项目不给分。"
             ].join("\n")
           }
         ]
@@ -136,7 +148,7 @@ function openAiRequestBody(payload, model) {
           {
             type: "input_image",
             image_url: payload.image,
-            detail: "high"
+            detail: "low"
           }
         ]
       }
@@ -263,16 +275,15 @@ function firstBalancedJsonObject(text) {
 function workersAiPrompt(payload) {
   return [
     "你是 MoCA 中文量表画图题评分助手。只根据图片和评分标准评分。",
-    "不要使用人工勾选。评分要考虑老年人手绘因素。",
-    "线条抖动、重描、轻微断开、歪斜、大小不一、间距不均、椭圆或近似圆表盘都不应直接扣分。",
+    "不要使用人工勾选。严格按照 MoCA 中文量表评分，不要放宽标准。",
+    "不得凭题目要求推测图片中不存在的线、数字或指针。",
     "必须只输出一个单行 JSON 对象，不要 Markdown，不要解释文字，不要在 JSON 前后添加任何字符。",
     "JSON 字段：scoreSuggestion(integer), confidence(number), rubricMatched(boolean), requiresHumanReview(boolean), comment(string), criteria(array)。criteria 可为空数组。",
     "requiresHumanReview 固定 false。",
-    "criteria 必须列出每个分项的 passed true/false；comment 只写未得分项目，满分时 comment 为空字符串。",
-    "comment 示例：未得分：指针（未看到两根明确指针）。不要在 comment 里解释已得分项目。",
-    "立方体：能辨认为三维盒状/立方体、主要边线基本存在、无明显无关多余线、相对边大致平行且长度接近，即可 1 分。",
-    "钟表：轮廓、数字、指针三项各 1 分；圆/椭圆/近似圆可给轮廓分，1-12 基本写全且总体顺时针可给数字分。",
-    "钟表指针项必须看得到两根明确的指针/线段，并大致表示 11 点 10 分才给 1 分；没有指针、只有一根指针、只有数字/表盘时，指针项固定 0 分，不能凭题目要求或猜测补分。",
+    "criteria 必须列出每个分项的 passed true/false；evidence 写图片证据；comment 只写未得分项目，满分时 comment 为空字符串。",
+    "comment 示例：未得分：指针（必须有两个指针且一起指向正确的时间）。不要在 comment 里解释已得分项目。",
+    "立方体总分只有 0 或 1 分：完全符合图形为三维结构、所有的线都存在、无多余的线、相对的边基本平行且长度基本一致（长方体或棱柱体也算正确）时给 1 分；任一标准违反即 0 分。",
+    "钟表：轮廓、数字、指针三项各 1 分。轮廓：表面必须是个圆，允许有轻微的缺陷（如，圆没有闭合）。数字：所有的数字必须完整且无多余的数字；数字顺序必须正确且在所属的象限内；可以是罗马数字；数字可以放在圆圈之外。指针：必须有两个指针且一起指向正确的时间；时针必须明显短于分针；指针的中心交点必须在表内且接近于钟表的中心。各项目中只要违反任何一条，该项目不给分。",
     JSON.stringify({
       taskId: payload.taskId,
       taskType: payload.taskType,
@@ -304,15 +315,57 @@ function extractOutputText(result) {
 
 function normalizeAiScore(result = {}, payload = {}, mode = "ai-score") {
   const maxScore = Number.isFinite(Number(payload.maxScore)) ? Number(payload.maxScore) : 0;
+  const criteria = normalizeDrawingCriteria(result.criteria, payload);
+  const deductionPoints = drawingDeductionPoints(criteria);
+  const scoreSuggestion = drawingScoreFromCriteria(payload, criteria, result.scoreSuggestion, maxScore);
   return {
     mode,
     taskId: payload.taskId,
-    scoreSuggestion: clampScore(result.scoreSuggestion, maxScore),
+    scoreSuggestion,
     confidence: Math.max(0, Math.min(1, Number(result.confidence) || 0)),
     requiresHumanReview: false,
     aiImageScoringConfigured: mode === "cloudflare-workers-ai" || mode === "openai-vision" || mode === "external-ai-score-endpoint",
-    rubricMatched: Boolean(result.rubricMatched),
-    comment: String(result.comment || ""),
-    criteria: Array.isArray(result.criteria) ? result.criteria : []
+    rubricMatched: criteria.length ? true : Boolean(result.rubricMatched),
+    comment: deductionPoints.length
+      ? `未得分：${deductionPoints.map((item) => `${item.label}（${item.standard}）`).join("；")}`
+      : String(result.comment || ""),
+    criteria: criteria.length ? criteria : (Array.isArray(result.criteria) ? result.criteria : []),
+    deductionPoints
   };
+}
+
+function normalizeDrawingCriteria(criteria = [], payload = {}) {
+  const rubric = DRAWING_RUBRICS[payload.taskId] || [];
+  if (!rubric.length || !Array.isArray(criteria) || !criteria.length) return [];
+  return rubric.map((rubricItem, index) => {
+    const item = criteria.find((entry) => entry?.key === rubricItem.key)
+      || criteria.find((entry) => entry?.label === rubricItem.label)
+      || criteria[index]
+      || {};
+    return {
+      key: rubricItem.key,
+      label: rubricItem.label,
+      standard: rubricItem.standard,
+      passed: typeof item.passed === "boolean" ? item.passed : Boolean(item.correct ?? item.met ?? false),
+      evidence: String(item.evidence || item.comment || item.reason || "").trim()
+    };
+  });
+}
+
+function drawingScoreFromCriteria(payload, criteria, fallbackScore, maxScore) {
+  if (!criteria.length) return clampScore(fallbackScore, maxScore);
+  if (payload.taskId === "cube") return criteria.every((item) => item.passed) ? 1 : 0;
+  if (payload.taskId === "clock") return clampScore(criteria.reduce((sum, item) => sum + (item.passed ? 1 : 0), 0), maxScore);
+  return clampScore(fallbackScore, maxScore);
+}
+
+function drawingDeductionPoints(criteria = []) {
+  return criteria
+    .filter((item) => item && item.passed === false)
+    .map((item) => ({
+      key: item.key,
+      label: item.label,
+      standard: item.standard,
+      evidence: item.evidence
+    }));
 }

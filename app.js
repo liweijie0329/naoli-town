@@ -30,6 +30,8 @@ const ADMIN_PASSWORD = "123";
 const SERIAL_SUBTRACTION_NUMBER = 7;
 const DELAYED_CONFIRM_TASK_IDS = new Set(["trail", "cube", "clock"]);
 const DELAYED_CONFIRM_MS = 5000;
+const AUTO_ADVANCE_MS = 650;
+const AUTO_ADVANCE_NUMERIC_MS = 900;
 const SENTENCE_AUTO_STOP_MS = 30000;
 const SETUP_PROMPT_TEXT = "请填写病例号、姓名和教育水平。";
 const POST_TEST_SURVEY_INTRO_TEXT = "下面我将问一些问题，有关您刚才答题时的感觉。请根据您的真实感受回答，答案没有对错之分，当您准备好了请按开始";
@@ -387,15 +389,15 @@ const fluencyFillerPhrases = [
 
 const DRAWING_AI_RUBRICS = {
   cube: [
-    { key: "threeDimensional", label: "三维结构", detail: "图形只要能辨认为三维盒状/立方体结构即可；手绘透视不标准、线条抖动不扣分。" },
-    { key: "allLinesPresent", label: "线条完整", detail: "所有主要边线基本存在即可；允许线条轻微断开、重描或歪斜。" },
-    { key: "noExtraLines", label: "无多余线", detail: "不能有明显多余线条。" },
-    { key: "parallelAndSimilar", label: "平行等长", detail: "相对边大致平行、长度接近即可；允许手绘造成的角度和长度轻微偏差。" }
+    { key: "threeDimensional", label: "三维结构", detail: "图形为三维结构" },
+    { key: "allLinesPresent", label: "线条完整", detail: "所有的线都存在" },
+    { key: "noExtraLines", label: "无多余线", detail: "无多余的线" },
+    { key: "parallelAndSimilar", label: "平行等长", detail: "相对的边基本平行，长度基本一致（长方体或棱柱体也算正确）" }
   ],
   clock: [
-    { key: "contour", label: "轮廓", detail: "表盘可以是圆、椭圆或近似圆；允许手抖、轻微开口、变形或不居中。" },
-    { key: "numbers", label: "数字", detail: "1-12 可以用阿拉伯数字、中文数字或罗马数字等可辨认标记表示；基本写全且总体顺时针分布即可，允许歪斜、大小不一、间距不均或轻微偏离象限。" },
-    { key: "hands", label: "指针", detail: "必须看得到两根明确的近似直线指针/线段，普通直线或带箭头直线均可给分；没有指针或只有一根指针时本项固定 0 分。允许角度小偏差，但需能看出分针指向 2 附近、时针在 11 附近且时针较短。" }
+    { key: "contour", label: "轮廓", detail: "表面必须是个圆，允许有轻微的缺陷（如，圆没有闭合）" },
+    { key: "numbers", label: "数字", detail: "所有的数字必须完整且无多余的数字；数字顺序必须正确且在所属的象限内；可以是罗马数字；数字可以放在圆圈之外" },
+    { key: "hands", label: "指针", detail: "必须有两个指针且一起指向正确的时间；时针必须明显短于分针；指针的中心交点必须在表内且接近于钟表的中心" }
   ]
 };
 
@@ -404,7 +406,7 @@ const orientationPrompts = [
   { key: "date", label: "今天是几月几号？", fields: ["month", "day"] },
   { key: "weekday", label: "今天星期几？", fields: ["weekday"] },
   { key: "city", label: "你现在在哪个城市？", fields: ["city"] },
-  { key: "place", label: "这里是什么地方？", fields: ["place"] }
+  { key: "place", label: "这是什么地方？", fields: ["place"] }
 ];
 
 const tasks = [
@@ -415,9 +417,9 @@ const tasks = [
     maxScore: 1,
     type: "trail",
     modality: "拖拽连线",
-    prompt: "请从一个圆圈拖线连到另一个圆圈，按数字和汉字交替上升的规则完成。",
-    instruction: "请按数字和汉字交替上升的规则，把所有圆圈用一条线连起来。每次从当前圆圈拖到下一个圆圈。",
-    scoring: "最终连线序列只要包含 1-甲-2-乙-3-丙-4-丁-5-戊 的正确顺序，即给 1 分；重复点击同一节点不扣分，撤销后按最后留下的序列判分。"
+    prompt: "请按照从数字到汉字并逐渐升高的顺序画一条连线。",
+    instruction: "请按照从数字到汉字并逐渐升高的顺序画一条连线。从数字 1 连向甲，再连向 2，并一直连下去，到戊结束。",
+    scoring: "完全按照 1-甲-2-乙-3-丙-4-丁-5-戊 的顺序进行连线且没有任何交叉线时给 1 分。出现任何错误而没有立刻自我纠正时，给 0 分。"
   },
   {
     id: "cube",
@@ -427,9 +429,9 @@ const tasks = [
     type: "drawing",
     drawingKind: "cube",
     modality: "画图",
-    prompt: "请照着左侧图形，在空白区域尽可能精确地画一遍。",
+    prompt: "请照着左侧图形，在右边空白处再画一遍，并尽可能精确。",
     instruction: "请您照着这幅图在下面的空白处再画一遍，并尽可能精确。",
-    scoring: "按 MoCA 标准并考虑手绘误差：图形能辨认为三维结构、主要线条基本存在、无明显无关多余线、相对边大致平行且长度接近；四项全部满足给 1 分，任一项明显不满足给 0 分。"
+    scoring: "完全符合下列标准时，给 1 分：图形为三维结构；所有的线都存在；无多余的线；相对的边基本平行，长度基本一致（长方体或棱柱体也算正确）。上述标准中，只要违反其中任何一条，即为 0 分。"
   },
   {
     id: "clock",
@@ -440,8 +442,8 @@ const tasks = [
     drawingKind: "clock",
     modality: "画图",
     prompt: "请画一个钟表，填上所有数字，并指示出 11 点过 10 分。",
-    instruction: "请您在此处画一个钟表，填上所有的数字并指示出 11 点 10 分。",
-    scoring: "按 MoCA 标准并考虑手绘误差：轮廓 1 分，圆、椭圆或近似圆均可；数字 1 分，1-12 基本写全、可辨认且总体顺时针即可，阿拉伯数字、中文数字或罗马数字等可辨认标记均可；指针 1 分，必须看得到两根近似直线或带箭头近似直线，且大致表示 11 点 10 分，时针较短。没有指针或只有一根指针时，指针项为 0 分。"
+    instruction: "请您画一个钟表，填上所有的数字并指示出 11 点 10 分。",
+    scoring: "符合下列三个标准时，分别给 1 分：轮廓，表面必须是个圆，允许有轻微的缺陷（如，圆没有闭合）；数字，所有的数字必须完整且无多余的数字，数字顺序必须正确且在所属的象限内，可以是罗马数字，数字可以放在圆圈之外；指针，必须有两个指针且一起指向正确的时间，时针必须明显短于分针，指针的中心交点必须在表内且接近于钟表的中心。上述各项目的标准中，如果违反其中任何一条，则该项目不给分。"
   },
   {
     id: "naming",
@@ -588,9 +590,9 @@ const rubricGroups = [
   {
     title: "视空间与执行功能",
     items: [
-      { title: "交替连线测验", prompt: "请您按照从数字到汉字并逐渐升高的顺序画一条连线。从 1 连向甲，再连向 2，并一直连下去，到戊结束。", scoring: "最终连线序列包含 1-甲-2-乙-3-丙-4-丁-5-戊 的正确顺序即给 1 分。重复点击同一节点不扣分，撤销后按最后留下的序列判分。", image: true },
-      { title: "复制立方体", prompt: "请您照着这幅图在下面的空白处再画一遍，并尽可能精确。", scoring: "符合下列标准时给 1 分：图形可辨认为三维结构；主要线条基本存在；无明显无关多余线；相对边大致平行且长度接近。允许手绘线条抖动、重描、轻微断开、角度不完美或小幅长度偏差。", image: true },
-      { title: "画钟表", prompt: "请您在此处画一个钟表，填上所有的数字并指示出 11 点 10 分。", scoring: "轮廓 1 分：圆、椭圆或近似圆均可，允许轻微缺陷。数字 1 分：1-12 基本写全、可辨认、总体顺时针分布即可，阿拉伯数字、中文数字或罗马数字等可辨认标记均可，允许歪斜、大小不一、间距不均。指针 1 分：必须看得到两根近似直线或带箭头近似直线并大致表示 11 点 10 分，时针短于分针；没有指针或只有一根指针时，指针项为 0 分。", image: true }
+      { title: "交替连线测验", prompt: "请您按照从数字到汉字并逐渐升高的顺序画一条连线。从 1 连向甲，再连向 2，并一直连下去，到戊结束。", scoring: "当患者完全按照 1-甲-2-乙-3-丙-4-丁-5-戊 的顺序进行连线且没有任何交叉线时给 1 分。当患者出现任何错误而没有立刻自我纠正时，给 0 分。", image: true },
+      { title: "复制立方体", prompt: "请您照着这幅图在下面的空白处再画一遍，并尽可能精确。", scoring: "完全符合下列标准时，给 1 分：图形为三维结构；所有的线都存在；无多余的线；相对的边基本平行，长度基本一致（长方体或棱柱体也算正确）。上述标准中，只要违反其中任何一条，即为 0 分。", image: true },
+      { title: "画钟表", prompt: "请您画一个钟表，填上所有的数字并指示出 11 点 10 分。", scoring: "轮廓 1 分：表面必须是个圆，允许有轻微的缺陷（如，圆没有闭合）。数字 1 分：所有的数字必须完整且无多余的数字；数字顺序必须正确且在所属的象限内；可以是罗马数字；数字可以放在圆圈之外。指针 1 分：必须有两个指针且一起指向正确的时间；时针必须明显短于分针；指针的中心交点必须在表内且接近于钟表的中心。上述各项目的标准中，如果违反其中任何一条，则该项目不给分。", image: true }
     ]
   },
   {
@@ -711,6 +713,7 @@ let viewportRenderTimer = null;
 let drawingIdleTimers = [];
 let pendingAiScoreTaskIds = new Set();
 let backgroundSessionSaveTimer = null;
+let autoAdvanceTimer = null;
 let immediateInstructionPlayback = false;
 let setupVoiceRecorder = null;
 
@@ -1355,7 +1358,7 @@ function renderOnboarding() {
           ${renderGuideCharacterHTML()}
         </div>
         <div class="onboarding-bubble">
-          <p>${escapeHtml(ONBOARDING_STEPS[step])}</p>
+          <p>${renderTypewriterText(ONBOARDING_STEPS[step], `onboarding:${step}`, "onboarding-typewriter")}</p>
         </div>
       </div>
       <div class="onboarding-hint">
@@ -1397,12 +1400,6 @@ function renderSetup() {
           </button>
         </div>
         <button class="setup-skip-login" data-action="skipLogin">跳过登录</button>
-        <div class="setup-welcome">
-          <div class="setup-welcome-inner">
-            <div class="setup-welcome-bubble">请依次填入您的<br>个人信息</div>
-            ${renderGuideCharacterHTML()}
-          </div>
-        </div>
       </section>
     </div>
   `;
@@ -2350,11 +2347,11 @@ function renderTrailGuidePractice(instructionReady) {
   const complete = isTrailGuidePracticeComplete();
   return html`
     <div class="trail-guide-practice ${complete ? "complete" : ""}">
-      <p>请按手指方向连线</p>
+      <p>练习：从 1 连到甲，再连到 2</p>
       <div class="trail-guide-board ${instructionReady ? "" : "locked"}">
         <canvas id="trailGuideCanvas" class="trail-guide-canvas" aria-label="连线练习区域"></canvas>
       </div>
-      <strong>${complete ? "练习完成" : instructionReady ? "请从 1 拖到甲，再拖到 2" : "请先听完说明"}</strong>
+      <strong>${complete ? "练习完成" : instructionReady ? "请从 1 拖到甲，再拖到 2" : "说明播放中"}</strong>
     </div>
   `;
 }
@@ -2455,8 +2452,13 @@ function taskActionSecondaryButtons(task) {
 
 function shouldShowConfirmButton(task) {
   if (task.type === "vigilance") return false;
+  if (isAutoAdvanceTask(task)) return false;
   if (task.type === "sentence" && !sentenceStepHasFinalTranscript(task, getTaskStep(task))) return false;
   return true;
+}
+
+function isAutoAdvanceTask(task) {
+  return ["naming", "choice", "serial7", "abstractionChoice", "orientation"].includes(task?.type);
 }
 
 function shouldNudgeConfirm(task) {
@@ -3005,7 +3007,7 @@ function renderSpeechControls(transcript) {
   return html`
     ${renderAudioWave()}
     ${renderAudioButton("playCurrentAudio")}
-    <textarea class="transcript-input" data-voice-manual placeholder="语音识别结果会显示在这里，也可以手动修改。">${escapeHtml(value)}</textarea>
+    <textarea class="transcript-input" data-voice-manual placeholder="语音识别结果会显示在文本框内，也可以手动修改。">${escapeHtml(value)}</textarea>
   `;
 }
 
@@ -3042,7 +3044,7 @@ function renderLiveTranscriptBox(live, placeholder) {
 function renderTranscriptEditor(live, kind, disabled = "") {
   const value = joinTranscriptText(live?.finalText, live?.interimText);
   const attr = kind === "fluency" ? "data-fluency-manual" : "data-voice-manual";
-  return `<textarea class="transcript-input" ${attr} ${disabled} placeholder="语音识别结果会显示在这里，也可以手动修改。">${escapeHtml(value)}</textarea>`;
+  return `<textarea class="transcript-input" ${attr} ${disabled} placeholder="语音识别结果会显示在文本框内，也可以手动修改。">${escapeHtml(value)}</textarea>`;
 }
 
 function renderAudioWave() {
@@ -3486,7 +3488,7 @@ function renderAdmin() {
               <span>测评详情</span>
               <strong>暂无记录</strong>
             </div>
-            <p class="empty">保存或刷新后，可在这里查看每道题得分。</p>
+            <p class="empty">保存或刷新后，可查看每道题得分。</p>
           </aside>
         `}
       </div>
@@ -3722,8 +3724,8 @@ function visualAnswerParts(item, user) {
 }
 
 function drawingStandardText(taskId) {
-  if (taskId === "cube") return "可辨认三维结构、主要线条基本完整、无明显多余线、相对边大致平行且长度接近";
-  if (taskId === "clock") return "圆/椭圆/近似圆表盘、1-12 基本写全且顺时针（阿拉伯/中文/罗马数字等均可）、必须有两根近似直线或带箭头近似直线大致表示 11 点 10 分";
+  if (taskId === "cube") return "图形为三维结构；所有的线都存在；无多余的线；相对的边基本平行，长度基本一致（长方体或棱柱体也算正确）";
+  if (taskId === "clock") return "轮廓：表面必须是个圆；数字：所有数字完整、无多余数字、顺序正确且在所属象限内；指针：两个指针一起指向正确时间，时针明显短于分针，中心交点在表内且接近中心";
   return "";
 }
 
@@ -4143,7 +4145,7 @@ function setupFreeCanvas(task) {
     activeCtx.fillStyle = "rgba(36, 52, 71, 0.12)";
     activeCtx.textAlign = "center";
     activeCtx.textBaseline = "middle";
-    activeCtx.fillText("在这里画", rect.width / 2, rect.height / 2);
+    activeCtx.fillText("请在空白处画", rect.width / 2, rect.height / 2);
     activeCtx.restore();
   }
 
@@ -4531,24 +4533,24 @@ function canvasPoint(event, canvas) {
   return { x: event.clientX - rect.left, y: event.clientY - rect.top };
 }
 
-function captureCanvas(taskId) {
+function captureCanvas(taskId, options = {}) {
   const canvas = activeCanvasTaskId === taskId ? activeCanvas : null;
   if (!canvas) return state.drawings[taskId] || getResponse(taskId).drawingImage || null;
-  const image = canvasToCompactDataUrl(canvas);
-  state.drawings[taskId] = image;
+  const image = canvasToCompactDataUrl(canvas, options);
+  if (!options.transient) state.drawings[taskId] = image;
   return image;
 }
 
-function refreshDrawingImage(taskId) {
-  const image = captureCanvas(taskId);
+function refreshDrawingImage(taskId, options = {}) {
+  const image = captureCanvas(taskId, options);
   if (image) getResponse(taskId).drawingImage = image;
   return image;
 }
 
-function currentDrawingImage(taskId) {
+function currentDrawingImage(taskId, options = {}) {
   const response = getResponse(taskId);
-  const image = response.drawingImage || state.drawings[taskId] || captureCanvas(taskId);
-  if (image) {
+  const image = options.transient ? captureCanvas(taskId, options) : response.drawingImage || state.drawings[taskId] || captureCanvas(taskId, options);
+  if (image && !options.transient) {
     response.drawingImage = image;
     state.drawings[taskId] = image;
   }
@@ -5231,10 +5233,12 @@ root.addEventListener("click", async (event) => {
   if (action === "nextTask") await nextTask();
   if (action === "chooseNaming") {
     const response = getResponse(current.id);
-    const item = current.items[getTaskStep(current)];
+    const step = getTaskStep(current);
+    const item = current.items[step];
     response.answer[item.key] = target.dataset.value;
     saveDraft();
     render();
+    queueTaskAutoAdvance(current.id, step);
   }
   if (action === "toggleMemoryWord") toggleMemoryWord(target.dataset.word);
   if (action === "reviewMemoryReplay") {
@@ -5247,10 +5251,16 @@ root.addEventListener("click", async (event) => {
   }
   if (action === "chooseAbstraction") {
     const response = getResponse("abstraction");
+    const step = getTaskStep(current);
+    const item = current.items?.[step];
     response.answer[target.dataset.key] = target.dataset.value;
     delete response.behavior.selectionWarning;
+    if (item?.practice && target.dataset.value !== item.answer) {
+      response.behavior.selectionWarning = `请选择正确答案：${item.answer}`;
+    }
     saveDraft();
     render();
+    if (!response.behavior.selectionWarning) queueTaskAutoAdvance(current.id, step);
   }
   if (action === "playCurrentAudio") playCurrentAudio();
   if (action === "replayTaskGuide") replayTaskGuide();
@@ -5265,8 +5275,10 @@ root.addEventListener("click", async (event) => {
   if (action === "backspaceOrientation") backspaceOrientation(target.dataset.field);
   if (action === "setOrientationDateField") setOrientationDateField(target.dataset.field);
   if (action === "chooseOrientation") {
+    const step = getTaskStep(current);
     applyOrientationChoice(target.dataset.key, target.dataset.value);
     render();
+    queueTaskAutoAdvance(current.id, step);
   }
   if (action === "openRubric") {
     activeRubricItem = getRubricItem(Number(target.dataset.group), Number(target.dataset.item));
@@ -5891,7 +5903,7 @@ function refreshNasaSliderUi(value) {
 
 async function submitActiveTaskWithFeedback(task) {
   if ((task.type === "drawing" || task.type === "trail") && hasDrawableResponse(task)) {
-    refreshDrawingImage(task.id);
+    refreshDrawingImage(task.id, isAsyncDrawingAiTask(task) ? { maxLongSide: 768, quality: 0.62 } : {});
   }
   state.taskSubmitting = {
     taskId: task.id,
@@ -5914,6 +5926,7 @@ async function submitActiveTaskWithFeedback(task) {
 }
 
 async function nextTask() {
+  clearTaskAutoAdvance();
   if (speechTranscribing || isTaskSubmitting()) return;
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
@@ -5955,7 +5968,25 @@ async function nextTask() {
   render();
 }
 
+function queueTaskAutoAdvance(taskId, step, delayMs = AUTO_ADVANCE_MS) {
+  clearTaskAutoAdvance();
+  autoAdvanceTimer = window.setTimeout(async () => {
+    autoAdvanceTimer = null;
+    if (state.view !== "test" || speechTranscribing || isTaskSubmitting()) return;
+    const task = tasks[state.activeTaskIndex];
+    if (!task || task.id !== taskId || getTaskStep(task) !== step) return;
+    await nextTask();
+  }, delayMs);
+}
+
+function clearTaskAutoAdvance() {
+  if (!autoAdvanceTimer) return;
+  window.clearTimeout(autoAdvanceTimer);
+  autoAdvanceTimer = null;
+}
+
 async function skipTask() {
+  clearTaskAutoAdvance();
   if (speechTranscribing || isTaskSubmitting()) return;
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
@@ -6352,37 +6383,39 @@ function requestImmediateInstructionPlayback(task, step = getTaskStep(task)) {
 }
 
 function taskGuideText(task, step = getTaskStep(task)) {
-  if (task.type === "trail") return "按数字和汉字交替上升连线。\n请先练习：从 1 连到甲，再连到 2。";
-  if (task.type === "drawing" && task.id === "cube") return "请看清示例。\n下一页照着样子画一个立方体。";
-  if (task.type === "drawing" && task.id === "clock") return "下一页请画一个钟表。\n数字要完整，指针指向 11 点 10 分。";
+  if (task.type === "trail") return "请按照从数字到汉字并逐渐升高的顺序画一条连线。\n先练习：从 1 连到甲，再连到 2。";
+  if (task.type === "drawing" && task.id === "cube") return "请照着左侧图形，在右边空白处再画一遍，并尽可能精确。";
+  if (task.type === "drawing" && task.id === "clock") return "请画一个钟表，填上所有的数字，并把指针指向 11 点 10 分。";
   if (task.type === "naming") {
-    return "下一页请选择动物名称。";
+    return "请您告诉我这个动物的名字。";
   }
   if (task.type === "abstractionChoice") return abstractionInstructionText(task, step);
   if (task.type === "orientation") return orientationInstructionText(step);
   if (task.type === "serial7") return serialSubtractionInstructionText(step);
-  if (task.id === "digitForward") return "下一页请听数字。\n听完后按相同顺序点出来。";
-  if (task.id === "digitBackward") return "下一页请听数字。\n听完后按相反顺序点出来。";
-  if (task.type === "vigilance") return "下一页听到数字 1 时，请敲一下。";
-  if (task.type === "sentence") return "下一页先听一句话。\n听完后请复述。";
-  if (task.type === "fluency") return "下一页请尽量多说动物名字。\n时间是一分钟。";
-  if (task.type === "memory") return task.trial === 1 ? "下一页请听五个词。\n听完后选择听到的词。" : "下一页请回忆刚才听过的词。";
+  if (task.id === "digitForward") return "下面我说一些数字，请您仔细听。\n听完后按相同顺序点出来。";
+  if (task.id === "digitBackward") return "下面我再说一些数字，请您仔细听。\n听完后按相反顺序点出来。";
+  if (task.type === "vigilance") return "下面会读出一系列数字。\n每当听到数字 1 时，请敲一下。";
+  if (task.type === "sentence") return "我会说一句话。\n听完后请尽可能原原本本地复述出来。";
+  if (task.type === "fluency") return "请尽可能快、尽可能多地说出动物名称。\n时间是 1 分钟。";
+  if (task.type === "memory") return task.trial === 1
+    ? "这是一个记忆力测验。\n我会读 5 个词，请注意听并记住。听完后选择您记住的词。"
+    : "刚才读过的 5 个词，请您再尽量回忆一下。";
   return task.instruction || task.prompt;
 }
 
 function taskQuestionText(task, step = getTaskStep(task)) {
   if (!task) return "";
-  if (task.type === "trail") return "请按照刚才练习的规则，把所有圆圈按 1、甲、2、乙的顺序一直连到戊。";
+  if (task.type === "trail") return "请按照从数字到汉字并逐渐升高的顺序连线：1、甲、2、乙，一直连到戊。";
   if (task.type === "drawing") {
-    if (task.id === "cube") return "请照着左边的图，在右边空白处画一个立方体。";
-    if (task.id === "clock") return "请画一个钟表，标出所有数字，并把指针画到 11 点 10 分。";
+    if (task.id === "cube") return "请照着左侧图形，在右边空白处再画一遍，并尽可能精确。";
+    if (task.id === "clock") return "请画一个钟表，填上所有的数字，并把指针指向 11 点 10 分。";
     return task.prompt || "请在空白处画图。";
   }
-  if (task.type === "naming") return "这是什么动物？请选择一个答案。";
+  if (task.type === "naming") return "请您告诉我这个动物的名字。";
   if (task.type === "memory") {
     return task.trial === 1
-      ? "请先听五个词，听完后点击刚刚听到的词。"
-      : "请回忆刚才听过的五个词，并点击所有记得的词。";
+      ? "请听 5 个词，听完后点击您记住的词。"
+      : "请回忆刚才听过的 5 个词，并点击所有记得的词。";
   }
   if (task.type === "choice") {
     return task.id === "digitBackward"
@@ -8787,14 +8820,19 @@ function numbersInText(text) {
 async function appendDigit(digit) {
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
+  const step = getTaskStep(task);
   response.answer.sequence = response.answer.sequence || [];
   if (response.answer.sequence.length < activeDigitItem(task).answer.length) response.answer.sequence.push(digit);
   saveDraft();
   refreshDigitChoiceUi(task, response);
   refreshTaskActionButtons();
+  if (response.answer.sequence.length >= activeDigitItem(task).answer.length) {
+    queueTaskAutoAdvance(task.id, step, AUTO_ADVANCE_MS);
+  }
 }
 
 function backspaceDigit() {
+  clearTaskAutoAdvance();
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
   response.answer.sequence = response.answer.sequence || [];
@@ -8821,16 +8859,31 @@ function refreshDigitChoiceUi(task, response = getResponse(task.id)) {
 }
 
 function inputSerialDigit(digit) {
+  clearTaskAutoAdvance();
+  const task = tasks[state.activeTaskIndex];
   const response = getResponse("serial7");
-  const step = getTaskStep(tasks[state.activeTaskIndex]);
+  const step = getTaskStep(task);
   const timing = ensureSerialStepTiming(response, step);
   if (!timing.firstInputAt) timing.firstInputAt = new Date().toISOString();
   response.answer.values = response.answer.values || ["", "", "", "", ""];
   response.answer.values[step] = `${response.answer.values[step] || ""}${digit}`;
   render();
+  if (isSerialStepInputComplete(response, step)) queueTaskAutoAdvance(task.id, step, AUTO_ADVANCE_NUMERIC_MS);
+}
+
+function isSerialStepInputComplete(response, step) {
+  const value = String(response.answer?.values?.[step] || "");
+  const expectedLength = String(serialExpectedValueAtStep(step)).length;
+  return value.length >= Math.max(1, expectedLength);
+}
+
+function serialExpectedValueAtStep(step) {
+  const subtractBy = serialSubtractionNumber();
+  return 100 - subtractBy * (Number(step) + 1);
 }
 
 function backspaceSerial() {
+  clearTaskAutoAdvance();
   const response = getResponse("serial7");
   const step = getTaskStep(tasks[state.activeTaskIndex]);
   ensureSerialStepTiming(response, step);
@@ -8840,7 +8893,10 @@ function backspaceSerial() {
 }
 
 function inputOrientationDigit(field, digit) {
+  clearTaskAutoAdvance();
+  const task = tasks[state.activeTaskIndex];
   const response = getResponse("orientation");
+  const step = getTaskStep(task);
   const key = field === "day" ? "day" : field === "month" ? "month" : "year";
   const maxLength = key === "year" ? 4 : 2;
   response.answer[key] = String(response.answer[key] || "");
@@ -8853,9 +8909,21 @@ function inputOrientationDigit(field, digit) {
   }
   saveDraft();
   render();
+  if (isOrientationStepInputComplete(response, step)) queueTaskAutoAdvance(task.id, step, AUTO_ADVANCE_NUMERIC_MS);
+}
+
+function isOrientationStepInputComplete(response, step) {
+  const prompt = orientationPrompts[step];
+  if (!prompt) return false;
+  if (prompt.key === "year") return String(response.answer?.year || "").length >= 4;
+  if (prompt.key === "date") {
+    return Boolean(String(response.answer?.month || "").length >= 1 && String(response.answer?.day || "").length >= 1);
+  }
+  return hasOrientationAnswer(response, step);
 }
 
 function backspaceOrientation(field) {
+  clearTaskAutoAdvance();
   const response = getResponse("orientation");
   const key = field === "day" ? "day" : field === "month" ? "month" : "year";
   response.answer[key] = String(response.answer[key] || "").slice(0, -1);
@@ -8864,6 +8932,7 @@ function backspaceOrientation(field) {
 }
 
 function setOrientationDateField(field) {
+  clearTaskAutoAdvance();
   const response = getResponse("orientation");
   response.answer.orientationDateActiveField = field === "day" ? "day" : "month";
   saveDraft();
@@ -9221,7 +9290,9 @@ function localAiScore(payload) {
 
 async function scoreTaskWithAi(task) {
   const response = getResponse(task.id);
-  const image = task.type === "drawing" || task.type === "trail" ? currentDrawingImage(task.id) : null;
+  const image = task.type === "drawing" || task.type === "trail"
+    ? currentDrawingImage(task.id, isAsyncDrawingAiTask(task) ? { maxLongSide: 768, quality: 0.62, transient: true } : {})
+    : null;
   const payload = {
     taskId: task.id,
     taskType: task.type,
@@ -9245,8 +9316,61 @@ async function scoreTaskWithAi(task) {
   } finally {
     window.clearTimeout(timeout);
   }
-  if (image) response.drawingImage = image;
-  return result;
+  if (image && !response.drawingImage) response.drawingImage = image;
+  return normalizeDrawingAiResult(task, result);
+}
+
+function normalizeDrawingAiResult(task, result = {}) {
+  if (!isAsyncDrawingAiTask(task)) return result;
+  const criteria = normalizeDrawingCriteria(task, result.criteria);
+  const scoreSuggestion = scoreFromDrawingCriteria(task, criteria, result.scoreSuggestion);
+  const deductionPoints = drawingDeductionPoints(task, criteria);
+  return {
+    ...result,
+    scoreSuggestion,
+    criteria,
+    deductionPoints,
+    comment: deductionPoints.length
+      ? `未得分：${deductionPoints.map((item) => `${item.label}（${item.standard}）`).join("；")}`
+      : String(result.comment || ""),
+    rubricMatched: criteria.length > 0 ? true : Boolean(result.rubricMatched)
+  };
+}
+
+function normalizeDrawingCriteria(task, criteria = []) {
+  const rubric = DRAWING_AI_RUBRICS[task.drawingKind] || [];
+  if (!Array.isArray(criteria) || !criteria.length) return [];
+  return rubric.map((rubricItem, index) => {
+    const item = criteria.find((entry) => entry?.key === rubricItem.key)
+      || criteria.find((entry) => entry?.label === rubricItem.label)
+      || criteria[index];
+    return {
+      key: rubricItem.key,
+      label: rubricItem.label,
+      standard: rubricItem.detail,
+      passed: typeof item?.passed === "boolean" ? item.passed : Boolean(item?.correct ?? item?.met ?? false),
+      evidence: String(item?.evidence || item?.comment || item?.reason || "").trim()
+    };
+  });
+}
+
+function scoreFromDrawingCriteria(task, criteria, fallbackScore) {
+  if (!criteria.length) return Math.max(0, Math.min(task.maxScore, Math.round(Number(fallbackScore) || 0)));
+  if (task.id === "cube") return criteria.every((item) => item.passed) ? 1 : 0;
+  if (task.id === "clock") return criteria.reduce((sum, item) => sum + (item.passed ? 1 : 0), 0);
+  return Math.max(0, Math.min(task.maxScore, Math.round(Number(fallbackScore) || 0)));
+}
+
+function drawingDeductionPoints(task, criteria) {
+  if (!isAsyncDrawingAiTask(task)) return [];
+  return criteria
+    .filter((item) => item && item.passed === false)
+    .map((item) => ({
+      key: item.key,
+      label: item.label,
+      standard: item.standard,
+      evidence: item.evidence
+    }));
 }
 
 function needsAiScore(task) {
@@ -9292,7 +9416,7 @@ function ensurePendingDrawingScores() {
     const response = getResponse(task.id);
     if (!hasDrawableResponse(task, response)) return;
     if (response.ai?.status === "completed" || response.ai?.status === "pending") return;
-    refreshDrawingImage(task.id);
+    refreshDrawingImage(task.id, { maxLongSide: 768, quality: 0.62 });
     markDrawingAiPending(task, response);
     scheduleDrawingAiScore(task);
   });
@@ -9355,7 +9479,7 @@ function drawingAiRubric(task) {
     taskTitle: task.title,
     drawingKind: task.drawingKind,
     maxScore: task.maxScore,
-    instruction: "请只根据用户画布图片评分，按照 MoCA 中文量表分项给出 scoreSuggestion；评分时要考虑老年人手绘误差，不要因为线条抖动、轻微歪斜、椭圆形表盘、数字大小不一或间距不均而扣分。钟表数字可以是阿拉伯数字、中文数字或罗马数字等可辨认标记。但钟表指针项必须看到两根明确指针/线段才可给分，普通近似直线或带箭头近似直线均可，不得凭猜测补出不存在的指针。",
+    instruction: "请只根据用户画布图片评分，按照 MoCA 中文量表分项给出 scoreSuggestion。立方体任一标准不符合即 0 分。钟表每项 1 分，任一分项标准中只要违反其中任何一条，该分项不给分。不得凭题目要求推测图片中不存在的线、数字或指针。",
     outputContract: {
       scoreSuggestion: "整数，范围 0 到 maxScore",
       comment: "只写未得分项目；满分时留空字符串。例如：未得分：指针（未看到两根明确指针）。",
@@ -9366,17 +9490,15 @@ function drawingAiRubric(task) {
     scoreRules: task.drawingKind === "cube"
       ? [
         "立方体总分只有 0 或 1 分。",
-        "只要能辨认为三维盒状/立方体结构、主要边线基本存在、没有明显无关多余线条、相对边大致平行且长度接近，就给 1 分。",
-        "允许手绘线条抖动、重描、轻微断开、角度不完美或长度小偏差。",
-        "画成平面图形、结构无法辨认为立方体、主要边线明显缺失或出现明显无关多余线，给 0 分。"
+        "完全符合下列标准时，给 1 分：图形为三维结构；所有的线都存在；无多余的线；相对的边基本平行，长度基本一致（长方体或棱柱体也算正确）。",
+        "上述标准中，只要违反其中任何一条，即为 0 分。"
       ]
       : [
         "钟表总分 0-3 分，每项 1 分。",
-        "轮廓：圆、椭圆或近似圆都给 1 分；允许手抖、轻微开口、变形或不居中。明显不像表盘轮廓才 0 分。",
-        "数字：1-12 基本写全且可辨认，总体按顺时针顺序分布在表盘内或附近，就给 1 分；阿拉伯数字、中文数字（如一二三）或罗马数字（如 I、II、III）等能表达 1-12 顺序的标记均可；允许歪斜、大小不一、间距不均、轻微偏离象限或个别数字写得潦草。缺多个数字、严重乱序、重复/多余数字导致无法辨认为 1-12 时给 0 分。",
-        "指针：必须看得到两根明确的近似直线指针/线段，普通直线或带箭头直线均可，且大致表示 11 点 10 分，才给 1 分；允许角度小偏差，但应能看出分针指向 2 附近、时针在 11 附近且时针较短。",
-        "如果没有指针、只有一根指针、只有数字/表盘，或看不出任何表示时间的线段，指针项必须 0 分；不能因为题目要求 11 点 10 分就推测用户画了指针。",
-        "每个分项只按图片证据给分；不要因正常手绘误差扣分。"
+        "轮廓：表面必须是个圆，允许有轻微的缺陷（如，圆没有闭合）。",
+        "数字：所有的数字必须完整且无多余的数字；数字顺序必须正确且在所属的象限内；可以是罗马数字；数字可以放在圆圈之外。",
+        "指针：必须有两个指针且一起指向正确的时间；时针必须明显短于分针；指针的中心交点必须在表内且接近于钟表的中心。",
+        "上述各项目的标准中，如果违反其中任何一条，则该项目不给分。"
       ],
     criteria: DRAWING_AI_RUBRICS[task.drawingKind] || []
   };
@@ -9857,12 +9979,16 @@ function missingDrawingCriteria(task, response) {
     .filter((item) => item && item.passed === false)
     .map((item) => ({
       label: item.label || labels[item.key] || item.key || "未通过项",
+      standard: item.standard || rubric.find((entry) => entry.key === item.key || entry.label === item.label)?.detail || "",
       evidence: item.evidence || ""
     }));
 }
 
 function formatMissingCriterion(item) {
   const evidence = String(item.evidence || "").trim().replace(/^未得分[:：]\s*/, "");
+  const standard = String(item.standard || "").trim();
+  if (standard && evidence) return `${item.label}（${standard}；${evidence}）`;
+  if (standard) return `${item.label}（${standard}）`;
   return evidence ? `${item.label}（${evidence}）` : item.label;
 }
 
@@ -10710,6 +10836,7 @@ function downloadBlobFile(filename, blob) {
 
 function stopTimers() {
   stopTrailGuide();
+  clearTaskAutoAdvance();
   stopHearingTone();
   clearPostSurveyAudioTimer();
   clearSpeechRecognitionRestartTimer();
