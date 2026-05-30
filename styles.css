@@ -8421,21 +8421,22 @@ body,
 }
 
 .task-question-character .guide-character {
-  width: min(92px, 13vw);
-  max-height: 120px;
+  width: min(76px, 10vw);
+  max-height: 96px;
 }
 
 .task-question-bubble {
   position: relative;
-  min-height: 68px;
-  padding: 14px 20px;
+  min-height: 48px;
+  padding: 10px 16px;
   border: 2px solid rgba(107, 157, 128, 0.42);
   border-radius: 8px;
   background: rgba(255, 253, 247, 0.96);
   color: var(--ink);
-  font-size: clamp(20px, 2.4vw, 28px);
+  font-size: clamp(20px, 2.2vw, 28px);
   font-weight: 900;
-  line-height: 1.45;
+  line-height: 1.35;
+  white-space: pre-line;
   box-shadow: 0 6px 0 rgba(198, 222, 205, 0.95), 0 16px 30px rgba(36, 52, 71, 0.10);
 }
 
@@ -8553,7 +8554,8 @@ body,
 
 .task-page-village {
   grid-template-rows: auto minmax(0, 1fr) auto;
-  padding-top: clamp(8px, 1.2dvh, 12px);
+  padding-top: clamp(4px, 0.8dvh, 8px);
+  gap: clamp(4px, 0.8dvh, 8px);
 }
 
 .task-page-village .task-question-dialog {
@@ -8562,14 +8564,14 @@ body,
 }
 
 .task-page-village .task-question-character .guide-character {
-  width: min(76px, 10vw);
-  max-height: 100px;
+  width: min(64px, 8vw);
+  max-height: 82px;
 }
 
 .task-page-village .task-question-bubble {
-  min-height: 54px;
-  padding: 12px 18px;
-  font-size: clamp(22px, 2.8vw, 32px);
+  min-height: 46px;
+  padding: 9px 15px;
+  font-size: clamp(20px, 2.3vw, 28px);
 }
 
 .task-page-village .task-workspace {
@@ -8596,11 +8598,14 @@ body,
   width: min(840px, 100%);
   min-height: min(440px, 62dvh);
   padding: clamp(24px, 4dvh, 44px);
+  border-color: rgba(107, 157, 128, 0.42);
+  background: rgba(255, 253, 247, 0.96);
 }
 
 .task-guide-page .task-guide-copy p {
   color: var(--ink);
-  font-size: clamp(38px, 4.8vw, 62px);
+  font-size: clamp(28px, 3.4vw, 42px);
+  font-weight: 900;
   line-height: 1.42;
 }
 

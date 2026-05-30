@@ -30,8 +30,6 @@ const ADMIN_PASSWORD = "123";
 const SERIAL_SUBTRACTION_NUMBER = 7;
 const DELAYED_CONFIRM_TASK_IDS = new Set(["trail", "cube", "clock"]);
 const DELAYED_CONFIRM_MS = 5000;
-const AUTO_ADVANCE_MS = 650;
-const AUTO_ADVANCE_NUMERIC_MS = 900;
 const SENTENCE_AUTO_STOP_MS = 30000;
 const SETUP_PROMPT_TEXT = "请填写病例号、姓名和教育水平。";
 const POST_TEST_SURVEY_INTRO_TEXT = "下面我将问一些问题，有关您刚才答题时的感觉。请根据您的真实感受回答，答案没有对错之分，当您准备好了请按开始";
@@ -86,7 +84,7 @@ const SELF_SELECTED_AUDIO_MAX_DB_HL = 80;
 const SELF_SELECTED_AUDIO_STEP_DB_HL = 5;
 const VOLUME_SAMPLE_TEXT = "请调到您觉得清楚、舒服的音量。";
 const VOLUME_SAMPLE_AUDIO_KEY = "volume:sample";
-const NAMING_QUESTION_TEXT = "这是什么动物？";
+const NAMING_QUESTION_TEXT = "请说出动物的名字。";
 const STATIC_TTS_MANIFEST_SRC = "./assets/audio/manifest.json";
 const STATIC_AUDIO_BUFFER_CACHE_LIMIT = 96;
 const LOCAL_DEV_API_ORIGIN = "http://127.0.0.1:5178";
@@ -406,7 +404,7 @@ const orientationPrompts = [
   { key: "date", label: "今天是几月几号？", fields: ["month", "day"] },
   { key: "weekday", label: "今天星期几？", fields: ["weekday"] },
   { key: "city", label: "你现在在哪个城市？", fields: ["city"] },
-  { key: "place", label: "这是什么地方？", fields: ["place"] }
+  { key: "place", label: "请告诉我现在所在的地点。", fields: ["place"] }
 ];
 
 const tasks = [
@@ -452,8 +450,8 @@ const tasks = [
     maxScore: 3,
     type: "naming",
     modality: "逐张看图选择",
-    prompt: "这是什么动物？",
-    instruction: "请您告诉我这个动物的名字。",
+    prompt: "请说出动物的名字。",
+    instruction: "请您告诉我动物的名字。",
     scoring: "狮子、犀牛、骆驼或单峰骆驼，各 1 分。",
     items: [
       { key: "lion", answer: "狮子", options: ["狮子", "老虎", "豹子", "狐狸"] },
@@ -581,7 +579,7 @@ const tasks = [
     type: "orientation",
     modality: "选择题+定位",
     prompt: "请选择现在的时间和地点。",
-    instruction: "告诉我今天是什么日期。然后请告诉我这是什么地方，它在哪个城市。",
+    instruction: "告诉我今天是什么日期。然后请告诉我现在所在的地点和城市。",
     scoring: "星期、月份、年份、日期、地点、城市各 1 分。"
   }
 ];
@@ -598,7 +596,7 @@ const rubricGroups = [
   {
     title: "命名与记忆",
     items: [
-      { title: "命名", prompt: "请您告诉我这个动物的名字。", scoring: "每答对一个给 1 分。正确回答是：狮子；犀牛；骆驼或单峰骆驼。", image: true },
+      { title: "命名", prompt: "请您告诉我动物的名字。", scoring: "每答对一个给 1 分。正确回答是：狮子；犀牛；骆驼或单峰骆驼。", image: true },
       { title: "词语学习", prompt: "我会给您读几个词，您要注意听，一定要记住。读完后，把您记住的词告诉我。", scoring: "学习试次不记分。", image: false },
       { title: "延迟回忆", prompt: "刚才我给您读了几个词让您记住，请您再尽量回忆一下，告诉我这些词都有什么？", scoring: "在未经提示下自由回忆正确的词，每词给 1 分。", image: false }
     ]
@@ -623,7 +621,7 @@ const rubricGroups = [
   {
     title: "定向",
     items: [
-      { title: "时间地点定向", prompt: "告诉我今天是什么日期。再问：告诉我这是什么地方，它在哪个城市？", scoring: "星期、月份、年份、日期、地点、城市每正确回答一项给 1 分。必须回答精确日期和地点，日期多一天或少一天均不给分。", image: false }
+      { title: "时间地点定向", prompt: "告诉我今天是什么日期。再问：告诉我现在所在的地点和城市。", scoring: "星期、月份、年份、日期、地点、城市每正确回答一项给 1 分。必须回答精确日期和地点，日期多一天或少一天均不给分。", image: false }
     ]
   }
 ];
@@ -713,7 +711,6 @@ let viewportRenderTimer = null;
 let drawingIdleTimers = [];
 let pendingAiScoreTaskIds = new Set();
 let backgroundSessionSaveTimer = null;
-let autoAdvanceTimer = null;
 let immediateInstructionPlayback = false;
 let setupVoiceRecorder = null;
 
@@ -2310,7 +2307,7 @@ function renderTaskQuestionDialog(task, step) {
     <div class="task-question-dialog">
       <div class="task-question-character">${renderGuideCharacterHTML()}</div>
       <div class="task-question-bubble">
-        ${renderTypewriterText(text, `question:${task.id}:${step}`, "question-typewriter")}
+        ${escapeHtml(formatDialogText(text))}
       </div>
     </div>
   `;
@@ -2347,7 +2344,6 @@ function renderTrailGuidePractice(instructionReady) {
   const complete = isTrailGuidePracticeComplete();
   return html`
     <div class="trail-guide-practice ${complete ? "complete" : ""}">
-      <p>练习：从 1 连到甲，再连到 2</p>
       <div class="trail-guide-board ${instructionReady ? "" : "locked"}">
         <canvas id="trailGuideCanvas" class="trail-guide-canvas" aria-label="连线练习区域"></canvas>
       </div>
@@ -2452,13 +2448,9 @@ function taskActionSecondaryButtons(task) {
 
 function shouldShowConfirmButton(task) {
   if (task.type === "vigilance") return false;
-  if (isAutoAdvanceTask(task)) return false;
+  if (task?.id === "memory1" && !getResponse(task.id).answer.audioReady) return false;
   if (task.type === "sentence" && !sentenceStepHasFinalTranscript(task, getTaskStep(task))) return false;
   return true;
-}
-
-function isAutoAdvanceTask(task) {
-  return ["naming", "choice", "serial7", "abstractionChoice", "orientation"].includes(task?.type);
 }
 
 function shouldNudgeConfirm(task) {
@@ -2682,7 +2674,7 @@ function renderMemoryTask(task) {
         </div>
         ${response.behavior.selectionWarning && !response.behavior.memoryReviewPromptVisible ? `<p class="task-warning">${escapeHtml(response.behavior.selectionWarning)}</p>` : ""}
         ${response.behavior.memoryReviewPromptVisible ? renderMemoryReviewPrompt(response) : ""}
-      ` : `<p class="memory-wait-copy">请先点击开始，听完 5 个词后再选择。</p>`}
+      ` : ""}
     </div>
   `;
 }
@@ -2706,7 +2698,7 @@ function renderMemoryStartButton() {
   const task = tasks[state.activeTaskIndex];
   if (!isTaskReadyToAnswer(task)) return `<button class="primary circle-button sound-button" disabled>请听说明</button>`;
   if (playState === "播放中...") {
-    return `<button class="primary circle-button sound-button" disabled>请听题</button>`;
+    return "";
   }
   return `<button class="primary circle-button pulse sound-button" data-action="playCurrentAudio">开始</button>`;
 }
@@ -2798,7 +2790,7 @@ function renderSentenceTask(task, step) {
       ${renderAudioWave()}
       <div class="speech-controls">${control}</div>
       ${live?.warningText ? `<p class="task-warning">${escapeHtml(live.warningText)}</p>` : ""}
-      ${audioReady ? renderTranscriptEditor(live, "sentence", disabled) : `<p class="sentence-wait-copy">请先听题，听完后手动开始复述。</p>`}
+      ${audioReady ? renderTranscriptEditor(live, "sentence", disabled) : `<p class="sentence-wait-copy">请听完后复述。</p>`}
     </div>
   `;
 }
@@ -2809,16 +2801,16 @@ function sentenceControlButton(task, step, audioReady, activeVoice, instructionR
       return `<button class="primary circle-button sound-button" disabled>请听说明</button>`;
     }
     if (playState === "播放中..." && speechPlaybackPurpose === "sentence") {
-      return `<button class="primary circle-button sound-button" disabled>播放中...</button>`;
+      return `<button class="primary circle-button sound-button" disabled>正在听题</button>`;
     }
-    return `<button class="primary circle-button pulse sound-button" data-action="playCurrentAudio">听题</button>`;
+    return `<button class="primary circle-button pulse sound-button" data-action="playCurrentAudio">重新听题</button>`;
   }
   if (speechTranscribing) return `<button class="secondary circle-button sound-button" disabled>请稍等</button>`;
-  if (activeVoice) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">结束</button>`;
+  if (activeVoice) return `<button class="secondary circle-button sound-button" data-action="toggleVoiceInput">说完了</button>`;
   const attempted = sentenceStepHasSpeechAttempt(task, step);
   return attempted
     ? `<button class="secondary circle-button sound-button sentence-retry-button" data-action="toggleVoiceInput">再说一次</button>`
-    : `<button class="primary circle-button pulse sound-button" data-action="toggleVoiceInput">开始复述</button>`;
+    : `<button class="primary circle-button pulse sound-button" data-action="toggleVoiceInput">开始说</button>`;
 }
 
 function sentenceStepAudioReady(response, step) {
@@ -2844,7 +2836,7 @@ function renderFluencyTask() {
 
 function fluencyStatusText(response, animals) {
   const countText = `已识别 ${animals.length} 个`;
-  if (response.answer?.completedAt) return `${countText} · ${speechTranscribing ? "正在计数" : "正在进入下一题"}`;
+  if (response.answer?.completedAt) return `${countText} · ${speechTranscribing ? "正在计数" : "正在处理"}`;
   return response.answer?.running ? `剩余 ${response.answer.remaining ?? 60} 秒 · ${countText}` : countText;
 }
 
@@ -5238,7 +5230,6 @@ root.addEventListener("click", async (event) => {
     response.answer[item.key] = target.dataset.value;
     saveDraft();
     render();
-    queueTaskAutoAdvance(current.id, step);
   }
   if (action === "toggleMemoryWord") toggleMemoryWord(target.dataset.word);
   if (action === "reviewMemoryReplay") {
@@ -5260,7 +5251,6 @@ root.addEventListener("click", async (event) => {
     }
     saveDraft();
     render();
-    if (!response.behavior.selectionWarning) queueTaskAutoAdvance(current.id, step);
   }
   if (action === "playCurrentAudio") playCurrentAudio();
   if (action === "replayTaskGuide") replayTaskGuide();
@@ -5275,10 +5265,8 @@ root.addEventListener("click", async (event) => {
   if (action === "backspaceOrientation") backspaceOrientation(target.dataset.field);
   if (action === "setOrientationDateField") setOrientationDateField(target.dataset.field);
   if (action === "chooseOrientation") {
-    const step = getTaskStep(current);
     applyOrientationChoice(target.dataset.key, target.dataset.value);
     render();
-    queueTaskAutoAdvance(current.id, step);
   }
   if (action === "openRubric") {
     activeRubricItem = getRubricItem(Number(target.dataset.group), Number(target.dataset.item));
@@ -5926,7 +5914,6 @@ async function submitActiveTaskWithFeedback(task) {
 }
 
 async function nextTask() {
-  clearTaskAutoAdvance();
   if (speechTranscribing || isTaskSubmitting()) return;
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
@@ -5949,6 +5936,7 @@ async function nextTask() {
     response.answer.step = step + 1;
     requestImmediateInstructionPlayback(task, response.answer.step);
     render();
+    scheduleTaskMediaAutostart(task.id, response.answer.step);
     return;
   }
   const submitted = await submitActiveTaskWithFeedback(task);
@@ -5968,25 +5956,7 @@ async function nextTask() {
   render();
 }
 
-function queueTaskAutoAdvance(taskId, step, delayMs = AUTO_ADVANCE_MS) {
-  clearTaskAutoAdvance();
-  autoAdvanceTimer = window.setTimeout(async () => {
-    autoAdvanceTimer = null;
-    if (state.view !== "test" || speechTranscribing || isTaskSubmitting()) return;
-    const task = tasks[state.activeTaskIndex];
-    if (!task || task.id !== taskId || getTaskStep(task) !== step) return;
-    await nextTask();
-  }, delayMs);
-}
-
-function clearTaskAutoAdvance() {
-  if (!autoAdvanceTimer) return;
-  window.clearTimeout(autoAdvanceTimer);
-  autoAdvanceTimer = null;
-}
-
 async function skipTask() {
-  clearTaskAutoAdvance();
   if (speechTranscribing || isTaskSubmitting()) return;
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
@@ -6387,11 +6357,11 @@ function taskGuideText(task, step = getTaskStep(task)) {
   if (task.type === "drawing" && task.id === "cube") return "请照着左侧图形，在右边空白处再画一遍，并尽可能精确。";
   if (task.type === "drawing" && task.id === "clock") return "请画一个钟表，填上所有的数字，并把指针指向 11 点 10 分。";
   if (task.type === "naming") {
-    return "请您告诉我这个动物的名字。";
+    return "请您告诉我动物的名字。";
   }
-  if (task.type === "abstractionChoice") return abstractionInstructionText(task, step);
+  if (task.type === "abstractionChoice") return abstractionGuideText(task, step);
   if (task.type === "orientation") return orientationInstructionText(step);
-  if (task.type === "serial7") return serialSubtractionInstructionText(step);
+  if (task.type === "serial7") return `现在请您做一道计算题。\n从 100 中减去 ${serialSubtractionNumber()}，之后从得数中再减去 ${serialSubtractionNumber()}。每次请把得数输入。`;
   if (task.id === "digitForward") return "下面我说一些数字，请您仔细听。\n听完后按相同顺序点出来。";
   if (task.id === "digitBackward") return "下面我再说一些数字，请您仔细听。\n听完后按相反顺序点出来。";
   if (task.type === "vigilance") return "下面会读出一系列数字。\n每当听到数字 1 时，请敲一下。";
@@ -6411,7 +6381,7 @@ function taskQuestionText(task, step = getTaskStep(task)) {
     if (task.id === "clock") return "请画一个钟表，填上所有的数字，并把指针指向 11 点 10 分。";
     return task.prompt || "请在空白处画图。";
   }
-  if (task.type === "naming") return "请您告诉我这个动物的名字。";
+  if (task.type === "naming") return "请您告诉我动物的名字。";
   if (task.type === "memory") {
     return task.trial === 1
       ? "请听 5 个词，听完后点击您记住的词。"
@@ -6419,12 +6389,12 @@ function taskQuestionText(task, step = getTaskStep(task)) {
   }
   if (task.type === "choice") {
     return task.id === "digitBackward"
-      ? "请点击开始听数字，听完后按相反顺序点出来。"
-      : "请点击开始听数字，听完后按听到的顺序点出来。";
+      ? "请听数字，听完后按相反顺序点出来。"
+      : "请听数字，听完后按听到的顺序点出来。";
   }
   if (task.type === "vigilance") return "听到数字 1 时，请敲一下。";
   if (task.type === "serial7") return serialSubtractionInstructionText(step);
-  if (task.type === "sentence") return "请先点击听题，听完后复述这句话。";
+  if (task.type === "sentence") return "请听完后复述这句话。";
   if (task.type === "fluency") return "请在一分钟内尽量多说动物的名字。";
   if (task.type === "abstractionChoice") return abstractionInstructionText(task, step);
   if (task.type === "orientation") return orientationInstructionText(step);
@@ -6438,13 +6408,19 @@ function abstractionInstructionText(task, step = getTaskStep(task)) {
   return `请您说说${item.words.join("和")}在什么方面相类似？`;
 }
 
+function abstractionGuideText(task, step = getTaskStep(task)) {
+  const item = task.items?.[step];
+  if (!item) return task.instruction || task.prompt;
+  if (item.practice) return "先看一个例子。\n桔子和香蕉在什么方面相类似？答案是水果。";
+  return `请您说说${item.words.join("和")}在什么方面相类似。`;
+}
+
 function orientationInstructionText(step = getTaskStep(tasks[state.activeTaskIndex])) {
+  if (step <= 0) return "请告诉我今天是什么日期。然后请告诉我现在所在的地点和城市。";
   return orientationPrompts[step]?.label || tasks.find((task) => task.id === "orientation")?.instruction || "";
 }
 
 function taskInstructionKey(task, step = getTaskStep(task)) {
-  if (task?.type === "naming") return `${task.id}:guide:${step}`;
-  if (task?.type === "abstractionChoice" || task?.type === "orientation" || task?.type === "serial7") return `${task.id}:guide:${step}`;
   return task ? `${task.id}:guide` : "";
 }
 
@@ -6496,7 +6472,7 @@ function audioKeyForInstruction(task, step = getTaskStep(task)) {
 
 function serialSubtractionInstructionText(step = 0) {
   const subtractBy = serialSubtractionNumber();
-  return step === 0 ? `100 减 ${subtractBy}，等于多少？` : `再减${subtractBy}，等于多少？`;
+  return step === 0 ? `请从 100 中减去 ${subtractBy}，输入得数。` : `请用上一步的得数再减 ${subtractBy}，输入得数。`;
 }
 
 function replayTaskGuide() {
@@ -6519,6 +6495,7 @@ function acknowledgeTaskGuide() {
   beginTask(task.id);
   saveDraft();
   render();
+  scheduleTaskMediaAutostart(task.id, step);
 }
 
 function trailGuidePracticeSequence() {
@@ -6570,6 +6547,44 @@ function playCurrentAudio() {
     return playDigitStimulus(task);
   }
   if (task.type === "sentence") return playSentenceForRepeat(task, step);
+}
+
+function scheduleTaskMediaAutostart(taskId, step = 0, delayMs = 220) {
+  window.setTimeout(() => {
+    if (state.view !== "test") return;
+    const task = tasks[state.activeTaskIndex];
+    if (!task || task.id !== taskId || getTaskStep(task) !== step || !isTaskReadyToAnswer(task, step)) return;
+    autostartTaskMedia(task, step);
+  }, delayMs);
+}
+
+function autostartTaskMedia(task, step = getTaskStep(task)) {
+  const response = getResponse(task.id);
+  if (playState === "播放中..." || speechTranscribing || recordingAudio || recognizing || speechRecognitionWanted || speechRecognitionStartPending) return;
+  if (task.id === "memory1" && !response.answer.audioReady && !response.answer.wordsPlaybackStarted) {
+    prioritizeStartPlayback(task, step);
+    playMemoryWords(response);
+    return;
+  }
+  if (task.type === "choice" && !response.answer.audioReady && !response.behavior.digitPlayback?.length) {
+    prioritizeStartPlayback(task, step);
+    playDigitStimulus(task);
+    return;
+  }
+  if (task.type === "sentence" && !sentenceStepAudioReady(response, step) && !sentencePlaybackStartedForStep(response, step)) {
+    prioritizeStartPlayback(task, step);
+    playSentenceForRepeat(task, step, { autoRecord: true });
+    return;
+  }
+  if (task.type === "fluency" && !response.answer.running && !response.answer.completedAt && !response.behavior.autoStartedAt) {
+    response.behavior.autoStartedAt = new Date().toISOString();
+    saveDraft();
+    void startFluency();
+  }
+}
+
+function sentencePlaybackStartedForStep(response, step) {
+  return (response.behavior?.sentencePlayback || []).some((entry) => Number(entry.step) === Number(step));
 }
 
 function playMemoryWords(response) {
@@ -6633,7 +6648,8 @@ function prioritizeStartPlayback(task, step = getTaskStep(task)) {
   markCurrentInstructionHandled(task, step);
 }
 
-function playSentenceForRepeat(task, step) {
+function playSentenceForRepeat(task, step, options = {}) {
+  const { autoRecord = false } = options;
   const text = task.sentences[step];
   if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
   const response = getResponse(task.id);
@@ -6653,6 +6669,13 @@ function playSentenceForRepeat(task, step) {
       response.answer.sentenceAudioReady[step] = true;
       saveDraft();
       render();
+      if (autoRecord && !sentenceStepHasSpeechAttempt(task, step)) {
+        window.setTimeout(() => {
+          if (state.view !== "test" || tasks[state.activeTaskIndex]?.id !== task.id || getTaskStep(task) !== step) return;
+          if (recognizing || recordingAudio || speechRecognitionWanted || speechRecognitionStartPending || speechTranscribing) return;
+          void startVoiceInput();
+        }, 350);
+      }
     }
   });
 }
@@ -8820,19 +8843,14 @@ function numbersInText(text) {
 async function appendDigit(digit) {
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
-  const step = getTaskStep(task);
   response.answer.sequence = response.answer.sequence || [];
   if (response.answer.sequence.length < activeDigitItem(task).answer.length) response.answer.sequence.push(digit);
   saveDraft();
   refreshDigitChoiceUi(task, response);
   refreshTaskActionButtons();
-  if (response.answer.sequence.length >= activeDigitItem(task).answer.length) {
-    queueTaskAutoAdvance(task.id, step, AUTO_ADVANCE_MS);
-  }
 }
 
 function backspaceDigit() {
-  clearTaskAutoAdvance();
   const task = tasks[state.activeTaskIndex];
   const response = getResponse(task.id);
   response.answer.sequence = response.answer.sequence || [];
@@ -8859,7 +8877,6 @@ function refreshDigitChoiceUi(task, response = getResponse(task.id)) {
 }
 
 function inputSerialDigit(digit) {
-  clearTaskAutoAdvance();
   const task = tasks[state.activeTaskIndex];
   const response = getResponse("serial7");
   const step = getTaskStep(task);
@@ -8868,22 +8885,9 @@ function inputSerialDigit(digit) {
   response.answer.values = response.answer.values || ["", "", "", "", ""];
   response.answer.values[step] = `${response.answer.values[step] || ""}${digit}`;
   render();
-  if (isSerialStepInputComplete(response, step)) queueTaskAutoAdvance(task.id, step, AUTO_ADVANCE_NUMERIC_MS);
-}
-
-function isSerialStepInputComplete(response, step) {
-  const value = String(response.answer?.values?.[step] || "");
-  const expectedLength = String(serialExpectedValueAtStep(step)).length;
-  return value.length >= Math.max(1, expectedLength);
-}
-
-function serialExpectedValueAtStep(step) {
-  const subtractBy = serialSubtractionNumber();
-  return 100 - subtractBy * (Number(step) + 1);
 }
 
 function backspaceSerial() {
-  clearTaskAutoAdvance();
   const response = getResponse("serial7");
   const step = getTaskStep(tasks[state.activeTaskIndex]);
   ensureSerialStepTiming(response, step);
@@ -8893,10 +8897,7 @@ function backspaceSerial() {
 }
 
 function inputOrientationDigit(field, digit) {
-  clearTaskAutoAdvance();
-  const task = tasks[state.activeTaskIndex];
   const response = getResponse("orientation");
-  const step = getTaskStep(task);
   const key = field === "day" ? "day" : field === "month" ? "month" : "year";
   const maxLength = key === "year" ? 4 : 2;
   response.answer[key] = String(response.answer[key] || "");
@@ -8909,21 +8910,9 @@ function inputOrientationDigit(field, digit) {
   }
   saveDraft();
   render();
-  if (isOrientationStepInputComplete(response, step)) queueTaskAutoAdvance(task.id, step, AUTO_ADVANCE_NUMERIC_MS);
-}
-
-function isOrientationStepInputComplete(response, step) {
-  const prompt = orientationPrompts[step];
-  if (!prompt) return false;
-  if (prompt.key === "year") return String(response.answer?.year || "").length >= 4;
-  if (prompt.key === "date") {
-    return Boolean(String(response.answer?.month || "").length >= 1 && String(response.answer?.day || "").length >= 1);
-  }
-  return hasOrientationAnswer(response, step);
 }
 
 function backspaceOrientation(field) {
-  clearTaskAutoAdvance();
   const response = getResponse("orientation");
   const key = field === "day" ? "day" : field === "month" ? "month" : "year";
   response.answer[key] = String(response.answer[key] || "").slice(0, -1);
@@ -8932,7 +8921,6 @@ function backspaceOrientation(field) {
 }
 
 function setOrientationDateField(field) {
-  clearTaskAutoAdvance();
   const response = getResponse("orientation");
   response.answer.orientationDateActiveField = field === "day" ? "day" : "month";
   saveDraft();
@@ -10836,7 +10824,6 @@ function downloadBlobFile(filename, blob) {
 
 function stopTimers() {
   stopTrailGuide();
-  clearTaskAutoAdvance();
   stopHearingTone();
   clearPostSurveyAudioTimer();
   clearSpeechRecognitionRestartTimer();
