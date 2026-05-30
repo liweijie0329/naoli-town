@@ -95,7 +95,7 @@ const FLUENCY_ASR_TIMEOUT_MS = 120000;
 const AI_SCORE_TIMEOUT_MS = 45000;
 const FLUENCY_LIVE_ASR_INTERVAL_MS = 5000;
 const FLUENCY_LIVE_ASR_MIN_CHUNKS = 12;
-const PREFER_CLOUDFLARE_ASR = true;
+const PREFER_CLOUD_ASR = true;
 const STORED_AUDIO_SAMPLE_RATE = 8000;
 const MAX_STORED_AUDIO_RECORDING_BYTES = 1100 * 1024;
 const RECORDER_MIME_TYPES = [
@@ -705,6 +705,8 @@ let trailGuidePracticeDragStart = null;
 let trailGuidePracticeDragPoint = null;
 let trailGuidePracticeFrame = null;
 let trailGuidePracticeTick = 0;
+let typewriterTimers = [];
+const completedTypewriterKeys = new Set();
 let viewportRenderTimer = null;
 let drawingIdleTimers = [];
 let pendingAiScoreTaskIds = new Set();
@@ -878,6 +880,7 @@ function normalizeHearingScreening(screening = {}) {
   const base = createHearingScreeningState(screening && typeof screening === "object" ? screening : {});
   base.protocolVersion = base.protocolVersion || HEARING_PROTOCOL_VERSION;
   base.phase = base.phase || "intro";
+  if (base.phase === "channel" || base.phase === "practice") base.phase = "test";
   base.status = base.status || "not_started";
   base.channelCheckIndex = clampInteger(base.channelCheckIndex, 0, HEARING_SIDES.length - 1);
   base.practiceIndex = clampInteger(base.practiceIndex, 0, HEARING_PRACTICE_STEPS.length - 1);
@@ -1279,16 +1282,19 @@ function render() {
   activeCanvasTaskId = null;
   if (state.view === "onboarding") {
     root.innerHTML = renderOnboarding();
+    setupTypewriterDialogs();
     queueVisibleSpeechAudioPreload();
     return;
   }
   if (state.view === "setup") {
     root.innerHTML = renderSetup();
+    setupTypewriterDialogs();
     queueVisibleSpeechAudioPreload();
     return;
   }
   if (state.view === "volume") {
     root.innerHTML = renderVolumeSetup();
+    setupTypewriterDialogs();
     queueVisibleSpeechAudioPreload();
     return;
   }
@@ -1296,8 +1302,10 @@ function render() {
   ensureRenderableTask();
   const current = tasks[state.activeTaskIndex] || tasks[0];
   root.innerHTML = renderShell(current);
+  setupTypewriterDialogs();
   if (state.view === "test") {
-    setupCurrentTask(current);
+    if (isTaskGuideActive(current, getTaskStep(current))) setupTaskGuide(current);
+    else setupCurrentTask(current);
     scheduleTaskInstruction(current);
   }
   if (state.view === "surveyIntro" || state.view === "survey") schedulePostSurveyAudio();
@@ -1307,6 +1315,35 @@ function render() {
 
 function renderGuideCharacterHTML(className = "") {
   return `<img class="guide-character ${className}" src="${GUIDE_CHARACTER_SRC}" alt="" />`;
+}
+
+function renderTypewriterText(text, key, className = "") {
+  const normalized = String(text || "");
+  return `<span class="typewriter-text ${className}" data-typewriter-key="${escapeHtml(key || normalized)}" data-typewriter-text="${escapeHtml(normalized)}">${escapeHtml(normalized)}</span>`;
+}
+
+function setupTypewriterDialogs() {
+  typewriterTimers.forEach((timer) => window.clearTimeout(timer));
+  typewriterTimers = [];
+  document.querySelectorAll("[data-typewriter-text]").forEach((element) => {
+    const text = element.dataset.typewriterText || "";
+    const key = element.dataset.typewriterKey || text;
+    if (!text || completedTypewriterKeys.has(key)) {
+      element.textContent = text;
+      element.classList.add("typewriter-done");
+      return;
+    }
+    completedTypewriterKeys.add(key);
+    element.textContent = "";
+    const chars = Array.from(text);
+    chars.forEach((char, index) => {
+      const timer = window.setTimeout(() => {
+        element.textContent += char;
+        if (index === chars.length - 1) element.classList.add("typewriter-done");
+      }, index * 34);
+      typewriterTimers.push(timer);
+    });
+  });
 }
 
 function renderOnboarding() {
@@ -1664,8 +1701,7 @@ function renderShell(current) {
         <header class="page-header">
           <button class="icon-button" data-action="openMenu" aria-label="打开菜单">≡</button>
           <div class="header-title">
-            <h2>${state.view === "test" ? escapeHtml(current.title) : viewTitle()}</h2>
-            ${state.view === "test" ? `<p class="header-prompt">${escapeHtml(current.prompt)}</p>` : ""}
+            ${state.view === "test" ? "" : `<h2>${viewTitle()}</h2>`}
           </div>
           <div class="header-progress">
             <span>${escapeHtml(progress.label)}</span>
@@ -1781,7 +1817,7 @@ function renderMainView(current) {
 function hearingHeaderPrompt() {
   const screening = state.hearingScreening || createHearingScreeningState();
   if (screening.phase === "summary") return "完成后进入正式测试";
-  if (screening.phase === "practice" || screening.phase === "test") return "播放后选择";
+  if (screening.phase === "test") return "播放后选择";
   return "请戴上耳机，保持安静";
 }
 
@@ -1789,21 +1825,17 @@ function hearingProgressPercent() {
   const screening = state.hearingScreening || createHearingScreeningState();
   if (screening.phase === "summary") return 100;
   if (screening.phase === "intro") return 8;
-  if (screening.phase === "channel") return 16 + (screening.channelCheckIndex / HEARING_SIDES.length) * 14;
-  if (screening.phase === "practice") return 30 + (screening.practiceIndex / HEARING_PRACTICE_STEPS.length) * 16;
   if (screening.phase === "test") {
     const trialCount = createHearingTrials().length;
-    return 46 + (screening.trialIndex / Math.max(1, trialCount)) * 48;
+    return 12 + (screening.trialIndex / Math.max(1, trialCount)) * 84;
   }
   return 8;
 }
 
 function hearingQuestionProgress(screening = state.hearingScreening) {
   const normalized = normalizeHearingScreening(screening);
-  const total = HEARING_SIDES.length + HEARING_PRACTICE_STEPS.length + normalized.trials.length;
-  const completed = Math.min(HEARING_SIDES.length, normalized.channelChecks.length)
-    + Math.min(HEARING_PRACTICE_STEPS.length, normalized.practiceResponses.length)
-    + hearingCompletedTrialCount(normalized);
+  const total = normalized.trials.length;
+  const completed = hearingCompletedTrialCount(normalized);
   if (normalized.phase === "intro") return { current: 0, total };
   if (normalized.phase === "summary") return { current: total, total };
   return { current: Math.min(total, completed + 1), total };
@@ -1816,8 +1848,6 @@ function renderHearingCalibration() {
   return html`
     <section class="single-page hearing-page">
       ${screening.phase === "intro" ? renderHearingIntro(screening) : ""}
-      ${screening.phase === "channel" ? renderHearingChannelCheck(screening) : ""}
-      ${screening.phase === "practice" ? renderHearingPractice(screening) : ""}
       ${screening.phase === "test" ? renderHearingTest(screening) : ""}
       ${screening.phase === "summary" ? renderHearingSummary(screening) : ""}
       ${guide2}
@@ -2266,11 +2296,26 @@ function taskSubmittingLabel(task) {
 
 function renderTask(task) {
   const step = getTaskStep(task);
+  if (isTaskGuideActive(task, step)) return renderTaskGuide(task, step);
   return html`
-    <section class="single-page task-page">
+    <section class="single-page task-page task-page-village">
+      ${renderTaskQuestionDialog(task, step)}
       <div class="task-workspace">${renderTaskWorkspace(task, step)}</div>
       ${renderTaskActions(task, step)}
     </section>
+  `;
+}
+
+function renderTaskQuestionDialog(task, step) {
+  const text = taskQuestionText(task, step);
+  if (!text) return "";
+  return html`
+    <div class="task-question-dialog">
+      <div class="task-question-character">${renderGuideCharacterHTML()}</div>
+      <div class="task-question-bubble">
+        ${renderTypewriterText(text, `question:${task.id}:${step}`, "question-typewriter")}
+      </div>
+    </div>
   `;
 }
 
@@ -2279,20 +2324,18 @@ function renderTaskGuide(task, step) {
   const trailReady = task.type !== "trail" || isTrailGuidePracticeComplete();
   const canProceed = ready && trailReady;
   const playLabel = playState === "播放中..." ? "播放中..." : "再听一遍";
+  const guideText = taskGuideText(task, step);
   return html`
-    <section class="single-page task-guide-page">
+    <section class="single-page task-guide-page ${task.type === "trail" ? "trail-guide-page" : ""}">
       <div class="character-dialog-screen">
         <div class="character-side">
           ${renderGuideCharacterHTML()}
         </div>
         <div class="character-dialog-bubble">
           <div class="task-guide-copy">
-            <span>第 ${state.activeTaskIndex + 1} 题</span>
-            <h2>${escapeHtml(task.title)}</h2>
-            <p>${escapeHtml(taskGuideText(task, step))}</p>
+            <p>${renderTypewriterText(formatDialogText(guideText), taskInstructionKey(task, step), "guide-typewriter")}</p>
           </div>
           ${task.type === "trail" ? renderTrailGuidePractice(ready) : ""}
-          ${renderAudioWave()}
           <div class="task-guide-actions ${task.type === "trail" ? "task-guide-actions--center" : ""}">
             <button class="secondary big-button" data-action="replayTaskGuide" ${ready ? "" : "disabled"}>${playLabel}</button>
             <button class="primary big-button character-dialog-btn ${canProceed ? "pulse" : ""}" data-action="acknowledgeTaskGuide" ${canProceed ? "" : "disabled"}>准备好了</button>
@@ -2314,6 +2357,15 @@ function renderTrailGuidePractice(instructionReady) {
       <strong>${complete ? "练习完成" : instructionReady ? "请从 1 拖到甲，再拖到 2" : "请先听完说明"}</strong>
     </div>
   `;
+}
+
+function formatDialogText(text) {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+  if (normalized.length <= 34) return normalized;
+  return normalized
+    .replace(/([。！？；])\s*/g, "$1\n")
+    .replace(/，(?=.{12,})/g, "，\n")
+    .trim();
 }
 
 function renderTaskActions(task, step) {
@@ -2598,7 +2650,6 @@ function renderNamingTask(task, step) {
         <div class="animal-emoji" role="img" aria-label="${escapeHtml(item.answer)}">${animalEmojis[item.key]}</div>
       </div>
       <div class="animal-side">
-        <h4>这是什么动物？</h4>
         <div class="option-grid">
           ${item.options.map((option) => `<button class="option ${response.answer[item.key] === option ? "picked" : ""}" data-action="chooseNaming" data-value="${escapeHtml(option)}" ${disabled}${speechAttrs(option, audioKeyForText(option))}>${escapeHtml(option)}</button>`).join("")}
         </div>
@@ -2622,7 +2673,6 @@ function renderMemoryTask(task) {
       </div>`}
       ${ready ? `
         <div class="memory-choice-panel">
-          <strong>请点击刚刚听到的所有词语</strong>
           <span>${selected.length}/${MEMORY_TARGET_COUNT}</span>
         </div>
         <div class="option-grid memory-options">
@@ -2718,13 +2768,10 @@ function renderVigilanceTask() {
 function renderSerial7Task(step) {
   const response = getResponse("serial7");
   const values = response.answer.values || ["", "", "", "", ""];
-  const subtractBy = serialSubtractionNumber();
-  const question = step === 0 ? `100减${subtractBy}等于多少？` : `再减${subtractBy}，等于多少？`;
   const inputDisabled = isTaskReadyToAnswer(tasks[state.activeTaskIndex], step) ? "" : "disabled";
   return html`
     <div class="serial-page keypad-split-page">
       <div class="keypad-question-panel">
-        <div class="math-question">${question}</div>
         <div class="serial-display">${escapeHtml(values[step] || " ")}</div>
       </div>
       <div class="keypad-panel">
@@ -2843,7 +2890,6 @@ function renderOrientationTask(step) {
   const disabled = isTaskReadyToAnswer(tasks[state.activeTaskIndex], step) ? "" : "disabled";
   return html`
     <div class="orientation-page">
-      <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
       ${options.length ? `
         <div class="option-grid orientation-options">
           ${options.map((option) => `<button class="option ${picked === option.value ? "picked" : ""}" data-action="chooseOrientation" data-key="${prompt.key}" data-value="${escapeHtml(option.value)}" ${disabled}${speechAttrs(option.label, audioKeyForText(option.label))}>${escapeHtml(option.label)}</button>`).join("")}
@@ -2863,7 +2909,6 @@ function renderOrientationChoiceTask(response, prompt) {
   return html`
     <div class="orientation-page orientation-choice-page orientation-${prompt.key}-page">
       <div class="orientation-choice-question-panel">
-        <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
         ${weekday ? `
           <div class="weekday-answer-line">
             <span>星期</span>
@@ -2896,7 +2941,6 @@ function renderOrientationNumberTask(response, prompt) {
     return html`
       <div class="orientation-page orientation-number-page keypad-split-page">
         <div class="keypad-question-panel">
-          <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
           ${renderYearDigitBoxes(value)}
         </div>
         <div class="keypad-panel">
@@ -2911,7 +2955,6 @@ function renderOrientationNumberTask(response, prompt) {
   return html`
     <div class="orientation-page orientation-number-page keypad-split-page">
       <div class="keypad-question-panel">
-        <h4 class="orientation-question">${escapeHtml(prompt.label)}</h4>
         <div class="date-input-pair date-input-with-units">
           <button class="date-input-box ${activeField === "month" ? "active" : ""}" data-action="setOrientationDateField" data-field="month" ${disabled}>
             <strong>${escapeHtml(response.answer.month || " ")}</strong>
@@ -3012,14 +3055,11 @@ function renderAudioWave() {
       : voiceInputActive
         ? voiceState && voiceState !== "待说" ? voiceState : voicePromptText()
         : "";
-  const showLabel = voiceInputActive && label && !speechTranscribing;
+  if (!active || !label) return "";
   return html`
-    <div class="audio-wave-container">
-      <div class="audio-wave ${active ? "active" : ""}" aria-label="${escapeHtml(label)}">
-        <span></span><span></span><span></span><span></span><span></span>
-      </div>
+    <div class="audio-text-status" aria-live="polite">
+      ${renderTypewriterText(label, `audio-status:${label}:${playState}:${voiceState}:${speechTranscribing ? "wait" : "active"}`, "audio-status-typewriter")}
     </div>
-    ${showLabel ? `<strong class="voice-status">${escapeHtml(label)}</strong>` : ""}
   `;
 }
 
@@ -3049,8 +3089,9 @@ function sentenceStepSpeechWarning(task, step) {
 function sentenceStepHasSpeechAttempt(task, step) {
   const response = getResponse(task.id);
   if (String(response.answer?.transcript?.[step] || "").trim()) return true;
+  const asrAttemptEvents = ["cloud-asr-upload", "cloud-asr-result", "cloud-asr-error", "cloudflare-asr-upload", "cloudflare-asr-result", "cloudflare-asr-error"];
   return (response.behavior?.speechRecognition || []).some((event) => (
-    Number(event.step) === Number(step) && ["cloudflare-asr-upload", "cloudflare-asr-result", "cloudflare-asr-error"].includes(event.eventType)
+    Number(event.step) === Number(step) && asrAttemptEvents.includes(event.eventType)
   ));
 }
 
@@ -4553,7 +4594,7 @@ function startHearingCalibration() {
     environmentChecks: previous.environmentChecks,
     selfSelectedAudioLevelDbHl: previous.selfSelectedAudioLevelDbHl,
     selfSelectedAudioConfirmedAt: previous.selfSelectedAudioConfirmedAt,
-    phase: "channel",
+    phase: "test",
     status: "in_progress",
     startedAt: new Date().toISOString()
   });
@@ -5184,12 +5225,7 @@ root.addEventListener("click", async (event) => {
       render();
       return;
     }
-    state.activeTaskIndex = nextIndex;
-    state.view = "test";
-    menuOpen = false;
-    cognitionMenuOpen = false;
-    requestImmediateInstructionPlayback(tasks[nextIndex]);
-    render();
+    openTaskGuideFromMenu(nextIndex);
   }
   if (action === "skipTask") await skipTask();
   if (action === "nextTask") await nextTask();
@@ -5438,13 +5474,25 @@ async function runDrawerAdminAction(pending) {
       render();
       return;
     }
-    state.activeTaskIndex = nextIndex;
-    state.view = "test";
-    menuOpen = false;
-    cognitionMenuOpen = false;
-    requestImmediateInstructionPlayback(tasks[nextIndex]);
-    render();
+    openTaskGuideFromMenu(nextIndex);
   }
+}
+
+function openTaskGuideFromMenu(nextIndex) {
+  const task = tasks[nextIndex];
+  if (!task) return;
+  const step = getTaskStep(task);
+  const key = taskInstructionKey(task, step);
+  state.activeTaskIndex = nextIndex;
+  state.view = "test";
+  menuOpen = false;
+  cognitionMenuOpen = false;
+  state.acknowledgedInstructionKeys = state.acknowledgedInstructionKeys || {};
+  delete state.acknowledgedInstructionKeys[key];
+  resetInstructionPlayback(task, step);
+  immediateInstructionPlayback = true;
+  saveDraft();
+  render();
 }
 
 function focusAdminPasswordInput() {
@@ -6287,6 +6335,7 @@ function resetInstructionPlayback(task, step = getTaskStep(task)) {
   delete state.playedInstructionKeys[key];
   delete state.completedInstructionKeys[key];
   delete state.instructionCompletedAt?.[key];
+  completedTypewriterKeys.delete(key);
   if (pendingInstructionPlaybackKey === key) pendingInstructionPlaybackKey = "";
   if (activeInstructionPlaybackKey === key) activeInstructionPlaybackKey = "";
 }
@@ -6303,15 +6352,50 @@ function requestImmediateInstructionPlayback(task, step = getTaskStep(task)) {
 }
 
 function taskGuideText(task, step = getTaskStep(task)) {
+  if (task.type === "trail") return "按数字和汉字交替上升连线。\n请先练习：从 1 连到甲，再连到 2。";
+  if (task.type === "drawing" && task.id === "cube") return "请看清示例。\n下一页照着样子画一个立方体。";
+  if (task.type === "drawing" && task.id === "clock") return "下一页请画一个钟表。\n数字要完整，指针指向 11 点 10 分。";
   if (task.type === "naming") {
-    const instruction = task.instruction || "请您告诉我这个动物的名字。";
-    return instruction.includes(NAMING_QUESTION_TEXT) ? instruction : `${instruction}${NAMING_QUESTION_TEXT}`;
+    return "下一页请选择动物名称。";
   }
   if (task.type === "abstractionChoice") return abstractionInstructionText(task, step);
   if (task.type === "orientation") return orientationInstructionText(step);
   if (task.type === "serial7") return serialSubtractionInstructionText(step);
-  if (task.id === "digitBackward") return "下面我再说一些数字，您仔细听。说完后，请按相反的顺序选择出来。例如，听到一二三，您就选择三二一。";
+  if (task.id === "digitForward") return "下一页请听数字。\n听完后按相同顺序点出来。";
+  if (task.id === "digitBackward") return "下一页请听数字。\n听完后按相反顺序点出来。";
+  if (task.type === "vigilance") return "下一页听到数字 1 时，请敲一下。";
+  if (task.type === "sentence") return "下一页先听一句话。\n听完后请复述。";
+  if (task.type === "fluency") return "下一页请尽量多说动物名字。\n时间是一分钟。";
+  if (task.type === "memory") return task.trial === 1 ? "下一页请听五个词。\n听完后选择听到的词。" : "下一页请回忆刚才听过的词。";
   return task.instruction || task.prompt;
+}
+
+function taskQuestionText(task, step = getTaskStep(task)) {
+  if (!task) return "";
+  if (task.type === "trail") return "请按照刚才练习的规则，把所有圆圈按 1、甲、2、乙的顺序一直连到戊。";
+  if (task.type === "drawing") {
+    if (task.id === "cube") return "请照着左边的图，在右边空白处画一个立方体。";
+    if (task.id === "clock") return "请画一个钟表，标出所有数字，并把指针画到 11 点 10 分。";
+    return task.prompt || "请在空白处画图。";
+  }
+  if (task.type === "naming") return "这是什么动物？请选择一个答案。";
+  if (task.type === "memory") {
+    return task.trial === 1
+      ? "请先听五个词，听完后点击刚刚听到的词。"
+      : "请回忆刚才听过的五个词，并点击所有记得的词。";
+  }
+  if (task.type === "choice") {
+    return task.id === "digitBackward"
+      ? "请点击开始听数字，听完后按相反顺序点出来。"
+      : "请点击开始听数字，听完后按听到的顺序点出来。";
+  }
+  if (task.type === "vigilance") return "听到数字 1 时，请敲一下。";
+  if (task.type === "serial7") return serialSubtractionInstructionText(step);
+  if (task.type === "sentence") return "请先点击听题，听完后复述这句话。";
+  if (task.type === "fluency") return "请在一分钟内尽量多说动物的名字。";
+  if (task.type === "abstractionChoice") return abstractionInstructionText(task, step);
+  if (task.type === "orientation") return orientationInstructionText(step);
+  return task.prompt || task.instruction || "";
 }
 
 function abstractionInstructionText(task, step = getTaskStep(task)) {
@@ -6611,10 +6695,6 @@ function playHearingIntroPromptNow() {
 
 function hearingPromptAudioKey(screening = state.hearingScreening) {
   const normalized = normalizeHearingScreening(screening);
-  if (normalized.phase === "channel") {
-    const side = HEARING_SIDES[normalized.channelCheckIndex] || HEARING_SIDES[0];
-    return HEARING_PROMPT_AUDIO_KEYS.channel[side.key];
-  }
   return HEARING_PROMPT_AUDIO_KEYS[normalized.phase] || "";
 }
 
@@ -7333,8 +7413,8 @@ async function startVoiceInput() {
   beginLiveTranscriptSession({ resetFinal: true });
   speechRecognitionStartPending = true;
   render();
-  if (PREFER_CLOUDFLARE_ASR) {
-    recordSpeechRecognitionEvent("cloudflare-asr-preferred");
+  if (PREFER_CLOUD_ASR) {
+    recordSpeechRecognitionEvent("cloud-asr-preferred");
     const task = tasks[state.activeTaskIndex];
     const step = getTaskStep(task);
     const recordingStarted = await startAudioRecording({ transcribeOnStop: true, liveAsr: task?.type !== "fluency" });
@@ -7799,7 +7879,7 @@ async function flushFluencyLiveAsr(recorder, options = {}) {
   response.behavior.speechRecognition = response.behavior.speechRecognition || [];
   response.behavior.speechRecognition.push({
     step: recorder.step,
-    eventType: "cloudflare-asr-live-upload",
+    eventType: "cloud-asr-live-upload",
     sequence,
     finalChunk,
     size: blob.size,
@@ -7811,9 +7891,11 @@ async function flushFluencyLiveAsr(recorder, options = {}) {
     const text = cleanAsrTranscript(result?.text || result?.transcription || "");
     response.behavior.speechRecognition.push({
       step: recorder.step,
-      eventType: "cloudflare-asr-live-result",
+      eventType: "cloud-asr-live-result",
       sequence,
       finalChunk,
+      provider: result?.provider || "",
+      model: result?.model || "",
       text,
       at: new Date().toISOString()
     });
@@ -7825,7 +7907,7 @@ async function flushFluencyLiveAsr(recorder, options = {}) {
   } catch (error) {
     response.behavior.speechRecognition.push({
       step: recorder.step,
-      eventType: "cloudflare-asr-live-error",
+      eventType: "cloud-asr-live-error",
       sequence,
       finalChunk,
       message: error?.message || "Live ASR failed",
@@ -7989,7 +8071,7 @@ async function transcribeAudioBlob(blob, taskId, step) {
   }
   response.behavior.speechRecognition.push({
     step,
-    eventType: "cloudflare-asr-upload",
+    eventType: "cloud-asr-upload",
     mimeType: blob.type,
     size: blob.size,
     at: new Date().toISOString()
@@ -8005,8 +8087,8 @@ async function transcribeAudioBlob(blob, taskId, step) {
     const text = cleanAsrTranscript(result?.text || result?.transcription || "");
     response.behavior.speechRecognition.push({
       step,
-      eventType: "cloudflare-asr-result",
-      provider: result?.provider || "cloudflare-workers-ai",
+      eventType: "cloud-asr-result",
+      provider: result?.provider || "",
       model: result?.model || "",
       text,
       at: new Date().toISOString()
@@ -8033,7 +8115,7 @@ async function transcribeAudioBlob(blob, taskId, step) {
   } catch (error) {
     response.behavior.speechRecognition.push({
       step,
-      eventType: "cloudflare-asr-error",
+      eventType: "cloud-asr-error",
       message: error?.message || "ASR failed",
       at: new Date().toISOString()
     });
@@ -8133,7 +8215,7 @@ function applyVoiceTextForTask(task, response, step, text, options = {}) {
     updatedAt: new Date().toISOString()
   };
   response.behavior.voiceEvents = response.behavior.voiceEvents || [];
-  response.behavior.voiceEvents.push({ step, text, finalText: text, interimText: "", eventType: "cloudflare-asr", at: new Date().toISOString() });
+  response.behavior.voiceEvents.push({ step, text, finalText: text, interimText: "", eventType: "cloud-asr", at: new Date().toISOString() });
   saveDraft();
 }
 
