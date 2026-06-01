@@ -6746,6 +6746,13 @@ body,
   width: min(620px, 100%);
 }
 
+.task-guide-actions .secondary.big-button:not(:disabled) {
+  border: 3px solid var(--sky);
+  background: #ffffff;
+  color: var(--sky);
+  box-shadow: 0 5px 0 rgba(63, 141, 243, 0.24), 0 12px 24px rgba(63, 141, 243, 0.12);
+}
+
 .task-guide-actions .big-button:disabled {
   background: #eef2ef;
   color: #89958e;
@@ -8056,6 +8063,9 @@ body,
 
 .onboarding-bubble {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   flex: 1 1 auto;
   min-width: 0;
   max-width: 640px;
@@ -8085,6 +8095,7 @@ body,
   font-size: 28px;
   font-weight: 850;
   line-height: 1.65;
+  text-align: left;
 }
 
 .onboarding-hint {
@@ -8147,6 +8158,9 @@ body,
 
 .setup-welcome-bubble {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   padding: 16px 22px;
   border: 2px solid rgba(189, 210, 204, 0.82);
   border-radius: 8px;
@@ -8155,7 +8169,7 @@ body,
   font-size: 23px;
   font-weight: 850;
   line-height: 1.45;
-  text-align: center;
+  text-align: left;
   box-shadow: 0 6px 0 rgba(197, 213, 201, 0.9);
 }
 
@@ -8197,6 +8211,9 @@ body,
 
 .hearing-guide-bubble {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   max-width: 520px;
   padding: 16px 22px;
   border: 2px solid rgba(189, 210, 204, 0.82);
@@ -8206,6 +8223,7 @@ body,
   font-size: 22px;
   font-weight: 800;
   line-height: 1.55;
+  text-align: left;
   box-shadow: 0 6px 0 rgba(197, 213, 201, 0.9), 0 12px 26px rgba(36, 52, 71, 0.10);
 }
 
@@ -8252,6 +8270,9 @@ body,
 }
 
 .hearing-guide-popup-bubble {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   padding: 16px 20px;
   border: 2px solid rgba(189, 210, 204, 0.82);
   border-radius: 8px;
@@ -8260,7 +8281,7 @@ body,
   font-size: 22px;
   font-weight: 800;
   line-height: 1.55;
-  text-align: center;
+  text-align: left;
 }
 
 .hearing-guide-popup-bubble p {
@@ -8344,6 +8365,9 @@ body,
 
 .completion-bubble {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   padding: 14px 20px;
   border: 2px solid rgba(189, 210, 204, 0.82);
   border-radius: 8px;
@@ -8352,6 +8376,7 @@ body,
   font-size: 22px;
   font-weight: 850;
   line-height: 1.45;
+  text-align: left;
   box-shadow: 0 6px 0 rgba(197, 213, 201, 0.9);
 }
 
@@ -8427,6 +8452,9 @@ body,
 
 .task-question-bubble {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   min-height: 48px;
   padding: 10px 16px;
   border: 2px solid rgba(107, 157, 128, 0.42);
@@ -8436,6 +8464,7 @@ body,
   font-size: clamp(20px, 2.2vw, 28px);
   font-weight: 900;
   line-height: 1.35;
+  text-align: left;
   white-space: pre-line;
   box-shadow: 0 6px 0 rgba(198, 222, 205, 0.95), 0 16px 30px rgba(36, 52, 71, 0.10);
 }
@@ -8487,7 +8516,9 @@ body,
 
 .task-guide-page .character-dialog-bubble {
   min-height: min(520px, 78dvh);
+  align-content: center;
   justify-content: center;
+  justify-items: stretch;
   border-color: rgba(107, 157, 128, 0.42);
   background: rgba(255, 253, 247, 0.96);
   box-shadow: 0 8px 0 rgba(198, 222, 205, 0.95), 0 18px 34px rgba(36, 52, 71, 0.12);
@@ -8631,15 +8662,24 @@ body,
   width: min(840px, 100%);
   min-height: min(440px, 62dvh);
   padding: clamp(24px, 4dvh, 44px);
+  align-content: center;
+  justify-items: stretch;
   border-color: rgba(107, 157, 128, 0.42);
   background: rgba(255, 253, 247, 0.96);
 }
 
+.task-guide-page .task-guide-copy {
+  width: min(780px, 100%);
+  justify-items: stretch;
+  text-align: left;
+}
+
 .task-guide-page .task-guide-copy p {
   color: var(--ink);
-  font-size: clamp(32px, 4vw, 52px);
+  font-size: clamp(44px, 5.2vw, 72px);
   font-weight: 900;
   line-height: 1.42;
+  text-align: left;
 }
 
 .task-guide-page .guide-typewriter {
@@ -8663,7 +8703,7 @@ body,
 }
 
 .trail-guide-page .task-guide-copy p {
-  font-size: clamp(30px, 3.6vw, 44px);
+  font-size: clamp(36px, 4.4vw, 58px);
   line-height: 1.35;
 }
 
@@ -8742,7 +8782,7 @@ body,
   }
 
   .task-guide-page .task-guide-copy p {
-    font-size: clamp(28px, 7vw, 40px);
+    font-size: clamp(34px, 8vw, 50px);
   }
 }
 

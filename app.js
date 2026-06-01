@@ -701,12 +701,14 @@ let trailGuideFrame = null;
 let trailGuideTick = 0;
 let trailDragStart = null;
 let trailDragPoint = null;
+let trailDragStartPoint = null;
 let trailGuidePracticeDragStart = null;
 let trailGuidePracticeDragPoint = null;
 let trailGuidePracticeFrame = null;
 let trailGuidePracticeTick = 0;
 let typewriterTimers = [];
 const completedTypewriterKeys = new Set();
+const typewriterProgressByKey = new Map();
 let viewportRenderTimer = null;
 let drawingIdleTimers = [];
 let pendingAiScoreTaskIds = new Set();
@@ -1097,6 +1099,7 @@ function resetState() {
   protectedViewsUnlocked = false;
   adminPasswordDialog = null;
   manualTranscriptComposing = false;
+  resetTypewriterState();
   resetSetupPromptPlayback();
   fluencyAutoAdvanceInProgress = false;
   hearingIntroPromptStartedAt = 0;
@@ -1319,7 +1322,8 @@ function renderGuideCharacterHTML(className = "") {
 
 function renderTypewriterText(text, key, className = "") {
   const normalized = String(text || "");
-  return `<span class="typewriter-text ${className}" data-typewriter-key="${escapeHtml(key || normalized)}" data-typewriter-text="${escapeHtml(normalized)}">${escapeHtml(normalized)}</span>`;
+  const speed = className.includes("guide-typewriter") ? 92 : 34;
+  return `<span class="typewriter-text ${className}" data-typewriter-key="${escapeHtml(key || normalized)}" data-typewriter-text="${escapeHtml(normalized)}" data-typewriter-speed="${speed}">${escapeHtml(normalized)}</span>`;
 }
 
 function setupTypewriterDialogs() {
@@ -1328,22 +1332,37 @@ function setupTypewriterDialogs() {
   document.querySelectorAll("[data-typewriter-text]").forEach((element) => {
     const text = element.dataset.typewriterText || "";
     const key = element.dataset.typewriterKey || text;
-    if (!text || completedTypewriterKeys.has(key)) {
+    const chars = Array.from(text);
+    const progress = Math.min(chars.length, Number(typewriterProgressByKey.get(key) || 0));
+    if (!text || completedTypewriterKeys.has(key) || progress >= chars.length) {
       element.textContent = text;
       element.classList.add("typewriter-done");
+      completedTypewriterKeys.add(key);
+      typewriterProgressByKey.set(key, chars.length);
       return;
     }
-    completedTypewriterKeys.add(key);
-    element.textContent = "";
-    const chars = Array.from(text);
-    chars.forEach((char, index) => {
+    const speed = Math.max(18, Number(element.dataset.typewriterSpeed || 34));
+    element.textContent = chars.slice(0, progress).join("");
+    chars.slice(progress).forEach((char, offset) => {
+      const index = progress + offset;
       const timer = window.setTimeout(() => {
         element.textContent += char;
-        if (index === chars.length - 1) element.classList.add("typewriter-done");
-      }, index * 34);
+        typewriterProgressByKey.set(key, index + 1);
+        if (index === chars.length - 1) {
+          completedTypewriterKeys.add(key);
+          element.classList.add("typewriter-done");
+        }
+      }, offset * speed);
       typewriterTimers.push(timer);
     });
   });
+}
+
+function resetTypewriterState() {
+  typewriterTimers.forEach((timer) => window.clearTimeout(timer));
+  typewriterTimers = [];
+  completedTypewriterKeys.clear();
+  typewriterProgressByKey.clear();
 }
 
 function renderOnboarding() {
@@ -2311,9 +2330,7 @@ function renderTaskQuestionDialog(task, step, className = "") {
   return html`
     <div class="task-question-dialog ${className}">
       <div class="task-question-character">${renderGuideCharacterHTML()}</div>
-      <div class="task-question-bubble">
-        ${escapeHtml(formatDialogText(text))}
-      </div>
+      <div class="task-question-bubble">${escapeHtml(formatDialogText(text))}</div>
     </div>
   `;
 }
@@ -4267,6 +4284,7 @@ function setupTrailCanvas() {
     if (!node) return;
     playSfx("pick");
     trailDragStart = node;
+    trailDragStartPoint = point;
     trailDragPoint = point;
     canvas.setPointerCapture(event.pointerId);
     drawTrailCanvas(canvas);
@@ -4280,8 +4298,13 @@ function setupTrailCanvas() {
     if (!trailDragStart) return;
     const point = canvasPoint(event, canvas);
     const endNode = nearestTrailNode(point, canvas);
-    commitTrailDrag(trailDragStart, endNode, canvas);
+    if (isTrailTap(trailDragStart, endNode, trailDragStartPoint, point)) {
+      commitTrailTap(endNode, canvas);
+    } else {
+      commitTrailDrag(trailDragStart, endNode, canvas);
+    }
     trailDragStart = null;
+    trailDragStartPoint = null;
     trailDragPoint = null;
     canvas.releasePointerCapture(event.pointerId);
     drawTrailCanvas(canvas);
@@ -4291,6 +4314,7 @@ function setupTrailCanvas() {
   };
   canvas.onpointercancel = () => {
     trailDragStart = null;
+    trailDragStartPoint = null;
     trailDragPoint = null;
     drawTrailCanvas(canvas);
   };
@@ -4319,6 +4343,50 @@ function commitTrailDrag(startNode, endNode, canvas) {
   response.behavior.lastDrag = {
     from: startNode.label,
     to: endNode?.label || "",
+    at: new Date().toISOString()
+  };
+  if (canvas) response.drawingImage = canvasToCompactDataUrl(canvas);
+  maybeOpenTrailCompletionPrompt(response);
+}
+
+function isTrailTap(startNode, endNode, startPoint, endPoint) {
+  if (!startNode || !endNode || startNode.label !== endNode.label || !startPoint || !endPoint) return false;
+  return Math.sqrt((startPoint.x - endPoint.x) ** 2 + (startPoint.y - endPoint.y) ** 2) <= 14;
+}
+
+function commitTrailTap(node, canvas) {
+  const response = getResponse("trail");
+  if (!node) {
+    response.behavior.missedDrops = (response.behavior.missedDrops || 0) + 1;
+    return;
+  }
+  const sequence = Array.isArray(state.trail.sequence) ? state.trail.sequence : [];
+  const lastLabel = sequence[sequence.length - 1];
+  response.behavior.tapSequence = [...(response.behavior.tapSequence || []), {
+    label: node.label,
+    at: new Date().toISOString()
+  }];
+  if (!lastLabel) {
+    state.trail.sequence = [node.label];
+  } else if (lastLabel !== node.label) {
+    state.trail.edges = state.trail.edges || [];
+    state.trail.edges.push({
+      from: lastLabel,
+      to: node.label,
+      at: new Date().toISOString(),
+      mode: "tap-order"
+    });
+    rebuildTrailFromEdges();
+  } else {
+    response.behavior.repeatedTaps = Number(response.behavior.repeatedTaps || 0) + 1;
+  }
+  response.behavior.sequence = [...(state.trail.sequence || [])];
+  response.behavior.edges = [...(state.trail.edges || [])];
+  response.behavior.errors = state.trail.errors;
+  response.behavior.correctStep = state.trail.correctStep;
+  response.behavior.mode = "tap-order";
+  response.behavior.lastTap = {
+    label: node.label,
     at: new Date().toISOString()
   };
   if (canvas) response.drawingImage = canvasToCompactDataUrl(canvas);
@@ -5758,6 +5826,7 @@ async function startNewSession(participant) {
   state = createInitialState();
   drawingUndoStacks = {};
   pendingAiScoreTaskIds = new Set();
+  resetTypewriterState();
   fluencyAutoAdvanceInProgress = false;
   if (backgroundSessionSaveTimer) window.clearTimeout(backgroundSessionSaveTimer);
   backgroundSessionSaveTimer = null;
@@ -6342,6 +6411,7 @@ function resetInstructionPlayback(task, step = getTaskStep(task)) {
   delete state.completedInstructionKeys[key];
   delete state.instructionCompletedAt?.[key];
   completedTypewriterKeys.delete(key);
+  typewriterProgressByKey.delete(key);
   if (pendingInstructionPlaybackKey === key) pendingInstructionPlaybackKey = "";
   if (activeInstructionPlaybackKey === key) activeInstructionPlaybackKey = "";
 }
