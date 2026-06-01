@@ -2,6 +2,13 @@ name = "cognition-hearing-game"
 compatibility_date = "2026-05-07"
 pages_build_output_dir = "dist"
 
+[vars]
+ASR_PROVIDER = "iflytek"
+# 科大讯飞密钥不要写入文件。部署时用 Cloudflare Pages 环境变量或 secret 配置：
+# IFLYTEK_APP_ID / IFLYTEK_API_KEY / IFLYTEK_API_SECRET
+# 方言识别按讯飞控制台开通能力配置：
+# IFLYTEK_LANGUAGE / IFLYTEK_ACCENT / IFLYTEK_DOMAIN
+
 [ai]
 binding = "AI"
 

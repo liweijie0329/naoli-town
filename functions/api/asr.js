@@ -3,6 +3,10 @@ import { json } from "../_lib/http.js";
 const WHISPER_MODEL = "@cf/openai/whisper-large-v3-turbo";
 const WHISPER_FALLBACK_MODEL = "@cf/openai/whisper";
 const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
+const IFLYTEK_IAT_HOST = "iat-api.xfyun.cn";
+const IFLYTEK_IAT_PATH = "/v2/iat";
+const IFLYTEK_IAT_MODEL = "iat";
+const IFLYTEK_DEFAULT_FRAME_BYTES = 1280;
 const CHINESE_ASR_PROMPT = "这是一段中文普通话认知测验语音回答。请按听到内容转写为简体中文。";
 const FLUENCY_ASR_PROMPT = [
   "这是一段中文普通话认知测验中的动物词语流畅性回答。",
@@ -67,8 +71,245 @@ function arrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 
+function utf8Base64(text) {
+  const bytes = new TextEncoder().encode(String(text || ""));
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary);
+}
+
 function asrPromptForTask(taskId) {
   return taskId === "fluency" ? FLUENCY_ASR_PROMPT : CHINESE_ASR_PROMPT;
+}
+
+function envText(env, ...names) {
+  for (const name of names) {
+    const value = env?.[name];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function iflytekCredentials(env) {
+  return {
+    appId: envText(env, "IFLYTEK_APP_ID", "XFYUN_APP_ID"),
+    apiKey: envText(env, "IFLYTEK_API_KEY", "XFYUN_API_KEY"),
+    apiSecret: envText(env, "IFLYTEK_API_SECRET", "XFYUN_API_SECRET")
+  };
+}
+
+function isIflytekConfigured(env) {
+  const credentials = iflytekCredentials(env);
+  return Boolean(credentials.appId && credentials.apiKey && credentials.apiSecret);
+}
+
+function preferredAsrProvider(env) {
+  const configured = envText(env, "ASR_PROVIDER").toLowerCase();
+  if (configured) return configured;
+  return isIflytekConfigured(env) ? "iflytek" : "cloudflare";
+}
+
+async function hmacSha256Base64(secret, text) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  return arrayBufferToBase64(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(text)));
+}
+
+async function iflytekIatUrl(apiKey, apiSecret) {
+  const date = new Date().toUTCString();
+  const signatureOrigin = `host: ${IFLYTEK_IAT_HOST}\ndate: ${date}\nGET ${IFLYTEK_IAT_PATH} HTTP/1.1`;
+  const signature = await hmacSha256Base64(apiSecret, signatureOrigin);
+  const authorizationOrigin = `api_key="${apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signature}"`;
+  const params = new URLSearchParams({
+    authorization: utf8Base64(authorizationOrigin),
+    date,
+    host: IFLYTEK_IAT_HOST
+  });
+  return `wss://${IFLYTEK_IAT_HOST}${IFLYTEK_IAT_PATH}?${params.toString()}`;
+}
+
+function asciiAt(bytes, offset, text) {
+  for (let index = 0; index < text.length; index += 1) {
+    if (bytes[offset + index] !== text.charCodeAt(index)) return false;
+  }
+  return true;
+}
+
+function parseWavPcm(audioBuffer) {
+  const bytes = new Uint8Array(audioBuffer);
+  if (bytes.length < 44 || !asciiAt(bytes, 0, "RIFF") || !asciiAt(bytes, 8, "WAVE")) return null;
+  const view = new DataView(audioBuffer);
+  let offset = 12;
+  let sampleRate = 16000;
+  let channels = 1;
+  let bitsPerSample = 16;
+  let dataStart = -1;
+  let dataLength = 0;
+  while (offset + 8 <= bytes.length) {
+    const chunkId = String.fromCharCode(bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]);
+    const chunkLength = view.getUint32(offset + 4, true);
+    const chunkStart = offset + 8;
+    if (chunkId === "fmt " && chunkLength >= 16) {
+      channels = view.getUint16(chunkStart + 2, true);
+      sampleRate = view.getUint32(chunkStart + 4, true);
+      bitsPerSample = view.getUint16(chunkStart + 14, true);
+    }
+    if (chunkId === "data") {
+      dataStart = chunkStart;
+      dataLength = Math.min(chunkLength, bytes.length - chunkStart);
+      break;
+    }
+    offset = chunkStart + chunkLength + (chunkLength % 2);
+  }
+  if (dataStart < 0 || dataLength <= 0) return null;
+  return {
+    bytes: bytes.slice(dataStart, dataStart + dataLength),
+    sampleRate,
+    channels,
+    bitsPerSample
+  };
+}
+
+function audioForIflytek(audioBuffer, contentType = "") {
+  const wav = parseWavPcm(audioBuffer);
+  if (wav) {
+    if (wav.channels !== 1 || wav.bitsPerSample !== 16) {
+      throw new Error("科大讯飞语音听写需要 16bit 单声道 PCM/WAV 音频。");
+    }
+    return {
+      bytes: wav.bytes,
+      format: `audio/L16;rate=${wav.sampleRate || 16000}`,
+      encoding: "raw",
+      sampleRate: wav.sampleRate || 16000
+    };
+  }
+  const normalizedType = String(contentType || "").toLowerCase();
+  if (normalizedType.includes("mpeg") || normalizedType.includes("mp3")) {
+    return {
+      bytes: new Uint8Array(audioBuffer),
+      format: "audio/L16;rate=16000",
+      encoding: "lame",
+      sampleRate: 16000
+    };
+  }
+  return {
+    bytes: new Uint8Array(audioBuffer),
+    format: "audio/L16;rate=16000",
+    encoding: "raw",
+    sampleRate: 16000
+  };
+}
+
+function iflytekTextFromMessage(message) {
+  const words = message?.data?.result?.ws || [];
+  return words.map((entry) => entry?.cw?.[0]?.w || "").join("");
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function runIflytekIat(env, audioBuffer, taskId, contentType = "") {
+  if (typeof WebSocket === "undefined") {
+    throw new Error("当前运行环境不支持 WebSocket，无法连接科大讯飞语音听写。");
+  }
+  const { appId, apiKey, apiSecret } = iflytekCredentials(env);
+  if (!appId || !apiKey || !apiSecret) {
+    throw new Error("缺少科大讯飞语音识别配置：IFLYTEK_APP_ID、IFLYTEK_API_KEY、IFLYTEK_API_SECRET。");
+  }
+  const audio = audioForIflytek(audioBuffer, contentType);
+  if (!audio.bytes.length) throw new Error("音频为空，无法进行科大讯飞语音识别。");
+  const url = await iflytekIatUrl(apiKey, apiSecret);
+  const frameBytes = Math.max(640, Number(envText(env, "IFLYTEK_FRAME_BYTES")) || IFLYTEK_DEFAULT_FRAME_BYTES);
+  const frameDelayMs = Math.max(0, Number(envText(env, "IFLYTEK_FRAME_DELAY_MS")) || 0);
+  const timeoutMs = Math.max(15000, Number(envText(env, "IFLYTEK_TIMEOUT_MS")) || 120000);
+  const rawMessages = [];
+
+  return await new Promise((resolve, reject) => {
+    const ws = new WebSocket(url);
+    const textParts = [];
+    let settled = false;
+    const finish = (handler, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      try {
+        ws.close();
+      } catch {}
+      handler(value);
+    };
+    const timeout = setTimeout(() => {
+      finish(reject, new Error("科大讯飞语音识别超时。"));
+    }, timeoutMs);
+
+    ws.addEventListener("open", () => {
+      (async () => {
+        const total = Math.ceil(audio.bytes.length / frameBytes);
+        for (let index = 0; index < total; index += 1) {
+          const start = index * frameBytes;
+          const chunk = audio.bytes.slice(start, Math.min(audio.bytes.length, start + frameBytes));
+          const status = index === 0 ? 0 : index === total - 1 ? 2 : 1;
+          ws.send(JSON.stringify({
+            common: index === 0 ? { app_id: appId } : undefined,
+            business: index === 0 ? {
+              language: envText(env, "IFLYTEK_LANGUAGE") || "zh_cn",
+              domain: envText(env, "IFLYTEK_DOMAIN") || "iat",
+              accent: envText(env, "IFLYTEK_ACCENT") || "mandarin",
+              vad_eos: Number(envText(env, "IFLYTEK_VAD_EOS")) || 10000,
+              ptt: 0
+            } : undefined,
+            data: {
+              status,
+              format: audio.format,
+              encoding: audio.encoding,
+              audio: arrayBufferToBase64(chunk.buffer)
+            }
+          }));
+          if (frameDelayMs && index < total - 1) await delay(frameDelayMs);
+        }
+      })().catch((error) => finish(reject, error));
+    });
+
+    ws.addEventListener("message", (event) => {
+      let message;
+      try {
+        message = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      rawMessages.push(message);
+      const code = Number(message.code || 0);
+      if (code !== 0) {
+        finish(reject, new Error(message.message || `科大讯飞语音识别失败：${message.code}`));
+        return;
+      }
+      const text = iflytekTextFromMessage(message);
+      if (text) textParts.push(text);
+      if (Number(message?.data?.status) === 2) {
+        finish(resolve, {
+          provider: "iflytek",
+          model: IFLYTEK_IAT_MODEL,
+          text: toSimplifiedChinese(textParts.join("")),
+          raw: { sid: message.sid || "", messages: rawMessages.slice(-6), sampleRate: audio.sampleRate }
+        });
+      }
+    });
+
+    ws.addEventListener("error", () => {
+      finish(reject, new Error("科大讯飞语音识别连接失败。"));
+    });
+
+    ws.addEventListener("close", () => {
+      if (!settled) finish(reject, new Error("科大讯飞语音识别连接已关闭。"));
+    });
+  });
 }
 
 async function runWhisper(env, audioBuffer, taskId) {
@@ -100,13 +341,6 @@ function textFromAsrResult(result) {
 }
 
 export async function onRequestPost({ request, env }) {
-  if (!env.AI?.run) {
-    return json({
-      error: "Workers AI is not bound",
-      message: "请在 Cloudflare Pages 的 Functions 绑定中添加 Workers AI，变量名设为 AI。"
-    }, 500);
-  }
-
   const audioBuffer = await request.arrayBuffer();
   if (!audioBuffer.byteLength) {
     return json({ error: "Empty audio" }, 400);
@@ -117,6 +351,28 @@ export async function onRequestPost({ request, env }) {
 
   const url = new URL(request.url);
   const taskId = url.searchParams.get("taskId") || "";
+  const provider = preferredAsrProvider(env);
+  if (provider === "iflytek" || provider === "xunfei" || provider === "xfyun") {
+    try {
+      const asr = await runIflytekIat(env, audioBuffer, taskId, request.headers.get("content-type") || "");
+      return json(asr);
+    } catch (error) {
+      return json({
+        error: "Speech transcription failed",
+        provider: "iflytek",
+        model: IFLYTEK_IAT_MODEL,
+        message: error?.message || "科大讯飞语音识别失败"
+      }, 502);
+    }
+  }
+
+  if (!env.AI?.run) {
+    return json({
+      error: "Workers AI is not bound",
+      message: "请配置科大讯飞 IFLYTEK_APP_ID / IFLYTEK_API_KEY / IFLYTEK_API_SECRET，或在 Cloudflare Pages Functions 绑定 Workers AI。"
+    }, 500);
+  }
+
   let asr;
   try {
     asr = await runWhisper(env, audioBuffer, taskId);
