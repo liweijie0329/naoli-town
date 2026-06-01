@@ -1662,6 +1662,8 @@ function renderShell(current) {
   const hearingView = state.view === "hearing";
   const progress = headerProgressState();
   const drawerAvatar = participantAvatarSrc();
+  const taskStep = current ? getTaskStep(current) : 0;
+  const showHeaderQuestion = shouldShowTaskQuestionInHeader(current, taskStep);
   return html`
     <div class="app-shell">
       <aside class="hidden-drawer ${menuOpen ? "open" : ""}">
@@ -1692,10 +1694,10 @@ function renderShell(current) {
         </div>
       </aside>
       <main class="page-shell">
-        <header class="page-header">
+        <header class="page-header ${showHeaderQuestion ? "task-answer-header" : ""}">
           <button class="icon-button" data-action="openMenu" aria-label="打开菜单">≡</button>
           <div class="header-title">
-            ${state.view === "test" ? "" : `<h2>${viewTitle()}</h2>`}
+            ${showHeaderQuestion ? renderTaskQuestionDialog(current, taskStep, "header-task-question") : state.view === "test" ? "" : `<h2>${viewTitle()}</h2>`}
           </div>
           <div class="header-progress">
             <span>${escapeHtml(progress.label)}</span>
@@ -1707,6 +1709,10 @@ function renderShell(current) {
       ${renderAdminPasswordDialog()}
     </div>
   `;
+}
+
+function shouldShowTaskQuestionInHeader(task, step = getTaskStep(task)) {
+  return state.view === "test" && Boolean(task) && !isTaskGuideActive(task, step);
 }
 
 function headerProgressState() {
@@ -2293,18 +2299,17 @@ function renderTask(task) {
   if (isTaskGuideActive(task, step)) return renderTaskGuide(task, step);
   return html`
     <section class="single-page task-page task-page-village">
-      ${renderTaskQuestionDialog(task, step)}
       <div class="task-workspace">${renderTaskWorkspace(task, step)}</div>
       ${renderTaskActions(task, step)}
     </section>
   `;
 }
 
-function renderTaskQuestionDialog(task, step) {
+function renderTaskQuestionDialog(task, step, className = "") {
   const text = taskQuestionText(task, step);
   if (!text) return "";
   return html`
-    <div class="task-question-dialog">
+    <div class="task-question-dialog ${className}">
       <div class="task-question-character">${renderGuideCharacterHTML()}</div>
       <div class="task-question-bubble">
         ${escapeHtml(formatDialogText(text))}
