@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MoCA 交替连线 - Skill 协议演示</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'PingFang SC', system-ui, sans-serif;
+    background: #FDFBF7;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  .demo {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    max-width: 1200px;
+    width: 100%;
+  }
+  .panel {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+  }
+  .panel h3 {
+    font-size: 13px; color: #999; text-transform: uppercase;
+    letter-spacing: 1px; margin-bottom: 12px;
+    padding-bottom: 8px; border-bottom: 1px solid #eee;
+  }
+  .bubble {
+    background: rgba(250,248,243,0.9);
+    border-radius: 14px; padding: 12px 16px;
+    margin: 8px 0; font-size: 15px; font-weight: 700; line-height: 1.5;
+  }
+  .bubble.warn { border-left: 3px solid #e8b830; background: #fffef5; }
+  .bubble.err  { border-left: 3px solid #e55; background: #fff5f5; }
+  .bubble.ok   { border-left: 3px solid #22a96b; background: #f5fff9; }
+  .btn {
+    padding: 10px 20px; border: none; border-radius: 10px;
+    font-size: 15px; font-weight: 700; cursor: pointer; margin: 3px;
+  }
+  .btn-primary { background: #22a96b; color: #fff; }
+  .btn-yellow  { background: #f5c842; color: #4a3808; }
+  .btn-ghost   { background: #f0f0f0; color: #666; }
+  .btn:disabled { opacity: 0.4; pointer-events: none; }
+
+  .canvas-wrap {
+    position: relative; width: 100%;
+    aspect-ratio: 2.6/1;
+    border: 2px solid rgba(160,170,155,0.25);
+    border-radius: 10px; background: #fffef9;
+    overflow: hidden; touch-action: none;
+    margin: 8px 0;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .status-row {
+    display: flex; align-items: center; gap: 10px;
+    margin: 8px 0; font-size: 13px; font-weight: 700;
+  }
+  .status-row .tag {
+    padding: 3px 10px; border-radius: 999px; font-size: 12px;
+  }
+  .tag.good { background: #d0f5e4; color: #0d7a48; }
+  .tag.bad  { background: #ffe8e8; color: #c0392b; }
+  .tag.info { background: #e3f2fd; color: #1565c0; }
+
+  .log { font-family: 'SF Mono', monospace; font-size: 11px; max-height: 420px; overflow-y: auto; }
+  .log-entry { padding: 4px 0; border-bottom: 1px solid #f5f5f5; }
+  .log-entry .dir { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 700; margin-right: 6px; }
+  .dir.app { background: #e3f2fd; color: #1565c0; }
+  .dir.ai  { background: #e8f5e9; color: #2e7d32; }
+  .json { color: #555; white-space: pre-wrap; word-break: break-all; }
+
+  .phase-badge {
+    display: inline-block; padding: 4px 12px; border-radius: 999px;
+    font-size: 12px; font-weight: 800; margin-bottom: 8px;
+  }
+  .phase-badge.practice { background: #fff3cd; color: #856404; }
+  .phase-badge.formal   { background: #d1ecf1; color: #0c5460; }
+</style>
+</head>
+<body>
+
+<div class="demo">
+  <!-- LEFT: App UI -->
+  <div>
+    <div class="panel">
+      <h3>App 界面（模拟）</h3>
+      <div id="phaseLabel"></div>
+      <div id="bubbleArea"></div>
+      <div class="canvas-wrap" id="canvasWrap" style="display:none;">
+        <canvas id="trailCanvas"></canvas>
+      </div>
+      <div class="status-row" id="statusRow" style="display:none;"></div>
+      <div id="buttonArea" style="text-align:center;margin-top:8px;"></div>
+      <div id="scoreBadge" style="text-align:center;margin-top:8px;"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Protocol log -->
+  <div class="panel">
+    <h3>Skill 协议日志（App ↔ AI）</h3>
+    <div class="log" id="log">
+      <div class="log-entry" style="color:#999;">等待开始...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Skill protocol engine ──
+
+const FORMAL_SEQ = ["1","甲","2","乙","3","丙","4","丁","5","戊"];
+const PRACTICE_SEQ = ["1","甲","2"];
+
+const FORMAL_NODES = [
+  { label:"1", x:0.08, y:0.55 }, { label:"甲", x:0.18, y:0.22 },
+  { label:"2", x:0.28, y:0.68 }, { label:"乙", x:0.38, y:0.20 },
+  { label:"3", x:0.48, y:0.62 }, { label:"丙", x:0.58, y:0.28 },
+  { label:"4", x:0.68, y:0.55 }, { label:"丁", x:0.78, y:0.32 },
+  { label:"5", x:0.88, y:0.48 }, { label:"戊", x:0.95, y:0.22 }
+];
+
+const PRACTICE_NODES = [
+  { label:"1", x:0.20, y:0.65 }, { label:"甲", x:0.50, y:0.32 }, { label:"2", x:0.80, y:0.65 }
+];
+
+let state = { phase: "idle", edges: [], sequence: [], dragStart: null, dragPoint: null, selfCorrections: 0, hasCrossing: false };
+
+function log(dir, msg) {
+  const el = document.getElementById("log");
+  const cls = dir.includes("App") ? "app" : "ai";
+  el.innerHTML += `<div class="log-entry"><span class="dir ${cls}">${dir}</span><span class="json">${JSON.stringify(msg, null, 1)}</span></div>`;
+  el.scrollTop = el.scrollHeight;
+}
+
+function setBubble(text, cls="") {
+  document.getElementById("bubbleArea").innerHTML = `<div class="bubble ${cls}">${text}</div>`;
+}
+
+function setButtons(html) {
+  document.getElementById("buttonArea").innerHTML = html;
+}
+
+// ── Phase 1: Guide ──
+function startTask() {
+  state = { phase: "guide", edges: [], sequence: [], dragStart: null, dragPoint: null, selfCorrections: 0, hasCrossing: false };
+  document.getElementById("canvasWrap").style.display = "none";
+  document.getElementById("scoreBadge").innerHTML = "";
+  document.getElementById("statusRow").style.display = "none";
+
+  log("App→AI", { event: "task_started", taskId: "trail" });
+  log("AI→App", {
+    action: "guide_intro",
+    bubble_paragraphs: [
+      "我们有时会用\"123……\"或者\"甲乙丙……\"来表示顺序。",
+      "请您按照从数字到汉字并逐渐升高的顺序画一条连线。",
+      "从1连向甲，再连向2，并一直连下去，到戊结束。"
+    ],
+    show_practice: true
+  });
+
+  document.getElementById("phaseLabel").innerHTML = '<span class="phase-badge practice">练习阶段</span>';
+  setBubble("请在下方练习画布中试试看：<br>从 <b>1</b> 拖到 <b>甲</b>，再拖到 <b>2</b>");
+  document.getElementById("canvasWrap").style.display = "block";
+  setupCanvas(PRACTICE_NODES, PRACTICE_SEQ);
+  setButtons('<button class="btn btn-yellow" onclick="donePractice()">练习完成，开始正式测试</button>');
+}
+
+// ── Canvas setup ──
+function setupCanvas(nodes, expected) {
+  state.nodes = nodes;
+  state.expected = expected;
+  state.edges = [];
+  state.sequence = [];
+  state.dragStart = null;
+  state.dragPoint = null;
+  drawCanvas();
+}
+
+function getCanvas() {
+  const c = document.getElementById("trailCanvas");
+  const rect = c.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  c.width = rect.width * dpr;
+  c.height = rect.height * dpr;
+  return { canvas: c, ctx: c.getContext("2d"), w: rect.width, h: rect.height, dpr };
+}
+
+function drawCanvas() {
+  const { canvas: c, ctx, w, h, dpr } = getCanvas();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#fffef9";
+  ctx.fillRect(0, 0, w, h);
+
+  const nodes = state.nodes;
+  const nodeMap = {};
+
+  // Draw expected path (dashed)
+  ctx.setLineDash([10, 8]);
+  ctx.strokeStyle = "rgba(36,52,71,0.14)";
+  ctx.lineWidth = 7;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  state.expected.forEach((label, i) => {
+    const n = nodes.find(n => n.label === label);
+    if (!n) return;
+    nodeMap[label] = { x: n.x * w, y: n.y * h };
+    if (i === 0) ctx.moveTo(n.x * w, n.y * h);
+    else ctx.lineTo(n.x * w, n.y * h);
+  });
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw completed edges
+  state.edges.forEach(edge => {
+    const from = nodeMap[edge.from];
+    const to = nodeMap[edge.to];
+    if (!from || !to) return;
+    ctx.strokeStyle = "#20a66b";
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+  });
+
+  // Draw dragging line
+  if (state.dragStart && state.dragPoint) {
+    ctx.strokeStyle = "rgba(32,166,107,0.7)";
+    ctx.lineWidth = 6;
+    ctx.setLineDash([12, 7]);
+    ctx.beginPath();
+    ctx.moveTo(state.dragStart.x * w, state.dragStart.y * h);
+    ctx.lineTo(state.dragPoint.x, state.dragPoint.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Draw nodes
+  nodes.forEach(n => {
+    const nx = n.x * w, ny = n.y * h;
+    const used = state.sequence.includes(n.label);
+    ctx.beginPath();
+    ctx.fillStyle = used ? "#d0f5e4" : "#fff";
+    ctx.strokeStyle = used ? "#16a865" : "#243447";
+    ctx.lineWidth = used ? 4 : 2.5;
+    ctx.arc(nx, ny, 30, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = used ? "#0d7a48" : "#243447";
+    ctx.font = "800 26px 'PingFang SC', system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(n.label, nx, ny);
+  });
+
+  // Animated arrow tip
+  if (state.sequence.length < state.expected.length) {
+    const tick = Date.now() / 1000;
+    const fromLabel = state.sequence.length ? state.sequence[state.sequence.length - 1] : state.expected[0];
+    const toLabel = state.expected[state.sequence.length ? state.sequence.length : 1];
+    const from = nodeMap[fromLabel], to = nodeMap[toLabel];
+    if (from && to) {
+      const progress = 0.18 + Math.sin(tick * 2.5) * 0.28;
+      const ax = from.x + (to.x - from.x) * progress;
+      const ay = from.y + (to.y - from.y) * progress;
+      const angle = Math.atan2(to.y - from.y, to.x - from.x);
+      const pulse = 1 + Math.sin(tick * 3.5) * 0.06;
+      ctx.save(); ctx.translate(ax, ay); ctx.rotate(angle); ctx.scale(pulse, pulse);
+      ctx.fillStyle = "#22a96b";
+      ctx.beginPath(); ctx.moveTo(16,0); ctx.lineTo(-10,-11); ctx.lineTo(-4,0); ctx.lineTo(-10,11); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  }
+  requestAnimationFrame(() => drawCanvas());
+}
+
+// ── Canvas events ──
+document.addEventListener("DOMContentLoaded", () => {
+  const wrap = document.getElementById("canvasWrap");
+  wrap.addEventListener("pointerdown", e => {
+    if (state.phase === "idle") return;
+    const { w, h } = getCanvas();
+    const rect = wrap.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    const node = state.nodes.find(n => {
+      const dx = px - n.x * w, dy = py - n.y * h;
+      return Math.sqrt(dx*dx + dy*dy) <= 40;
+    });
+    // Only allow dragging from the correct next node
+    const fromIdx = state.sequence.length;
+    const expectedFrom = state.expected[fromIdx];
+    if (!node || node.label !== expectedFrom) return;
+    state.dragStart = node;
+    state.dragPoint = { x: px, y: py };
+  });
+  wrap.addEventListener("pointermove", e => {
+    if (!state.dragStart) return;
+    const rect = wrap.getBoundingClientRect();
+    state.dragPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  });
+  wrap.addEventListener("pointerup", e => {
+    if (!state.dragStart) return;
+    const { w, h } = getCanvas();
+    const rect = wrap.getBoundingClientRect();
+    const px = e.clientX - rect.left, py = e.clientY - rect.top;
+    const endNode = state.nodes.find(n => {
+      const dx = px - n.x * w, dy = py - n.y * h;
+      return Math.sqrt(dx*dx + dy*dy) <= 40;
+    });
+
+    if (endNode && endNode !== state.dragStart) {
+      const fromIdx = state.sequence.length;
+      const expectedFrom = state.expected[fromIdx];
+      const expectedTo = state.expected[fromIdx + 1];
+
+      if (state.dragStart.label === expectedFrom && endNode.label === expectedTo) {
+        // Correct!
+        state.edges.push({ from: state.dragStart.label, to: endNode.label });
+        state.sequence.push(endNode.label);
+        const msg = { event: "trail_edge_added", from: state.dragStart.label, to: endNode.label, sequence_so_far: [...state.sequence], total_edges: state.edges.length };
+        log("App→AI", msg);
+        log("AI→App", { action: "trail_edge_feedback", accepted: true, is_correct_step: true, correct_step: state.sequence.length, total_steps: state.expected.length });
+        setBubble(`<b>${state.dragStart.label}</b> → <b>${endNode.label}</b>，连对了！`, "ok");
+
+        if (state.sequence.length === state.expected.length) {
+          if (state.phase === "practice") {
+            setBubble("很好，就是这样！准备好了就开始正式连线吧。", "ok");
+          }
+        } else {
+          // Show next hint
+          setTimeout(() => {
+            const nextFrom = state.expected[state.sequence.length];
+            const nextTo = state.expected[state.sequence.length + 1];
+            if (nextFrom && nextTo) setBubble(`下一步：从 <b>${nextFrom}</b> 连向 <b>${nextTo}</b>`);
+          }, 800);
+        }
+      } else if (state.dragStart.label !== expectedFrom) {
+        // Wrong starting node
+        log("AI→App", { action: "trail_edge_feedback", accepted: false, error_type: "wrong_start", expected_from: expectedFrom, actual_from: state.dragStart.label, bubble_text: `请从${expectedFrom}开始连线` });
+        setBubble(`请从 <b>${expectedFrom}</b> 开始连线，而不是 <b>${state.dragStart.label}</b>`, "err");
+        setTimeout(() => setBubble(`下一步：从 <b>${expectedFrom}</b> 连向 <b>${expectedTo}</b>`), 2000);
+      } else {
+        // Wrong!
+        const msg = { event: "trail_edge_added", from: state.dragStart.label, to: endNode.label, expected_to: expectedTo, actual: endNode.label, is_error: true };
+        log("App→AI", msg);
+        log("AI→App", { action: "trail_edge_feedback", accepted: false, error_type: "wrong_node", expected_node: expectedTo, actual_node: endNode.label, auto_undo: true, bubble_text: `请从${state.dragStart.label}连向${expectedTo}` });
+        setBubble(`请从 <b>${state.dragStart.label}</b> 连向 <b>${expectedTo}</b>，而不是 <b>${endNode.label}</b>`, "err");
+        setTimeout(() => setBubble(`下一步：从 <b>${state.dragStart.label}</b> 连向 <b>${expectedTo}</b>`), 2000);
+      }
+    }
+    state.dragStart = null;
+    state.dragPoint = null;
+  });
+});
+
+// ── Practice → Formal transition ──
+function donePractice() {
+  log("App→AI", { event: "practice_complete" });
+  log("AI→App", { action: "practice_done" });
+
+  document.getElementById("phaseLabel").innerHTML = '<span class="phase-badge formal">正式测试</span>';
+  setBubble("正式开始！请按 1→甲→2→乙→3→丙→4→丁→5→戊 的顺序连线。");
+  setupCanvas(FORMAL_NODES, FORMAL_SEQ);
+  state.phase = "formal";
+  setButtons('<button class="btn btn-primary" onclick="submitTrail()">提交</button> <button class="btn btn-ghost" onclick="resetTrail()">重来</button>');
+  document.getElementById("statusRow").style.display = "flex";
+  updateStatus();
+}
+
+function updateStatus() {
+  document.getElementById("statusRow").innerHTML = `
+    <span class="tag info">进度：${state.sequence.length}/${state.expected.length}</span>
+    ${state.hasCrossing ? '<span class="tag bad">有交叉线</span>' : '<span class="tag good">无交叉</span>'}
+    <span class="tag info">自纠正：${state.selfCorrections}次</span>`;
+}
+
+function resetTrail() {
+  state.edges = []; state.sequence = []; state.hasCrossing = false; state.selfCorrections = 0;
+  setupCanvas(FORMAL_NODES, FORMAL_SEQ);
+  updateStatus();
+  log("App→AI", { event: "trail_reset" });
+  log("AI→App", { action: "trail_edge_feedback", accepted: true, reset: true });
+}
+
+function submitTrail() {
+  const correct = state.sequence.join(",") === FORMAL_SEQ.join(",");
+  const score = (correct && !state.hasCrossing) ? 1 : 0;
+  log("App→AI", { event: "trail_submitted", final_sequence: state.sequence, has_crossing: state.hasCrossing, self_corrections: state.selfCorrections });
+  log("AI→App", { action: "task_complete", score, max_score: 1, final_sequence: state.sequence, crossing_lines: state.hasCrossing, self_corrections: state.selfCorrections });
+
+  const texts = {
+    "correct": "完全正确，连得很好！",
+    "crossing": "线有一些交叉，下次注意避免交叉。",
+    "wrong_order": "连线的顺序和要求的有些不一样，没关系。"
+  };
+  let result = correct && !state.hasCrossing ? "correct" : (state.hasCrossing ? "crossing" : "wrong_order");
+  setBubble(texts[result], result === "correct" ? "ok" : "warn");
+  document.getElementById("scoreBadge").innerHTML = `<span style="font-size:28px;font-weight:900;color:${score?'#22a96b':'#e55'}">得分：${score}/1</span>`;
+  setButtons('<button class="btn btn-yellow" onclick="location.reload()">重新开始</button>');
+  state.phase = "done";
+}
+
+// Init
+setButtons('<button class="btn btn-yellow" onclick="startTask()">开始交替连线测试</button>');
+</script>
+</body>
+</html>

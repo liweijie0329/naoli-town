@@ -1,0 +1,3 @@
+- [MoCA Skill 架构设计](project-skill-architecture.md) — MoCA 量表游戏化技能三层拆解（交互/评分/视觉）
+- [画图题评分优化方案](project-vision-scoring-pipeline.md) — 分步验证链：前端事件 + AI 视觉复核
+- [用户角色与偏好](user-profile.md) — 课题组成员，新手开发者，正在学习 AI 编程
