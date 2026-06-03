@@ -1390,6 +1390,21 @@ h4 {
   animation: none;
 }
 
+.hearing-guide-character--large .character-container {
+  width: min(240px, 36vw);
+}
+
+.hearing-guide-bubble--large {
+  font-size: clamp(22px, 2.6vw, 28px);
+  padding: clamp(20px, 3dvh, 30px) clamp(22px, 3.5vw, 36px);
+  max-width: 560px;
+}
+
+.hearing-check-row--centered {
+  justify-content: center;
+  gap: clamp(16px, 2.5vw, 28px);
+}
+
 .hearing-guide-bubble {
   background: rgba(250, 248, 243, 0.82);
   backdrop-filter: blur(16px);

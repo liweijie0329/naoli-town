@@ -248,6 +248,7 @@ const HEARING_TONE_DURATION_MS = 1000;
 const HEARING_FADE_SECONDS = 0.035;
 const HEARING_MAX_NO_RESPONSE_DB_HL = 70;
 const HEARING_PASS_PTA_DB_HL = 35;
+const HEARING_AUTO_TONE_DELAY_SECONDS = 4;
 const HEARING_ENVIRONMENT_SAMPLE_MS = 3000;
 const HEARING_ENVIRONMENT_QUIET_RELATIVE_DB = -38;
 const HEARING_PRACTICE_STEPS = [
@@ -793,6 +794,12 @@ let speechTextFallbackTimer = null;
 let speechRecognitionRestartTimer = null;
 let activeSpeechAudio = null;
 let activeHearingTone = null;
+let hearingPromptPending = false;
+let hearingToneCountdownTimer = null;
+let hearingToneCountdownContext = "";
+let hearingToneCountdownRemaining = 0;
+let hearingToneWatchdogTimer = null;
+let hearingToneWatchdogStartedAt = 0;
 let staticTtsManifest = null;
 let staticTtsManifestPromise = null;
 let staticAudioPreloadTimer = null;
@@ -1427,6 +1434,7 @@ function render() {
     if (char && !char.destroyed) {
       setTimeout(() => { char.speakFor(2500); }, 300);
     }
+    scheduleHearingAutoTone();
   }
   if (state.view === "test") {
     setupCurrentTask(current);
@@ -1970,7 +1978,7 @@ function renderHearingGuide2Popup() {
         <div class="hearing-guide-popup-bubble">
           <p>${escapeHtml(guide2Text)}</p>
         </div>
-        <button class="primary big-button pulse">知道了</button>
+        <button class="primary big-button pulse" data-action="dismissHearingGuide2">知道了</button>
       </div>
     </div>
   `;
@@ -1982,36 +1990,32 @@ function renderHearingIntro(screening) {
   const checkLabel = screening.environment.status === "checking"
     ? "检测中..."
     : checked ? "重新检测" : "环境检测";
-  const level = {
-    id: "hearing-intro-guide",
-    scene: DEFAULT_STORY_SCENE,
-    character: BRAIN_DOCTOR_CHARACTER,
-    dialogue: "现在需要测试周围环境。\n请戴好耳机，保持安静。",
-    task: { id: "hearing", type: "hearing", title: "听力测试" },
-    choices: [],
-    scoring: null,
-    next: "hearing"
-  };
-  const introControls = html`
-    <div class="hearing-intro-controls">
-      <button class="story-action-bubble hearing-intro-action ${screening.environment.status === "checking" ? "" : "pulse"}" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
-        ${checkLabel}
-      </button>
-      ${screening.environment.status === "not_checked" ? "" : `
-        <span class="hearing-env-status ${screening.environment.status}">
-          ${hearingEnvironmentText(screening.environment)}
-        </span>
-      `}
-      ${canStart ? `<button class="story-action-bubble hearing-intro-action hearing-start-button pulse" data-action="startHearingCalibration">开始</button>` : ""}
+  getOrCreateCharacter();
+  const guideText = "现在需要测试周围环境，请您戴上耳机，保持安静。";
+  // Auto-advance when environment check passes
+  if (canStart && !state.hearingGuide2Pending && !screening._autoAdvanced) {
+    screening._autoAdvanced = true;
+    state.hearingScreening = screening;
+    window.setTimeout(() => startHearingCalibration(), 600);
+  }
+  return html`
+    <div class="hearing-intro-wrapper">
+      <div class="hearing-guide-character hearing-guide-character--large">
+        ${renderCharacterHTML()}
+        <div class="hearing-guide-bubble hearing-guide-bubble--large">${escapeHtml(guideText)}</div>
+      </div>
+      <div class="hearing-check-row hearing-check-row--centered">
+        <button class="primary big-button hearing-check-button ${checked ? "secondary" : "pulse"}" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
+          ${checkLabel}
+        </button>
+        ${screening.environment.status === "not_checked" ? "" : `
+          <span class="hearing-env-status ${screening.environment.status}">
+            ${hearingEnvironmentText(screening.environment)}
+          </span>
+        `}
+      </div>
     </div>
   `;
-  return renderStoryLevel(level, {
-    className: "hearing-intro-guide-page story-screen--task-guide",
-    typewriterClass: "guide-typewriter story-typewriter",
-    showProgress: false,
-    characterMood: canStart ? "nod" : "",
-    extraContent: introControls
-  });
 }
 
 function renderHearingChannelCheck(screening) {
@@ -2112,7 +2116,7 @@ function renderHearingSummary(screening) {
   return html`
     <div class="hearing-summary-wrapper">
       <div class="hearing-guide-character">
-        ${renderGuideCharacterHTML()}
+        ${renderCharacterHTML()}
         <div class="hearing-guide-bubble">听力测试已完成！<br>请继续认知测试</div>
       </div>
       <div class="hearing-card hearing-summary-card">
@@ -5168,6 +5172,12 @@ root.addEventListener("click", async (event) => {
   const action = target.dataset.action;
   const current = tasks[state.activeTaskIndex];
   const buttonSpeech = buttonSpeechData(target);
+  if (action === "dismissHearingGuide2") {
+    state.hearingGuide2Pending = false;
+    state.hearingGuide2Shown = true;
+    startHearingCalibration();
+    return;
+  }
   if (action === "closeAdminPasswordDialog") {
     adminPasswordDialog = null;
     render();
@@ -5179,12 +5189,6 @@ root.addEventListener("click", async (event) => {
   }
   if (requiresDrawerAdminPassword(action, target)) {
     openAdminPasswordDialog(target);
-    return;
-  }
-  if (action === "dismissHearingGuide2") {
-    state.hearingGuide2Pending = false;
-    state.hearingGuide2Shown = true;
-    startHearingCalibration();
     return;
   }
   if (action === "advanceOnboarding") {
@@ -6765,6 +6769,7 @@ function playHearingPrompt(options = {}) {
   if (screening.phase === "intro") return playHearingIntroPromptNow(options);
   const key = hearingPromptAudioKey();
   if (key) return playStaticPrompt(key, "instruction", options);
+  hearingPromptPending = false;
   return Promise.resolve(false);
 }
 
@@ -6806,6 +6811,7 @@ async function playStaticPrompt(audioKey, purpose = "speech") {
     finished = true;
     playState = "开始";
     speechPlaybackPurpose = null;
+    hearingPromptPending = false;
     if (shouldRenderForPlaybackUi()) render();
   };
   const started = await playStaticTtsAudio(audioKey, {
@@ -10392,7 +10398,7 @@ function hearingAutoToneContext(screening = state.hearingScreening) {
 function scheduleHearingAutoTone() {
   const screening = normalizeHearingScreening(state.hearingScreening);
   const context = hearingAutoToneContext(screening);
-  if (!context || hearingPromptPending || (playState === "播放中..." && speechPlaybackPurpose === "instruction")) {
+  if (!context || hearingPromptPending) {
     if (!context) clearHearingAutoCountdown();
     return;
   }
