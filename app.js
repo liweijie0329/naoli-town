@@ -965,6 +965,7 @@ function createHearingScreeningState(overrides = {}) {
     levelIndex: 0,
     currentTonePlayed: false,
     currentTonePlaying: false,
+    autoCountdown: 0,
     lastToneStartedAt: null,
     lastToneEndedAt: null,
     message: "",
@@ -1944,36 +1945,24 @@ function hearingQuestionProgress(screening = state.hearingScreening) {
   return { current: Math.min(total, completed + 1), total };
 }
 
+const HEARING_AUTO_TONE_DELAY_SECONDS = 3;
+
 function renderHearingCalibration() {
   state.hearingScreening = normalizeHearingScreening(state.hearingScreening);
   const screening = state.hearingScreening;
-  const guide2 = state.hearingGuide2Pending ? renderHearingGuide2Popup() : "";
+  if (screening.phase === "channel" || screening.phase === "practice") {
+    screening.phase = "test";
+  }
+  if (screening.phase === "intro" && screening.environment.status === "quiet") {
+    // Auto-advance to test after environment check passes
+    setTimeout(() => { if (state.view === "hearing") startHearingCalibration(); }, 1500);
+  }
   return html`
     <section class="single-page hearing-page">
       ${screening.phase === "intro" ? renderHearingIntro(screening) : ""}
-      ${screening.phase === "channel" ? renderHearingChannelCheck(screening) : ""}
-      ${screening.phase === "practice" ? renderHearingPractice(screening) : ""}
       ${screening.phase === "test" ? renderHearingTest(screening) : ""}
       ${screening.phase === "summary" ? renderHearingSummary(screening) : ""}
-      ${guide2}
     </section>
-  `;
-}
-
-function renderHearingGuide2Popup() {
-  const guide2Text = "接下来需要对您的听力进行测试，方便后续的挑战。请逐次点击播放键并回应。";
-  return html`
-    <div class="hearing-guide-overlay" data-action="dismissHearingGuide2">
-      <div class="hearing-guide-popup">
-        <div class="hearing-guide-popup-char">
-          ${renderCharacterHTML()}
-        </div>
-        <div class="hearing-guide-popup-bubble">
-          <p>${escapeHtml(guide2Text)}</p>
-        </div>
-        <button class="primary big-button pulse">知道了</button>
-      </div>
-    </div>
   `;
 }
 
@@ -1983,37 +1972,25 @@ function renderHearingIntro(screening) {
   const checkLabel = screening.environment.status === "checking"
     ? "检测中..."
     : checked ? "重新检测" : "环境检测";
-  const checkClass = checked ? "secondary hearing-check-button hearing-recheck-button" : "primary big-button hearing-check-button";
+  const envOK = screening.environment.status === "quiet";
   getOrCreateCharacter();
-  const guideText = "现在需要测试周围环境，请您戴上耳机，保持安静。";
   return html`
-    <div class="hearing-intro-wrapper">
-      <div class="hearing-guide-character">
-        ${renderCharacterHTML()}
-        <div class="hearing-guide-bubble">${escapeHtml(guideText)}</div>
-      </div>
-      <div class="hearing-card hearing-intro-card">
-        <div class="hearing-intro-layout">
-          <div class="hearing-hero-icon"><span class="headphone-icon"></span></div>
-          <div class="hearing-intro-main">
-            <div class="hearing-copy">
-              <h3><span>请戴上耳机</span><span>保持安静</span></h3>
-            </div>
-            <div class="hearing-check-row">
-              <button class="${checkClass}" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
-                ${checkLabel}
-              </button>
-              ${screening.environment.status === "not_checked" ? "" : `
-                <span class="hearing-env-status ${screening.environment.status}">
-                  ${hearingEnvironmentText(screening.environment)}
-                </span>
-              `}
-            </div>
-            ${canStart ? `<div class="hearing-actions">
-              <button class="primary big-button hearing-start-button pulse" data-action="startHearingCalibration">开始</button>
-            </div>` : ""}
-          </div>
+    <div class="character-dialog-screen">
+      <div class="character-side">${renderCharacterHTML()}</div>
+      <div class="character-dialog-bubble">
+        <div class="task-guide-copy">
+          <h2>听力测试</h2>
+          <p>请戴上耳机，保持安静</p>
         </div>
+        <div class="task-guide-actions" style="display:flex;justify-content:center;">
+          <button class="primary big-button ${checked ? "" : "pulse"}" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
+            ${checkLabel}
+          </button>
+        </div>
+        ${envOK ? `<p style="color:#22a96b;font-weight:900;margin:8px 0 0;text-align:center;">环境没问题，即将开始测试...</p>` : ""}
+        ${screening.environment.status !== "not_checked" && !envOK ? `
+          <p style="color:#888;margin:8px 0 0;text-align:center;">${hearingEnvironmentText(screening.environment)}</p>
+        ` : ""}
       </div>
     </div>
   `;
@@ -2077,7 +2054,14 @@ function renderHearingTest(screening) {
           <strong>${levelDbHl} dB HL</strong>
         </div>
       </div>
-      ${renderHearingPlayButton({ ear: trial.ear, frequencyHz: trial.frequencyHz, levelDbHl, context: "test" }, screening)}
+      <div class="hearing-auto-status" data-hearing-auto-status>
+        ${screening.currentTonePlaying
+          ? `<span class="hearing-auto-label">播放中...</span>`
+          : screening.autoCountdown > 0
+            ? `<span class="hearing-auto-countdown">${screening.autoCountdown}</span>`
+            : screening.currentTonePlayed
+              ? "" : `<span class="hearing-auto-label">准备中...</span>`}
+      </div>
       <div class="hearing-response-slot ${screening.currentTonePlayed ? "ready" : ""}">
         ${renderHearingResponseButtons("answerHearingTrial", screening)}
       </div>
@@ -2097,6 +2081,52 @@ function renderHearingResponseButtons(action, screening) {
       <button class="option hearing-missed" data-action="${action}" data-heard="false" ${screening.currentTonePlayed ? "" : "disabled"}>没听到</button>
     </div>
   `;
+}
+
+// ── Auto-countdown system ──
+let hearingAutoTimer = null;
+
+function scheduleHearingAutoTone() {
+  clearHearingAutoCountdown();
+  const screening = state.hearingScreening;
+  if (!screening || screening.phase !== "test" || state.view !== "hearing") return;
+  screening.autoCountdown = HEARING_AUTO_TONE_DELAY_SECONDS;
+  screening.currentTonePlayed = false;
+  updateHearingAutoDom();
+  hearingAutoTimer = setInterval(() => {
+    screening.autoCountdown--;
+    updateHearingAutoDom();
+    if (screening.autoCountdown <= 0) {
+      clearHearingAutoCountdown();
+      playHearingTone(hearingAutoToneStimulus());
+    }
+  }, 1000);
+}
+
+function hearingAutoToneStimulus() {
+  const screening = state.hearingScreening;
+  const trial = screening.trials[screening.trialIndex] || screening.trials[0];
+  const levelDbHl = HEARING_LEVELS_DB_HL[screening.levelIndex] || HEARING_LEVELS_DB_HL[0];
+  return { ear: trial.ear, frequencyHz: trial.frequencyHz, levelDbHl, context: "test" };
+}
+
+function clearHearingAutoCountdown() {
+  if (hearingAutoTimer) { clearInterval(hearingAutoTimer); hearingAutoTimer = null; }
+}
+
+function updateHearingAutoDom() {
+  const el = document.querySelector("[data-hearing-auto-status]");
+  if (!el) return;
+  const s = state.hearingScreening;
+  if (s.currentTonePlaying) {
+    el.innerHTML = '<span class="hearing-auto-label">播放中...</span>';
+  } else if (s.autoCountdown > 0) {
+    el.innerHTML = `<span class="hearing-auto-countdown">${s.autoCountdown}</span>`;
+  } else if (s.currentTonePlayed) {
+    el.innerHTML = "";
+  } else {
+    el.innerHTML = '<span class="hearing-auto-label">准备中...</span>';
+  }
 }
 
 function renderHearingPlayButton(stimulus, screening) {
@@ -4697,27 +4727,23 @@ function cubeReferenceSvg() {
 }
 
 function startHearingCalibration() {
-  if (!state.hearingGuide2Shown) {
-    state.hearingGuide2Pending = true;
-    render();
-    return;
-  }
   const previous = normalizeHearingScreening(state.hearingScreening);
   state.hearingScreening = createHearingScreeningState({
     environment: previous.environment,
     environmentChecks: previous.environmentChecks,
     selfSelectedAudioLevelDbHl: previous.selfSelectedAudioLevelDbHl,
     selfSelectedAudioConfirmedAt: previous.selfSelectedAudioConfirmedAt,
-    phase: "channel",
+    phase: "test",
     status: "in_progress",
     startedAt: new Date().toISOString()
   });
   state.hearingGuide2Pending = false;
   state.hearingGuide2Shown = true;
   if (activeCharacter) { activeCharacter.destroy(); activeCharacter = null; }
+  clearHearingAutoCountdown();
   saveDraft();
   render();
-  queueHearingPrompt();
+  setTimeout(() => scheduleHearingAutoTone(), 500);
 }
 
 function skipHearingCalibration() {
@@ -5023,6 +5049,9 @@ function answerHearingTrial(heard, { source = "button" } = {}) {
   state.hearingScreening = screening;
   saveDraft();
   render();
+  if (screening.phase === "test") {
+    setTimeout(() => scheduleHearingAutoTone(), 300);
+  }
   if (screening.phase !== previousPhase) queueHearingPrompt();
 }
 

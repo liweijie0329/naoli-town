@@ -8701,3 +8701,30 @@ body,
     transform: translateX(-50%) rotate(90deg);
   }
 }
+
+/* ── Hearing auto-countdown ── */
+.hearing-auto-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  padding: 16px;
+}
+
+.hearing-auto-countdown {
+  font-size: 64px;
+  font-weight: 1000;
+  color: var(--leaf);
+  animation: countPulse 1s ease-in-out infinite;
+}
+
+.hearing-auto-label {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+@keyframes countPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.7; }
+}
