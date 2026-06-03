@@ -248,7 +248,7 @@ const HEARING_TONE_DURATION_MS = 1000;
 const HEARING_FADE_SECONDS = 0.035;
 const HEARING_MAX_NO_RESPONSE_DB_HL = 70;
 const HEARING_PASS_PTA_DB_HL = 35;
-const HEARING_AUTO_TONE_DELAY_SECONDS = 4;
+const HEARING_AUTO_TONE_DELAY_SECONDS = 3;
 const HEARING_ENVIRONMENT_SAMPLE_MS = 3000;
 const HEARING_ENVIRONMENT_QUIET_RELATIVE_DB = -38;
 const HEARING_PRACTICE_STEPS = [
@@ -830,8 +830,10 @@ let trailGuideFrame = null;
 let trailGuideTick = 0;
 let trailDragStart = null;
 let trailDragPoint = null;
+let trailDragStartPoint = null;
 let trailGuidePracticeDragStart = null;
 let trailGuidePracticeDragPoint = null;
+let trailGuidePracticeDragStartPoint = null;
 let trailGuidePracticeFrame = null;
 let trailGuidePracticeTick = 0;
 let viewportRenderTimer = null;
@@ -2005,14 +2007,12 @@ function renderHearingIntro(screening) {
         <div class="hearing-guide-bubble hearing-guide-bubble--large">${escapeHtml(guideText)}</div>
       </div>
       <div class="hearing-check-row hearing-check-row--centered">
-        <button class="primary big-button hearing-check-button ${checked ? "secondary" : "pulse"}" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>
-          ${checkLabel}
-        </button>
-        ${screening.environment.status === "not_checked" ? "" : `
+        ${!canStart ? `<button class="primary big-button hearing-check-button pulse" data-action="checkHearingEnvironment" ${screening.environment.status === "checking" ? "disabled" : ""}>${checkLabel}</button>` : ""}
+        ${checked ? `
           <span class="hearing-env-status ${screening.environment.status}">
             ${hearingEnvironmentText(screening.environment)}
           </span>
-        `}
+        ` : ""}
       </div>
     </div>
   `;
@@ -2407,6 +2407,7 @@ function renderTask(task) {
     <section class="single-page task-page">
       <div class="task-workspace">${renderTaskWorkspace(task, step)}</div>
       ${renderTaskActions(task, step)}
+      ${renderAnswerConfirmModal()}
     </section>
   `;
 }
@@ -2434,8 +2435,7 @@ function renderTaskGuide(task, step) {
             }
           </div>
           ${isTrail ? renderTrailGuidePractice() : ""}
-          <div class="task-guide-actions ${isTrail ? "task-guide-actions--center" : ""}">
-            <button class="secondary big-button" data-action="replayTaskGuide">${playLabel}</button>
+          <div class="task-guide-actions task-guide-actions--center">
             <button class="primary character-dialog-btn pulse" data-action="acknowledgeTaskGuide">准备好了</button>
           </div>
         </div>
@@ -2451,6 +2451,53 @@ function renderTrailGuidePractice() {
       <strong>${complete ? "练习完成！" : "试试看：从 1 拖到甲，再拖到 2"}</strong>
       <div class="trail-guide-board">
         <canvas id="trailGuideCanvas" class="trail-guide-canvas" aria-label="连线练习区域"></canvas>
+      </div>
+    </div>
+  `;
+}
+
+function shouldUseAnswerConfirm(task) {
+  if (!task) return false;
+  return !["vigilance", "fluency"].includes(task.type);
+}
+
+function openAnswerConfirm(task, response = getResponse(task.id), step = getTaskStep(task)) {
+  if (!shouldUseAnswerConfirm(task)) return false;
+  state.answerConfirm = {
+    taskId: task.id,
+    step,
+    answerText: visualAnswerText(task, response, step),
+    createdAt: new Date().toISOString(),
+    confirmed: false
+  };
+  saveDraft();
+  return true;
+}
+
+function renderAnswerConfirmModal() {
+  const confirm = state.answerConfirm;
+  if (!confirm || confirm.confirmed) return "";
+  const task = tasks[state.activeTaskIndex];
+  if (!task || confirm.taskId !== task.id) return "";
+  const showAnswer = task.type !== "trail" && task.type !== "drawing";
+  const isLastStep = (confirm.step || getTaskStep(task)) >= getTaskStepCount(task) - 1;
+  const confirmText = isLastStep ? "是否确认提交？" : "是否确认？";
+  return html`
+    <div class="answer-confirm-modal" data-action="cancelAnswerConfirm">
+      <div class="answer-confirm-panel">
+        <div class="answer-confirm-character">
+          ${renderCharacterHTML()}
+          <div class="character-nameplate">脑博士</div>
+        </div>
+        <div class="answer-confirm-bubble">
+          ${showAnswer ? `<p>您的答案为</p>
+          <strong>${escapeHtml(confirm.answerText || "未填写")}</strong>` : ""}
+          <p>${confirmText}</p>
+          <div class="answer-confirm-actions">
+            <button class="secondary answer-confirm-button" data-action="cancelAnswerConfirm">否</button>
+            <button class="primary answer-confirm-button pulse" data-action="confirmAnswerConfirm">是</button>
+          </div>
+        </div>
       </div>
     </div>
   `;
@@ -2543,7 +2590,16 @@ function taskActionSecondaryButtons(task) {
 
 function shouldShowConfirmButton(task) {
   if (task.type === "vigilance") return false;
+  if (task.type === "fluency") return false;
   if (task.type === "sentence" && !sentenceStepHasFinalTranscript(task, getTaskStep(task))) return false;
+  if (["naming", "abstractionChoice"].includes(task.type)) return false;
+  if (task.type === "orientation") {
+    // Keep confirm button for date step (month/day input),
+    // hide for other steps (year, weekday, city, place - tap to choose)
+    const step = getTaskStep(task);
+    if (step === 1) return true; // date fields
+    return false;
+  }
   return true;
 }
 
@@ -2616,8 +2672,8 @@ function getTaskStepCount(task) {
 }
 
 function confirmLabel(task, step) {
-  if (step < getTaskStepCount(task) - 1) return "答完了，下一题";
-  return nextTaskIndexAfterSubmitPreview(task) < 0 ? "答完了，查看结果" : "答完了，下一题";
+  if (step < getTaskStepCount(task) - 1) return "确认";
+  return nextTaskIndexAfterSubmitPreview(task) < 0 ? "确认并查看结果" : "确认";
 }
 
 function nextTaskIndexAfterSubmitPreview(task) {
@@ -3801,6 +3857,38 @@ function normalizeAnswerPart(part = {}) {
   };
 }
 
+function visualAnswerText(task, response, step) {
+  const type = task?.type;
+  const answer = response?.answer || {};
+  if (type === "naming") {
+    const item = task.items[step];
+    return (item ? answer[item.key] : "") || "未选择";
+  }
+  if (type === "abstractionChoice") {
+    const item = task.items[step];
+    return (item ? answer[item.key] : "") || "未选择";
+  }
+  if (type === "memory") {
+    const words = Array.isArray(answer.selectedWords) ? answer.selectedWords : [];
+    return words.length ? words.join("、") : "未选择";
+  }
+  if (type === "digit") return (Array.isArray(answer.sequence) ? answer.sequence.join(" ") : answer.sequence) || "未输入";
+  if (type === "serial7") {
+    const values = Array.isArray(answer.values) ? answer.values : [];
+    return values[step] || "未输入";
+  }
+  if (type === "orientation") return answer.input || answer.selected || "未输入";
+  if (type === "trail") return "已完成连线";
+  if (type === "drawing") return "已完成画图";
+  if (type === "vigilance") return `敲击 ${answer.taps || 0} 次`;
+  if (type === "fluency") return answer.transcription || `${answer.animals?.length || 0} 个动物`;
+  if (type === "sentence") return answer.transcription || "未记录";
+  if (answer.selected) return answer.selected;
+  if (answer.transcription) return answer.transcription;
+  if (answer.sequence) return Array.isArray(answer.sequence) ? answer.sequence.join(" ") : String(answer.sequence);
+  return "未填写";
+}
+
 function visualAnswerParts(item, user) {
   const parts = [{
     label: "图案",
@@ -4037,6 +4125,7 @@ function setupTrailGuidePracticeCanvas() {
     if (!node) return;
     playSfx("pick");
     trailGuidePracticeDragStart = node;
+    trailGuidePracticeDragStartPoint = point;
     trailGuidePracticeDragPoint = point;
     canvas.setPointerCapture(event.pointerId);
     drawTrailGuidePracticeCanvas(canvas);
@@ -4050,8 +4139,13 @@ function setupTrailGuidePracticeCanvas() {
     if (!trailGuidePracticeDragStart) return;
     const point = canvasPoint(event, canvas);
     const endNode = nearestTrailGuidePracticeNode(point, canvas);
-    commitTrailGuidePracticeDrag(trailGuidePracticeDragStart, endNode, canvas);
+    if (isTrailTap(trailGuidePracticeDragStart, endNode, trailGuidePracticeDragStartPoint, point)) {
+      commitTrailGuidePracticeTap(endNode);
+    } else {
+      commitTrailGuidePracticeDrag(trailGuidePracticeDragStart, endNode, canvas);
+    }
     trailGuidePracticeDragStart = null;
+    trailGuidePracticeDragStartPoint = null;
     trailGuidePracticeDragPoint = null;
     canvas.releasePointerCapture(event.pointerId);
     drawTrailGuidePracticeCanvas(canvas);
@@ -4063,6 +4157,36 @@ function setupTrailGuidePracticeCanvas() {
     trailGuidePracticeDragPoint = null;
     drawTrailGuidePracticeCanvas(canvas);
   };
+}
+
+function commitTrailGuidePracticeTap(node) {
+  const response = getResponse("trail");
+  response.behavior.trailGuidePracticeAttempts = Number(response.behavior.trailGuidePracticeAttempts || 0) + 1;
+  if (!node) {
+    response.behavior.trailGuidePracticeMissedDrops = Number(response.behavior.trailGuidePracticeMissedDrops || 0) + 1;
+    return;
+  }
+  const expected = trailGuidePracticeExpected();
+  const current = trailGuidePracticeSequence();
+  const expectedLabel = expected[current.length || 0];
+  response.behavior.trailGuidePracticeTapSequence = [...(response.behavior.trailGuidePracticeTapSequence || []), {
+    label: node.label, at: new Date().toISOString()
+  }];
+  if (node.label !== expectedLabel) {
+    response.behavior.trailGuidePracticeErrors = Number(response.behavior.trailGuidePracticeErrors || 0) + 1;
+    return;
+  }
+  const next = [...current, node.label];
+  response.behavior.trailGuidePracticeSequence = next;
+  if (next.length > 1) {
+    response.behavior.trailGuidePracticeEdges = [
+      ...trailGuidePracticeEdges(),
+      { from: next[next.length - 2], to: node.label, at: new Date().toISOString(), mode: "tap-order" }
+    ];
+  }
+  if (next.length >= expected.length) {
+    response.behavior.trailGuidePracticeCompletedAt = new Date().toISOString();
+  }
 }
 
 function trailGuidePracticeExpected() {
@@ -4388,6 +4512,7 @@ function setupTrailCanvas() {
     if (!node) return;
     playSfx("pick");
     trailDragStart = node;
+    trailDragStartPoint = point;
     trailDragPoint = point;
     canvas.setPointerCapture(event.pointerId);
     drawTrailCanvas(canvas);
@@ -4401,9 +4526,14 @@ function setupTrailCanvas() {
     if (!trailDragStart) return;
     const point = canvasPoint(event, canvas);
     const endNode = nearestTrailNode(point, canvas);
-    commitTrailDrag(trailDragStart, endNode, canvas);
+    if (isTrailTap(trailDragStart, endNode, trailDragStartPoint, point)) {
+      commitTrailTap(endNode, canvas);
+    } else {
+      commitTrailDrag(trailDragStart, endNode, canvas);
+    }
     trailDragStart = null;
     trailDragPoint = null;
+    trailDragStartPoint = null;
     canvas.releasePointerCapture(event.pointerId);
     drawTrailCanvas(canvas);
     state.drawings.trail = canvasToCompactDataUrl(canvas);
@@ -4442,6 +4572,47 @@ function commitTrailDrag(startNode, endNode, canvas) {
     to: endNode?.label || "",
     at: new Date().toISOString()
   };
+  if (canvas) response.drawingImage = canvasToCompactDataUrl(canvas);
+  maybeOpenTrailCompletionPrompt(response);
+}
+
+function isTrailTap(startNode, endNode, startPoint, endPoint) {
+  if (!startNode || !endNode || startNode.label !== endNode.label || !startPoint || !endPoint) return false;
+  return Math.sqrt((startPoint.x - endPoint.x) ** 2 + (startPoint.y - endPoint.y) ** 2) <= 14;
+}
+
+function commitTrailTap(node, canvas) {
+  const response = getResponse("trail");
+  if (!node) {
+    response.behavior.missedDrops = (response.behavior.missedDrops || 0) + 1;
+    return;
+  }
+  const sequence = Array.isArray(state.trail.sequence) ? state.trail.sequence : [];
+  const lastLabel = sequence[sequence.length - 1];
+  response.behavior.tapSequence = [...(response.behavior.tapSequence || []), {
+    label: node.label,
+    at: new Date().toISOString()
+  }];
+  if (!lastLabel) {
+    state.trail.sequence = [node.label];
+  } else if (lastLabel !== node.label) {
+    state.trail.edges = state.trail.edges || [];
+    state.trail.edges.push({
+      from: lastLabel,
+      to: node.label,
+      at: new Date().toISOString(),
+      mode: "tap-order"
+    });
+    rebuildTrailFromEdges();
+  } else {
+    response.behavior.repeatedTaps = Number(response.behavior.repeatedTaps || 0) + 1;
+  }
+  response.behavior.sequence = [...(state.trail.sequence || [])];
+  response.behavior.edges = [...(state.trail.edges || [])];
+  response.behavior.errors = state.trail.errors;
+  response.behavior.correctStep = state.trail.correctStep;
+  response.behavior.mode = "tap-order";
+  response.behavior.lastTap = { label: node.label, at: new Date().toISOString() };
   if (canvas) response.drawingImage = canvasToCompactDataUrl(canvas);
   maybeOpenTrailCompletionPrompt(response);
 }
@@ -5172,6 +5343,16 @@ root.addEventListener("click", async (event) => {
   const action = target.dataset.action;
   const current = tasks[state.activeTaskIndex];
   const buttonSpeech = buttonSpeechData(target);
+  if (action === "cancelAnswerConfirm") {
+    state.answerConfirm = null;
+    render();
+    return;
+  }
+  if (action === "confirmAnswerConfirm") {
+    if (state.answerConfirm) state.answerConfirm.confirmed = true;
+    nextTask();
+    return;
+  }
   if (action === "dismissHearingGuide2") {
     state.hearingGuide2Pending = false;
     state.hearingGuide2Shown = true;
@@ -5362,7 +5543,9 @@ root.addEventListener("click", async (event) => {
     const item = current.items[getTaskStep(current)];
     response.answer[item.key] = target.dataset.value;
     saveDraft();
+    openAnswerConfirm(current, response, getTaskStep(current));
     render();
+    return;
   }
   if (action === "toggleMemoryWord") toggleMemoryWord(target.dataset.word);
   if (action === "reviewMemoryReplay") {
@@ -5378,7 +5561,9 @@ root.addEventListener("click", async (event) => {
     response.answer[target.dataset.key] = target.dataset.value;
     delete response.behavior.selectionWarning;
     saveDraft();
+    openAnswerConfirm(current, response, getTaskStep(current));
     render();
+    return;
   }
   if (action === "playCurrentAudio") playCurrentAudio();
   if (action === "replayTaskGuide") replayTaskGuide();
@@ -5394,7 +5579,10 @@ root.addEventListener("click", async (event) => {
   if (action === "setOrientationDateField") setOrientationDateField(target.dataset.field);
   if (action === "chooseOrientation") {
     applyOrientationChoice(target.dataset.key, target.dataset.value);
+    const resp = getResponse("orientation");
+    openAnswerConfirm(tasks.find(t => t.id === "orientation"), resp, getTaskStep(current));
     render();
+    return;
   }
   if (action === "openRubric") {
     activeRubricItem = getRubricItem(Number(target.dataset.group), Number(target.dataset.item));
@@ -6048,7 +6236,18 @@ async function nextTask() {
     return;
   }
   if (task.type === "serial7") finishSerialStepTiming(response, step);
-  if (step < getTaskStepCount(task) - 1) {
+  const isLastStep = step >= getTaskStepCount(task) - 1;
+  // Show confirmation popup before advancing
+  if (shouldUseAnswerConfirm(task)) {
+    if (!state.answerConfirm || state.answerConfirm.taskId !== task.id || state.answerConfirm.step !== step) {
+      openAnswerConfirm(task, response, step);
+      render();
+      return;
+    }
+    if (!state.answerConfirm.confirmed) return;
+  }
+  state.answerConfirm = null;
+  if (!isLastStep) {
     response.answer.step = step + 1;
     requestImmediateInstructionPlayback(task, response.answer.step);
     render();
