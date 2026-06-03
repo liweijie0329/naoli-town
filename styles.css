@@ -8701,3 +8701,70 @@ body,
     transform: translateX(-50%) rotate(90deg);
   }
 }
+
+
+/* ══ v2 hearing CSS ══ */
+.hearing-intro-guide-page .story-extra-content {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.hearing-intro-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 2vw, 20px);
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.hearing-intro-action {
+  min-width: min(300px, 82vw);
+}
+
+.hearing-auto-status {
+  display: inline-grid;
+  min-width: min(420px, 86vw);
+  min-height: clamp(76px, 10dvh, 96px);
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px clamp(22px, 4vw, 42px);
+  border: 3px solid #5b482b;
+  border-radius: 999px;
+  background: #ffe875;
+  color: #2c220f;
+  font-size: clamp(28px, 3.8vw, 42px);
+  font-weight: 1000;
+  line-height: 1.05;
+  text-align: center;
+  box-shadow: 0 8px 0 #c99a22, 0 18px 34px rgba(83, 65, 26, 0.18);
+}
+
+.hearing-auto-status strong {
+  display: inline-grid;
+  min-width: 1.4em;
+  place-items: center;
+  color: var(--leaf-dark);
+  font-size: 1.25em;
+}
+
+.hearing-auto-status.playing,
+.hearing-auto-status.ready {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.hearing-auto-status.playing {
+  background: #e7f5ff;
+  box-shadow: 0 8px 0 #9fc8e8, 0 18px 34px rgba(63, 141, 243, 0.16);
+}
+
+  .hearing-intro-controls {
+    flex-direction: column;
+  }
+
+  .hearing-auto-status {
+    grid-template-columns: minmax(0, 1fr);
+    min-width: min(330px, 92vw);
+    font-size: var(--game-cta-mobile-font-size);
+  }
